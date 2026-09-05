@@ -4511,7 +4511,25 @@ void BacktestEngine::apply_filled_order_to_state(
             // exceeds the equity there, so only the rounding can fail it.
             const double cost_s = order.frozen_default_qty * order.sizing_price
                                   * syminfo_.pointvalue * fx_s;
-            if (order.sizing_equity + 1e-9 < tv_money_round(cost_s)) {
+            // The equity the broker judges the order against is the equity
+            // at the moment it judges it: a bare REVERSAL (one order, the
+            // position still open at this fill) is judged at the signal close
+            // with the frozen sizing equity — 4782/4782 taro + every-bar
+            // reversal decisions fit E_s, 813 fail the fill-marked equity —
+            // while an entry that fills FROM FLAT is judged at its fill with
+            // the account's cash then. For a true-flat placement that is the
+            // same number as E_s (nothing to mark); for a strategy.close +
+            // strategy.entry pair it is the cash AFTER the close leg filled
+            // at this open, gap included: demete1226 2025-04-07 08:00Z (long
+            // 915248.71 closed at 1.10014, six pips above the 1.10008 signal
+            // close; E_s 1006883.2254 puts the short's 915281.82 in the
+            // rule-5 tie band, cash 1006938.15 after the close does not) —
+            // TradingView filled the short and margin-called the 0.0011
+            // deficit one unit at the fill; willowsportz pulse and algoai
+            // share the close+entry shape.
+            const double judged_equity =
+                flat_open ? current_equity() : order.sizing_equity;
+            if (judged_equity + 1e-9 < tv_money_round(cost_s)) {
                 if (!reversal_entry) {
                     decline_and_cancel();
                     return;
@@ -4522,7 +4540,7 @@ void BacktestEngine::apply_filled_order_to_state(
                 const double notional_per_price =
                     order.frozen_default_qty * syminfo_.pointvalue * fx_s;
                 const double affordable_price = tv_money_round(
-                    tv_money_round(order.sizing_equity) / notional_per_price);
+                    tv_money_round(judged_equity) / notional_per_price);
                 if (std::isfinite(affordable_price)
                     && affordable_price < order.sizing_price) {
                     if (reversal_entry) {
