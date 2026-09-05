@@ -240,19 +240,35 @@ void test_trail_level_tick_grid_snap() {
 
 void test_resolver_aapl_long_arms_at_subtick_open() {
     std::printf("test_resolver_aapl_long_arms_at_subtick_open\n");
-    // activation 191.91 + 384t = 195.75 < open 196.135: fires at the open as
-    // the trail's LEVEL (open_is_trail_level) — omitted offset and explicit 0
-    // alike. The raw open is reported; the consumer snaps it directionally.
+    // activation 191.91 + 384t = 195.75 < open 196.135. OMITTED offset: fires
+    // at the open as the trail's LEVEL (open_is_trail_level). The raw open is
+    // reported; the consumer snaps it directionally.
     const double tp = scalper_trail_points(191.92, 0.01);
-    const double offsets[] = {kNaN, 0.0};
-    for (double off : offsets) {
-        ExitPathFill f = trail_fill(kAapl0422_1330, PositionSide::LONG, tp, off,
+    {
+        ExitPathFill f = trail_fill(kAapl0422_1330, PositionSide::LONG, tp, kNaN,
                                     /*entry=*/191.91, /*best_start=*/193.43,
                                     /*mintick=*/0.01);
         CHECK(f.should_fill == true);
         CHECK(f.fill_price == 196.135);
         CHECK(f.at_bar_open == true);
         CHECK(f.open_is_trail_level == true);
+        CHECK(f.is_limit == false);
+        CHECK(near(f.path_position, 0.0));
+    }
+    // EXPLICIT 0 (round 10 family AC, test_zero_offset_trail_rides): the open
+    // ARMS the trail with best = open and it rides; the adverse-first leg
+    // crosses the level 196.135 at once — a path LEVEL fill at position 0,
+    // not an open print (the consumer floors it to the same TV 196.13; the
+    // print rounding would give 196.14, which the aapl-pre-tp100 tape refutes).
+    {
+        ExitPathFill f = trail_fill(kAapl0422_1330, PositionSide::LONG, tp, 0.0,
+                                    /*entry=*/191.91, /*best_start=*/193.43,
+                                    /*mintick=*/0.01);
+        CHECK(f.should_fill == true);
+        CHECK(f.fill_price == 196.135);
+        CHECK(f.is_trail == true);
+        CHECK(f.at_bar_open == false);
+        CHECK(f.open_is_trail_level == false);
         CHECK(f.is_limit == false);
         CHECK(near(f.path_position, 0.0));
     }

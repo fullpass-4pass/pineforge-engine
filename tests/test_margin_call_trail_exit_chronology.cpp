@@ -29,9 +29,9 @@
  *      BEFORE the extreme on the path -> no slice (fail-closed chronology
  *      is preserved, the hook is not simply switched on for trails).
  *   C. Emulator off -> nothing fires.
- *   D. #148 regression pin: an EXPLICIT trail_offset=0 must not retro-arm
- *      from the carried post-entry extreme, while an OMITTED trail_offset
- *      still does.
+ *   D. Arming pin: an EXPLICIT trail_offset=0 arms from the placement close
+ *      exactly like an OMITTED trail_offset (round 10 family AC); the #148
+ *      retro-arm is closed by the family-Z restart at the command layer.
  */
 
 #include <cassert>
@@ -212,16 +212,20 @@ static void test_trail_chronology_disabled_emulator_stays_quiet() {
     CHECK(near(eng.exit_price(0), 3821.06));
 }
 
-// ---- D: #148 arming semantics stay put ------------------------------------
+// ---- D: the explicit zero arms from the placement close like the omitted --
 
-// An EXPLICIT trail_offset=0 is TV's one-shot exit-at-activation trail and
-// must NOT retro-arm from the carried post-entry extreme (#148, a6e46ca);
-// an OMITTED trail_offset still does. Both cells share this fixture: the
-// trail is armed on bar 1 (carried best = bar 1 close 3810, already past the
-// 3821.06 activation for a short), and bar 2 opens ABOVE the activation and
-// never trades down to it. Only a carried armed state can fill there.
-static void test_zero_offset_arming_semantics_unchanged() {
-    std::printf("test_zero_offset_arming_semantics_unchanged\n");
+// Both cells share this fixture: the exit is issued on bar 1 at its close
+// 3810 (the running extreme restarts there — round 9 family Z), already past
+// the 3821.06 activation for a short, and bar 2 opens ABOVE that level and
+// never trades down to it. Only a carried armed state can fill there — and
+// since round 10 family AC (test_zero_offset_trail_rides: TV fills the
+// placement-armed zero-offset trail at the open that gaps through its
+// level, f-gapdown-0404-1600-tp4 / 0423-1345-tp7b) the explicit zero carries
+// it exactly as the omitted offset does. The #148 retro-arm (a6e46ca) is
+// closed by the family-Z restart at the command layer, not by refusing the
+// carried best here.
+static void test_zero_offset_arms_from_the_placement_close_like_omitted() {
+    std::printf("test_zero_offset_arms_from_the_placement_close_like_omitted\n");
     std::vector<Bar> bars = {
         mk_bar(1000, 3879.36, 3879.36, 3879.36, 3879.36, 1.0),
         mk_bar(2000, 3879.36, 3879.36, 3800.00, 3810.00, 1.0),
@@ -229,12 +233,17 @@ static void test_zero_offset_arming_semantics_unchanged() {
         mk_bar(4000, 3832.00, 3836.00, 3826.00, 3833.00, 1.0),
     };
 
-    // Explicit zero: no retro-arm -> the position is still open at the end.
+    // Explicit zero: armed at the placement close 3810, the open 3830 gaps
+    // through the level -> the open print, bar 2.
     TrailChronologyShortProbe explicit_zero(/*disable_mc=*/false,
                                             /*trail_offset=*/0.0);
     explicit_zero.run(bars.data(), (int)bars.size());
-    CHECK(explicit_zero.trade_count() == 0);
-    CHECK(near(explicit_zero.position_size(), -2.119, 1e-9));
+    CHECK(explicit_zero.trade_count() == 1);
+    if (explicit_zero.trade_count() == 1) {
+        CHECK(near(explicit_zero.exit_price(0), 3830.0));
+        CHECK(explicit_zero.exit_bar(0) == 2);
+    }
+    CHECK(near(explicit_zero.position_size(), 0.0));
 
     // Omitted offset: the carried extreme keeps the activation armed, so
     // the exit fills at bar 2's open.
@@ -257,7 +266,7 @@ int main() {
     test_trail_exit_slices_at_adverse_extreme_first();
     test_trail_exit_before_extreme_stays_quiet();
     test_trail_chronology_disabled_emulator_stays_quiet();
-    test_zero_offset_arming_semantics_unchanged();
+    test_zero_offset_arms_from_the_placement_close_like_omitted();
 
     std::printf("\n%d passed, %d failed\n", tests_passed, tests_failed);
     return (tests_failed > 0) ? 1 : 0;
