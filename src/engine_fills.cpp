@@ -2194,7 +2194,15 @@ bool BacktestEngine::margin_call_slice_at_bar_open(const Bar& bar) {
 
 // Update trailing stop best price for the current bar's open / high / low.
 // Called once per bar before any intra-bar fill evaluation.
+//
+// Not on the bar whose close-time strategy.exit re-issue restarted the
+// extreme from the close (round 10 family Y, trail_close_restart_bar_): the
+// process_orders_on_close body runs between this bar's two calls, and the
+// new order's path starts at the NEXT bar's open — folding this bar's
+// high/low again would place its trail at the extreme + offset instead of
+// TradingView's close + offset.
 void BacktestEngine::update_trail_best_for_bar_open(const Bar& bar) {
+    if (trail_close_restart_bar_ == bar_index_) return;
     if (position_side_ == PositionSide::LONG) {
         if (std::isnan(trail_best_price_) || bar.high > trail_best_price_)
             trail_best_price_ = bar.high;

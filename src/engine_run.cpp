@@ -711,6 +711,7 @@ void BacktestEngine::reset_run_state() {
 
     // Per-bar cursor + session-predicate state.
     bar_index_ = 0;
+    trail_close_restart_bar_ = -1;
     prev_bar_timestamp_ = 0;
     // The chart's native daily partition is rebuilt per run by the
     // multi-timeframe run() (prepare_chart_day_partition); a run that never

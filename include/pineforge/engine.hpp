@@ -1564,6 +1564,14 @@ protected:
     // --- Trailing stop state ---
     // Best favorable price since position entry (for trailing stop computation)
     double trail_best_price_ = std::numeric_limits<double>::quiet_NaN();
+    // The script bar on which a strategy.exit re-issue restarted
+    // trail_best_price_ from the bar's CLOSE under process_orders_on_close
+    // (round 9 family Z's restart rule, round 10 family Y's bar rule). The
+    // restarted extreme is the NEW order's, and that order's path starts at
+    // the next bar's open: the same bar's high/low must not be folded into
+    // it by the close-time process_pending_orders that follows the script
+    // body (update_trail_best_for_bar_open skips this bar). -1 = none.
+    int trail_close_restart_bar_ = -1;
 
     // --- Intraday fill counter ---
     // Counts every fill processed by ``apply_filled_order_to_state`` on

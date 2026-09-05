@@ -3010,10 +3010,27 @@ void BacktestEngine::clear_existing_exit_order(const std::string& id,
     const bool trail_request_changed = had_existing_order
         && !(same_request(resting_trail_points, trail_points)
              && same_request(resting_trail_price, trail_price));
+    //
+    // The restarted extreme is the issuing bar's close and NOTHING else of
+    // that bar: the replaced order's path starts at the next bar's open.
+    // round 10 family Y (winthetrade ema-9-vwap, CME_MINI:NQ1! 15m; `lab
+    // tv` famy-nq-A/B/E, famy-btc-A/B): under process_orders_on_close the
+    // script body runs between the bar's two process_pending_orders calls,
+    // and the second one folded the issuing bar's own high/low into the
+    // just-restarted extreme (short 2025-04-01 22:00Z @19652.75: the
+    // engine's 'Short Exit' 04-02 00:15Z @19606.0 = the 00:00Z LOW
+    // 19583.25 + 91t; TV 00:30Z @19586.25 = the 00:15Z close 19572.75
+    // restarted, walked to the 00:30Z low 19563.25 + 92t). Remember the
+    // bar so update_trail_best_for_bar_open skips it; a mid-bar
+    // calc_on_order_fills body is not the close-time re-issue and keeps
+    // its segment fold.
     if (has_trail_request && position_side_ != PositionSide::FLAT
         && from_entry_holds_live_lot(from_entry)
         && (!had_existing_order || trail_request_changed)) {
         trail_best_price_ = current_bar_.close;
+        trail_close_restart_bar_ =
+            (process_orders_on_close_ && !coof_fill_recalc_active_)
+                ? bar_index_ : -1;
     }
 
     // Erase only the matching prior EXIT order — mirror the gated lookup

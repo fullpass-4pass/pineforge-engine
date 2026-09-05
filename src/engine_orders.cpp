@@ -729,6 +729,7 @@ void BacktestEngine::reset_position_state_to_flat() {
     position_entry_count_ = 0;
     position_open_bar_ = -1;
     trail_best_price_ = std::numeric_limits<double>::quiet_NaN();
+    trail_close_restart_bar_ = -1;
     pyramid_entries_.clear();
     id_unclosed_qty_.clear();
     // Bracket legs live for the POSITION cycle, so the provenance that keeps
