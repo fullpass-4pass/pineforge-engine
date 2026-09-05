@@ -120,7 +120,19 @@ double ATR::recompute(double high, double low, double close, double prev_chart_c
 
 // --- StdDev (Standard Deviation) ---
 
-StdDev::StdDev(int length, bool biased) : length_(length), biased_(biased) {}
+StdDev::StdDev(int length, bool biased)
+    : length_(length), biased_(biased), sum_x_(length), sum_xx_(length), bar_count_(0) {}
+
+// The biased (default) value from the two sliding sums: TradingView's
+// sqrt(Sxx / n - m * m) with m = Sx / n (see the class note in ta.hpp). The
+// argument never went negative on the pinned lane; the clamp only guards a
+// pathological cancellation from producing NaN.
+double StdDev::biased_value() const {
+    const double n = static_cast<double>(length_);
+    const double m = sum_x_.sum() / n;
+    const double var = sum_xx_.sum() / n - m * m;
+    return std::sqrt(var > 0.0 ? var : 0.0);
+}
 
 double StdDev::held_stdev() const {
     double sum = 0.0;
@@ -136,6 +148,20 @@ double StdDev::held_stdev() const {
 }
 
 double StdDev::compute(double src) {
+    if (biased_) {
+        if (is_na(src)) {
+            // na never enters (KI-66); the seeded value is held (see below).
+            sum_x_.note_no_push();
+            sum_xx_.note_no_push();
+            if (bar_count_ >= length_) return biased_value();
+            return na<double>();
+        }
+        sum_x_.push(src);
+        sum_xx_.push(src * src);
+        bar_count_++;
+        if (bar_count_ < length_) return na<double>();
+        return biased_value();
+    }
     if (is_na(src)) {
         // Pine ta.stdev, like ta.sma (KI-66): an na input never enters the
         // compact last-N-valid window; once `length` valid values have been
@@ -724,6 +750,16 @@ double ATR::recompute(double high, double low, double close) {
 
 // --- StdDev ---
 double StdDev::recompute(double src) {
+    if (biased_) {
+        if (is_na(src)) return na<double>();
+        if (sum_x_.count() == 0) return compute(src);
+        // Replay the bar with the new source against the same evicted addends
+        // and the same pre-bar sums (KahanWindowSum::repush), as SMA does.
+        sum_x_.repush(src);
+        sum_xx_.repush(src * src);
+        if (bar_count_ < length_) return na<double>();
+        return biased_value();
+    }
     if (buffer_.empty()) return compute(src);
     buffer_.back() = src;
 

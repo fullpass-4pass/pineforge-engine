@@ -16,6 +16,7 @@ set(TEST_SOURCES
     test_ta_sma_exact_order
     test_ta_sma_window_residual
     test_ta_sma_stochrsi_ties
+    test_ta_window_underapplied
     test_ta_na_source_rules
     test_matrix
     test_matrix_identity
