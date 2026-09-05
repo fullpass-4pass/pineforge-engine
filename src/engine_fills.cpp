@@ -4363,6 +4363,70 @@ void BacktestEngine::apply_filled_order_to_state(
             std::isfinite(order.sizing_fx) && order.sizing_fx > 0.0
                 ? order.sizing_fx
                 : active_account_currency_fx();
+        // round 9 family X-b (BINANCE:ETHUSDT.P@15 HARD lane; rule, pins and
+        // scope on tv_money_round / tv_money_scope, engine.hpp): TradingView's
+        // broker admits a default 100 %-of-equity, margin-100 MARKET entry on
+        // money rounded to TEN SIGNIFICANT DIGITS —
+        //
+        //     E_s >= tv_money_round(|frozen_qty| x tick(close_S) x pv x fx)
+        //
+        // strict (C == the rounded cost fills: famxb-S-a_atsig 1423387.081000
+        // -> 330.0271). When it fails a FLAT open is dropped (no fill, no row,
+        // no later fill) and a REVERSAL keeps only its closing leg (the
+        // position goes flat at the fill and no new position opens —
+        // affordability_close_only, dispatched by apply_market_order_fill).
+        // The floor invariant below (qty x sizing_price <= E_s) holds EXACTLY,
+        // so these are the fills the KI-54 admit could never decline:
+        //   - flat: the probe's 2025-08-22 13:45Z long, E_s 1423385.7956919968,
+        //     Q 331.9169 x 4288.38 = 1423385.795622 -> 1423385.796 > E_s,
+        //     TradingView prints no row on the pump bar, the engine printed
+        //     trade 1213 (a +2 % trail exit on the same bar);
+        //   - reversal: the probe's 2025-12-17 01:15Z crossover with the short
+        //     336.8445 @2944.15 open, E_s 1016949.8827450001, Q 343.5804 x
+        //     2959.86 = 1016949.882744 -> 1016949.883 > E_s (E - B = 1e-6):
+        //     TradingView closes the short 'Long' @2959.86 and opens no long
+        //     (the next entry is a from-flat short 345.7766 at 02:15Z), the
+        //     engine flipped into a 343.5804 long. Zero gap, so the exact
+        //     family-G check admits; the famxb-R sweep admits 343.5804 at
+        //     +0.0005 of capital and 343.5803 at -0.0005 (the lot flips
+        //     first), only the exact equity drops.
+        // 24 flat (13 long, 11 short) + 11 reversal capital-sweep tapes in
+        // tests/test_famxb_flat_entry_rounded_money.cpp. Runs AHEAD of the
+        // exact fill-price checks (the gap-reject and the KI-54 reversal
+        // admission, which is skipped for a close-only order: it judges an
+        // OPENING quantity and its whole-drop would turn TV's flat-at-the-
+        // open into a held position). Same-direction adds have no tape. The
+        // cost is taken at the SLIPPED sizing price the quantity was floored
+        // against (frozen_sizing_price) — the same double as tick(close_S) at
+        // slippage 0, every pinned tape — so with slippage ticks the gate
+        // still asks only about the rounding residual of the floor
+        // invariant, never about the whole tick of notional between the
+        // slipped basis and the mark (unpinned; the KI-54 arms below price a
+        // slipped reversal the same way).
+        if (order.type == OrderType::MARKET
+            && !order.affordability_close_only
+            && (position_side_ == PositionSide::FLAT
+                    ? order.opening_affordability_exemption_candidate
+                    : reversal)
+            && !same_dir
+            && std::abs(default_qty_value_ - 100.0) < 1e-12
+            && std::isfinite(margin_pct)
+            && std::abs(margin_pct - 100.0) < 1e-12
+            && std::isfinite(order.sizing_mark) && order.sizing_mark > 0.0
+            && std::isfinite(order.sizing_price) && order.sizing_price > 0.0
+            && tv_money_scope(order.sizing_mark)) {
+            const double cost_s = std::abs(order.frozen_default_qty)
+                                  * order.sizing_price * syminfo_.pointvalue
+                                  * sizing_fx;
+            if (std::isfinite(cost_s)
+                && order.sizing_equity + 1e-9 < tv_money_round(cost_s)) {
+                if (!reversal) {
+                    decline_and_cancel();
+                    return;
+                }
+                order.affordability_close_only = true;
+            }
+        }
         // Gap-reject (design-cntvxiao-gap-reject, PANEL-CLEARED; widened to
         // commissioned entries by the round-7 family-H market-entry-admission
         // pin, below): a high-level strategy.entry with omitted qty, sized
@@ -4489,7 +4553,8 @@ void BacktestEngine::apply_filled_order_to_state(
         // (required = equity * pct/100 * margin/100 > equity), which would
         // silently drop every flat open. Leverage below 1x has no TV pin.
         bool leverage_below_1x = margin_pct > 100.0;
-        if (!raw_opposite_close && !leverage_below_1x && margin_pct > 0.0) {
+        if (!raw_opposite_close && !leverage_below_1x && margin_pct > 0.0
+            && !order.affordability_close_only) {
             // The margin the OPEN position ties up, marked at the SAME price
             // sizing_equity was marked at (the signal bar's close). Only the
             // all-in add reaches this (see unpinned_fractional_add), where

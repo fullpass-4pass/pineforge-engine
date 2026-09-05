@@ -29,6 +29,52 @@ namespace pineforge {
 
 enum class PositionSide { FLAT, LONG, SHORT };
 
+// round 9 family X-b (BINANCE:ETHUSDT.P@15 HARD lane, stevenygabbyperez-fast-
+// scalper-with-stops trade 1213; campaign notes log-20260905t181501z-a46e9ae0
+// (diagnosis), log-20260905t182002z-1806586d (13 long tapes),
+// log-20260905t182222z-2397af4f (11 short tapes); the same arithmetic round 8
+// family R pinned on OANDA:EURUSD@15, notes log-20260905t164404z-85800609 and
+// log-20260905t180248z-0dce5ab0): TradingView's broker carries MONEY at TEN
+// SIGNIFICANT DIGITS, half-up — 3 decimals at >= 1e6, 4 decimals below. Two
+// consequences are implemented here, both scoped by tv_money_scope (below):
+//   1. SIZING — a default percent_of_equity order is floored from the ROUNDED
+//      equity (calc_qty): with E = 1423386.22447 on ETHUSDT.P at close_S
+//      4288.38 (lot 0.0001) the exact floor gives 331.9170, TradingView sizes
+//      331.9169 (sig10(E) = 1423386.224 < 331.9170 x 4288.38 = .22446); with
+//      E = 1423385.795612 the exact floor gives 331.9168, TradingView sizes
+//      331.9169 from sig10(E) = 1423385.796 — and then drops the order (2.).
+//   2. ADMISSION — a default 100 %-of-equity, margin-100 MARKET entry is
+//      admitted iff the exact sizing equity covers the ROUNDED cost at the
+//      signal close,
+//          E_s >= tv_money_round(Q x tick(close_S) x pv x fx)
+//      (strict: E_s == the rounded cost fills). When it fails a FLAT open is
+//      DROPPED (no fill, no row, no later fill) and a REVERSAL keeps only its
+//      closing leg (flat at the fill, no new position). The probe: after
+//      1212 matched trades E_s = 1423385.7956919968, Q = 331.9169, cost
+//      1423385.795622 -> 1423385.796 > E_s: TradingView has no long on the
+//      2025-08-22 14:00Z pump bar; the exact floor invariant admitted it.
+//      Reversal: 2025-12-17 01:15Z, short 336.8445 @2944.15 open, E_s
+//      1016949.8827450001, Q 343.5804 x 2959.86 = 1016949.882744 ->
+//      1016949.883 > E_s: TradingView closes the short 'Long' @2959.86 and
+//      opens nothing (famxb-R sweep: the exact equity drops, +/-0.0005 of
+//      capital admits 343.5804 / 343.5803).
+//      Capital sweeps: longs 1423385.795692 / .795922 / .795992 / .795622 /
+//      .795612 dropped, .796022 / .796622 admitted 331.9169, .795322 admitted
+//      331.9168; shorts (close_S 4312.94) 1423387.080744 / .080974 / .080674 /
+//      .080664 dropped, .081000 (== the rounded cost) / .081674 admitted
+//      330.0271, .080374 admitted 330.0270, 1423385.355508 / .355568 admitted
+//      330.0267, .355198 admitted 330.0266 — 24/24.
+// Same-direction adds are not pinned. Where equity ~ 1e6 the 0.0005 rounding
+// residual crosses a lot boundary only on a lot worth less than one unit of
+// account currency — hence the scope.
+inline double tv_money_round(double value) {
+    if (!std::isfinite(value) || value == 0.0) return value;
+    const double magnitude = std::floor(std::log10(std::abs(value)));
+    const double scale = std::pow(10.0, 9.0 - magnitude);
+    const double rounded = std::floor(std::abs(value) * scale + 0.5) / scale;
+    return value < 0.0 ? -rounded : rounded;
+}
+
 // Forward declaration of an internal enum used by some BacktestEngine
 // method signatures. The full definition lives in src/engine_internal.hpp
 // (private to libruntime); only the underlying-type pin is needed here.
@@ -2013,6 +2059,22 @@ protected:
     // first (the inverse of the instrument->account multiply used for
     // commission/PnL/margin) so the division by fill_price stays dimensionally
     // consistent; default 1.0 leaves the corpus untouched.
+    // round 9 family X-b scope (tv_money_round above): the 10-significant-
+    // digit money arithmetic is applied where it was pinned and where it can
+    // move a lot — a lot-stepped instrument whose lot is worth less than one
+    // unit of account currency at the sizing price (BINANCE:ETHUSDT.P 1e-4 x
+    // 4,300 = 0.43; BINANCE:BTCUSDT 1e-5 x 85,000 = 0.85; OANDA:EURUSD 0.01 x
+    // 1.1 = 0.011). On integer-lot instruments (F, AAPL, ES, NQ, NIFTY: a lot
+    // is 10..250k) and on the corpus' continuous qty_step 0 the exact
+    // arithmetic stays: there the rounding could only ever bite on a synthetic
+    // exact tie.
+    bool tv_money_scope(double price) const {
+        if (!(qty_step_ > 0.0) || !std::isfinite(price) || price <= 0.0) return false;
+        const double lot_value = qty_step_ * price * syminfo_.pointvalue
+                                 * active_account_currency_fx();
+        return std::isfinite(lot_value) && lot_value < 1.0;
+    }
+
     // Floor an order quantity to the instrument's tradable lot increment
     // (qty_step_). TradingView applies this to EVERY order it sends to the
     // exchange, not just forced liquidations — verified row-for-row: a
@@ -2154,9 +2216,16 @@ protected:
                 // how the already-open position was sized. The open lot is
                 // marked at the ROUNDED close (see above): a sub-tick print
                 // never reaches the broker ledger.
-                const double equity = percent_commission_live_equity(
+                double equity = percent_commission_live_equity(
                     round_to_mintick(current_bar_.close));
                 if (!std::isfinite(equity)) return 0.0;
+                // round 9 family X-b: the broker's sizing equity is money at
+                // TEN SIGNIFICANT DIGITS (tv_money_round) where the lot is
+                // sub-unit (tv_money_scope) — the floor flips one lot when the
+                // exact equity sits within half a money unit of a lot boundary
+                // (ETHUSDT.P 1423386.22447 -> 331.9169 not 331.9170;
+                // 1423385.795612 -> 331.9169 not 331.9168).
+                if (tv_money_scope(basis)) equity = tv_money_round(equity);
                 double cash = reserve_percent_commission(equity * (default_qty_value_ / 100.0)) / active_account_currency_fx();
                 // Reject (qty 0) on a non-finite / non-positive fill price — a
                 // degenerate $0/NaN print must NOT size as the raw % number.
