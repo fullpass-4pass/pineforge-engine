@@ -1509,6 +1509,12 @@ void BacktestEngine::revive_position_brackets_after_margin_call_partial(
         o.dormant_reissue_pending = false;
         o.dormant_original_stop_price =
             std::numeric_limits<double>::quiet_NaN();
+        // A revived bracket is whole again: its trail leg rides the
+        // position's extreme (round 10 family AE fields cleared).
+        o.dormant_reversal_kill_bar = -1;
+        o.dormant_trail_best = std::numeric_limits<double>::quiet_NaN();
+        o.dormant_trail_best_start = std::numeric_limits<double>::quiet_NaN();
+        o.dormant_trail_leg_dead = false;
         // Marketable at the margin-call event price? Whole-position brackets
         // only — the TV-pinned shape: a deferred default leg (qty NaN, 100%)
         // or, round 7 family N mechanism 2 (fast-scalper 07-21 13:30Z, TV
@@ -1565,6 +1571,10 @@ void BacktestEngine::settle_dormant_bracket_reissues() {
         o.dormant_bracket = false;
         o.dormant_original_stop_price =
             std::numeric_limits<double>::quiet_NaN();
+        o.dormant_reversal_kill_bar = -1;
+        o.dormant_trail_best = std::numeric_limits<double>::quiet_NaN();
+        o.dormant_trail_best_start = std::numeric_limits<double>::quiet_NaN();
+        o.dormant_trail_leg_dead = false;
     }
 }
 
@@ -2195,12 +2205,39 @@ bool BacktestEngine::margin_call_slice_at_bar_open(const Bar& bar) {
 // Update trailing stop best price for the current bar's open / high / low.
 // Called once per bar before any intra-bar fill evaluation.
 void BacktestEngine::update_trail_best_for_bar_open(const Bar& bar) {
+    // Capture the extreme as it stood before this bar (once per bar: the
+    // process_orders_on_close kernel folds the same bar a second time).
+    const bool first_fold_this_bar = trail_best_before_bar_index_ != bar_index_;
+    if (first_fold_this_bar) {
+        trail_best_before_bar_ = trail_best_price_;
+        trail_best_before_bar_index_ = bar_index_;
+    }
     if (position_side_ == PositionSide::LONG) {
         if (std::isnan(trail_best_price_) || bar.high > trail_best_price_)
             trail_best_price_ = bar.high;
     } else if (position_side_ == PositionSide::SHORT) {
         if (std::isnan(trail_best_price_) || bar.low < trail_best_price_)
             trail_best_price_ = bar.low;
+    }
+    // Round 10 family AE: a trail leg revived after a declined reversal
+    // keeps its own running extreme, which skips the decline bar
+    // (PendingOrder::dormant_trail_best) and follows every later bar. The
+    // fill walk reads the PRE-bar value (dormant_trail_best_start), exactly
+    // as the position's own trail_best_path_state is snapshotted before this
+    // function folds the bar in.
+    for (PendingOrder& o : pending_orders_) {
+        if (!o.dormant_bracket || o.type != OrderType::EXIT) continue;
+        if (o.dormant_reversal_kill_bar < 0
+            || o.dormant_reversal_kill_bar >= bar_index_) continue;
+        if (std::isnan(o.trail_points) && std::isnan(o.trail_price)) continue;
+        if (first_fold_this_bar) o.dormant_trail_best_start = o.dormant_trail_best;
+        if (position_side_ == PositionSide::LONG) {
+            if (std::isnan(o.dormant_trail_best) || bar.high > o.dormant_trail_best)
+                o.dormant_trail_best = bar.high;
+        } else if (position_side_ == PositionSide::SHORT) {
+            if (std::isnan(o.dormant_trail_best) || bar.low < o.dormant_trail_best)
+                o.dormant_trail_best = bar.low;
+        }
     }
 }
 
@@ -4453,7 +4490,7 @@ void BacktestEngine::apply_filled_order_to_state(
         const bool reversal = position_side_ != PositionSide::FLAT && !same_dir;
         if (reversal && order.type == OrderType::MARKET) {
             suppress_declined_reversal_close_legs(order);
-            mark_position_brackets_dormant_on_declined_reversal();
+            mark_position_brackets_dormant_on_declined_reversal(bar);
         }
         decline_and_cancel();
         return;
@@ -4655,7 +4692,7 @@ void BacktestEngine::apply_filled_order_to_state(
                     && affordable_price < order.sizing_price) {
                     if (reversal_entry) {
                         suppress_declined_reversal_close_legs(order);
-                        mark_position_brackets_dormant_on_declined_reversal();
+                        mark_position_brackets_dormant_on_declined_reversal(bar);
                     }
                     decline_and_cancel();
                     return;
@@ -4921,7 +4958,7 @@ void BacktestEngine::apply_filled_order_to_state(
                 // excluded — see suppress_declined_reversal_close_legs.
                 if (reversal && order.type == OrderType::MARKET) {
                     suppress_declined_reversal_close_legs(order);
-                    mark_position_brackets_dormant_on_declined_reversal();
+                    mark_position_brackets_dormant_on_declined_reversal(bar);
                 }
                 decline_and_cancel();
                 return;
@@ -6712,11 +6749,12 @@ bool BacktestEngine::dormant_bracket_trail_leg_live(const PendingOrder& o) const
     // on 22:30). AAPL/XAUUSD/F fire on a LATER bar, unaffected.
     return o.dormant_bracket
         && o.type == OrderType::EXIT
+        && !o.dormant_trail_leg_dead
         && o.dormant_reversal_kill_bar != bar_index_
         && (!std::isnan(o.trail_points) || !std::isnan(o.trail_price));
 }
 
-void BacktestEngine::mark_position_brackets_dormant_on_declined_reversal() {
+void BacktestEngine::mark_position_brackets_dormant_on_declined_reversal(const Bar& bar) {
     if (position_side_ == PositionSide::FLAT) return;
     // Round 7 family N mechanism 2 (note log-20260905t112259z-33f32db4; lab
     // tv tape scratchpad/r7/pins/aapl15-mcopen1-stop-algoai + the algoai
@@ -6772,6 +6810,29 @@ void BacktestEngine::mark_position_brackets_dormant_on_declined_reversal() {
         // trail leg is held for the rest of THIS bar and resumes next bar
         // (dormant_bracket_trail_leg_live).
         o.dormant_reversal_kill_bar = bar_index_;
+        // Round 10 family AE (PendingOrder::dormant_trail_best /
+        // dormant_trail_leg_dead): the surviving trail leg restarts from the
+        // position's extreme BEFORE this bar — the decline bar's own path
+        // never arms it — and a leg whose activation this bar's open already
+        // sits past dies with the stop and limit legs.
+        const bool has_trail = !std::isnan(o.trail_points) || !std::isnan(o.trail_price);
+        if (!has_trail) continue;
+        o.dormant_trail_best = trail_best_before_bar_index_ == bar_index_
+            ? trail_best_before_bar_ : trail_best_price_;
+        o.dormant_trail_best_start = o.dormant_trail_best;
+        const bool is_long = position_side_ == PositionSide::LONG;
+        double activation = o.trail_price;
+        if (!std::isnan(o.trail_points)) {
+            const double ticks = internal::trail_points_to_ticks(o.trail_points);
+            activation = internal::snap_trail_level_to_tick_grid(
+                is_long ? position_entry_price_ + ticks * syminfo_mintick_
+                        : position_entry_price_ - ticks * syminfo_mintick_,
+                syminfo_mintick_);
+        }
+        if (std::isfinite(activation) && std::isfinite(bar.open)
+            && (is_long ? bar.open >= activation : bar.open <= activation)) {
+            o.dormant_trail_leg_dead = true;
+        }
     }
 }
 
@@ -7310,7 +7371,14 @@ BacktestEngine::FillEvaluation BacktestEngine::evaluate_fill_price(
             order.trail_price,
             order.trail_offset,
             position_entry_price_,
-            trail_best_path_state,
+            // Round 10 family AE: a trail leg revived after a declined
+            // reversal reads its own pre-bar extreme, which skips the decline
+            // bar. Only that shape -- a bracket dormant from a margin call
+            // (dormant_reversal_kill_bar < 0) keeps the position's extreme.
+            (order.dormant_bracket && order.dormant_reversal_kill_bar >= 0
+             && std::isfinite(order.dormant_trail_best_start))
+                ? order.dormant_trail_best_start
+                : trail_best_path_state,
             is_entry_bar,
             bar_magnifier_enabled_,
             syminfo_mintick_,

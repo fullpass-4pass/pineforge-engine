@@ -892,6 +892,32 @@ struct PendingOrder {
     // 22:30: TV holds the trail through the decline bar's crash and exits at
     // the next-bar re-issue).
     int dormant_reversal_kill_bar = -1;
+    // Round 10 family AE (campaign note log-20260905t224809z-*, lab tv tapes
+    // famae-dr-* / famae-dr2-* on NASDAQ:AAPL 15m, the 2025-10-31 13:30Z
+    // earnings gap: long 10-30 15:15Z @270.90, reversal short declined at
+    // the 276.90 open, bar H 277.32 L 269.15 C 270.68):
+    //   * the decline bar's path does NOT arm the surviving trail leg. With
+    //     the activation at 277.00 (open below it, high past it) TradingView
+    //     never fires at the 13:45Z open the way a carried 277.32 best
+    //     would; the leg resumes UNARMED and fills only when the activation
+    //     is reached again (11-24 20:45Z touch, 11-25 14:30Z @280.38), as
+    //     the 277.90 leg the decline bar never crossed does (11-25 @277.90).
+    //     dormant_trail_best is the leg's own running extreme: seeded with
+    //     the position's best BEFORE the decline bar and folded with every
+    //     later bar, never with the decline bar itself.
+    //   * a trail leg whose activation the decline bar's OPEN already sits
+    //     past (the probe's 276.32 under the 276.90 open, where the no-
+    //     reversal control fills at the open) dies with the stop and limit
+    //     legs: TradingView never fires it again — not at 13:45Z, not when
+    //     276.32 is crossed again on 11-13 14:30Z (high 276.69), the long
+    //     rides to the 17:30Z reversal. dormant_trail_leg_dead.
+    //     dormant_trail_best is the leg's own running extreme; the fill walk
+    //     reads dormant_trail_best_start, its value BEFORE the current bar was
+    //     folded in — the same pre-bar `trail_best_start` coordinate
+    //     process_orders_* snapshots for the position (engine_fills.cpp:195).
+    double dormant_trail_best = std::numeric_limits<double>::quiet_NaN();
+    double dormant_trail_best_start = std::numeric_limits<double>::quiet_NaN();
+    bool dormant_trail_leg_dead = false;
     // Qty this deferred close debited from id_unclosed_qty_[<bare id>] in
     // compute_close_target_qty's default-FIFO branch at strategy.close CALL
     // time. On the false->true suppression transition it is re-credited to that
@@ -1582,6 +1608,13 @@ protected:
     // --- Trailing stop state ---
     // Best favorable price since position entry (for trailing stop computation)
     double trail_best_price_ = std::numeric_limits<double>::quiet_NaN();
+    // The position's running extreme as it stood BEFORE the current bar's
+    // high / low were folded in (update_trail_best_for_bar_open), and the
+    // bar it was captured on: a trail leg killed by a declined reversal on
+    // this bar restarts from it (round 10 family AE,
+    // PendingOrder::dormant_trail_best).
+    double trail_best_before_bar_ = std::numeric_limits<double>::quiet_NaN();
+    int trail_best_before_bar_index_ = -1;
 
     // --- Intraday fill counter ---
     // Counts every fill processed by ``apply_filled_order_to_state`` on
@@ -3650,7 +3683,7 @@ private:
     bool tv_money_long_margin_call(const Bar& bar);
     // finding-311: mark the live position's standing strategy.exit brackets
     // dormant when an in-position reversal entry is declined at fill.
-    void mark_position_brackets_dormant_on_declined_reversal();
+    void mark_position_brackets_dormant_on_declined_reversal(const Bar& bar);
     // Round 9 family X: the kill is leg-scoped — a dormant bracket's trail
     // leg (trail_points / trail_price) stays live; its stop / limit die. Not
     // on the decline bar itself (dormant_reversal_kill_bar): the flip attempt
