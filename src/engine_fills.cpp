@@ -4609,8 +4609,34 @@ void BacktestEngine::apply_filled_order_to_state(
                     tv_money_round(judged_equity) / notional_per_price);
                 if (std::isfinite(affordable_price)
                     && affordable_price < order.sizing_price) {
+                    // Round 11 family AG (campaign notes
+                    // log-20260905t232805z-41661c90 and
+                    // log-20260905t233556z-7f5ce2ed; 19 lab tv tapes
+                    // famag-A*/famag-B* on OANDA:EURUSD 15): a rule-5
+                    // whole drop removes the reversal order AT PLACEMENT,
+                    // so a strategy.close co-queued on the same signal bar
+                    // (the scrapper wrapper's entry(opposite) + close(current)
+                    // idiom) STILL FILLS at the open — famag-B-z-tie-ef
+                    // (E_s = Q x tick(close_S) + 0.0002, zero gap): 'C1'
+                    // closes the 870000 short @1.13384 and no long fills;
+                    // famag-B-g-tie-ef (+2-pip gap) and famag-B-d-tie-ef
+                    // (-1 pip): the same; entry-only famag-B-z-tie-eo HOLDS.
+                    // The probes: hossa 2025-05-23 07:45Z, version-sk 05-20
+                    // 01:30Z, erdensedat 04-03 20:45Z, hexatrades 03-31
+                    // 23:45Z, markittick 04-01 20:00Z, ajayinderbrar 04-03
+                    // 16:00Z, elistools 07-17 17:00Z — every one a rule-5
+                    // tie (E_s - Q x close_S = +0.00008..+0.00039) whose
+                    // 'Close entry(s) order' row the engine held through
+                    // more margin-call slices. Only the fill-open gap reject
+                    // (KI-54 below, Q x open > E_s: famag-B-g-gap-ef,
+                    // famag-A1-ef/A3-ef/A4-ef/A5-ef) is atomic with its
+                    // co-queued close (#91, suppress_declined_reversal_
+                    // close_legs) — so the suppression is NOT applied here.
+                    // The position's priced brackets still go dormant as
+                    // for any declined reversal (the close, if any, takes
+                    // the position at the open; if none, the hold is the
+                    // KI-54 shape).
                     if (reversal_entry) {
-                        suppress_declined_reversal_close_legs(order);
                         mark_position_brackets_dormant_on_declined_reversal();
                     }
                     decline_and_cancel();
