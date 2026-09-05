@@ -4460,14 +4460,29 @@ void BacktestEngine::apply_filled_order_to_state(
     // fill-price checks below: under the family-G gap reject (Q x open > E_s)
     // TV still filled the closing leg 39 times (1 whole drop) when this
     // rounded check failed, and whole-dropped 1597 times when it passed.
-    // Same-direction adds are out of scope (no tape). Also documented and
-    // NOT implemented: the sweeps' whole-order rejection band above the
-    // rounded cost (famr-adm-revb/revd/S1/S3: E in [B, B + 0.00046) dropped
-    // entirely, matched by 35 taro/sensor whole drops but contradicted by
-    // 3086 admissions with the same placement features — note
-    // log-20260905t180249z-4bd857ad) and TV's 1-unit entry fill when the
-    // entry leg fails with Q == |position| + 1.00 exactly (revL L23, taro
-    // 2025-09-15 16:15Z).
+    // Same-direction adds are out of scope (no tape).
+    // round 9 family R follow-up — rule 5 (engine.hpp; campaign notes
+    // log-20260905t205824z-af397c83, log-20260905t210117z-ab914192): once
+    // the rounded-cost admission has passed, the broker's fill-time margin
+    // check runs on the PRICE scale. The price at which the rounded equity
+    // exactly buys the frozen quantity,
+    //
+    //     P = tv_money_round( tv_money_round(E_s) / (|frozen_qty| x pv x fx) )
+    //
+    // must reach the sizing price as the broker holds it (tick(close_S) =
+    // ticks x fl(mintick), the frozen sizing_price); P < sizing_price drops
+    // the WHOLE order — the flat open never fills, a reversal keeps its
+    // position and its close leg is dropped with the entry (the same
+    // decline shape as the KI-54 reversal decline below). No epsilon: P is
+    // a decimal at 1e-9 and the decision inside the band is the ulp of the
+    // tick-built price (double(1.08273) sits 3.0e-17 below its decimal, the
+    // fl(1e-5) product lands one ulp above it -> F6-010400 dropped;
+    // double(1.08254) 2.1e-17 below -> F6-010330 filled; sig10(B) - B >=
+    // 0.000462 -> P rounds up to close + 1e-9 -> F7-311130 filled). 507/507
+    // famr3 sweep decisions, 3086/3086 taro + every-bar admissions,
+    // 1631/1631 whole drops, 64/64 close-only, 52/52 famr-adm band tapes.
+    // NOT implemented: TV's 1-unit entry fill when the entry leg fails with
+    // Q == |position| + 1.00 exactly (revL L23, taro 2025-09-15 16:15Z).
     if (order.type == OrderType::MARKET
         && !order.affordability_close_only
         && !std::isnan(order.sizing_equity) && !std::isnan(order.sizing_mark)
@@ -4502,6 +4517,21 @@ void BacktestEngine::apply_filled_order_to_state(
                     return;
                 }
                 order.affordability_close_only = true;
+            } else {
+                // Rule 5: the price-scale margin check (comment above).
+                const double notional_per_price =
+                    order.frozen_default_qty * syminfo_.pointvalue * fx_s;
+                const double affordable_price = tv_money_round(
+                    tv_money_round(order.sizing_equity) / notional_per_price);
+                if (std::isfinite(affordable_price)
+                    && affordable_price < order.sizing_price) {
+                    if (reversal_entry) {
+                        suppress_declined_reversal_close_legs(order);
+                        mark_position_brackets_dormant_on_declined_reversal();
+                    }
+                    decline_and_cancel();
+                    return;
+                }
             }
         }
     }

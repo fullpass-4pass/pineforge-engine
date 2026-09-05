@@ -2959,14 +2959,25 @@ static void test_commission_free_short_floor_zero_closes_one_contract() {
     // ledger that print is 100.00, exactly at liquidation, and fires
     // nothing (test_sizing_basis_mintick.cpp E1). The 166-event class this
     // pins is a lot-rule fact and is unchanged by the mark.
+    //
+    // round 8/9 family R (engine.hpp rules 2 and 5): this lot is worth 0.4
+    // units of account (0.0001 x 4000), so the broker admits the all-in
+    // short on ten-digit money. At capital == 10 x entry exactly, the
+    // price at which the rounded equity buys 10 is 3999.99 as a decimal
+    // while the tick-built 3999.99 (399999 x fl(0.01)) sits two ulp above
+    // its double — TradingView drops such a tie whole (rule 5; the ETH
+    // 15m sweeps famr3e-Et-* on the tick+1ulp closes 1822.86 / 1823.61 /
+    // 1838.87). One thousandth of equity above the cost clears it
+    // (P = 3999.9901) and leaves q_min at 0.4975 of a step: still a
+    // floor-zero short margin call.
     const double entry = 3999.99;
     const double adverse = 4000.00;
-    const double capital = 10.0 * entry;
+    const double capital = 10.0 * entry + 0.001;
     const double equity_at_high = capital - (adverse - entry) * 10.0;
     const double q_min = 10.0 - equity_at_high / adverse;
     CHECK(q_min > 0.0);
     CHECK(q_min < step);
-    CHECK(near(q_min, 0.5 * step, 1e-12));
+    CHECK(near(q_min, 0.4975 * step, 1e-9));
 
     std::vector<Bar> bars = {
         mk_bar(1000, entry, entry, entry - 1.0, entry, 1.0),    // short 10 fills @entry

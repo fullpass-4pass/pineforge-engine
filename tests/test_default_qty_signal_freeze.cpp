@@ -371,6 +371,16 @@ void test_reversal_bracket_binding_survives_freeze() {
 // ledger.  Before the C fix, apply_market_order_fill handed the frozen value
 // to enter_market_from_flat as an ordinary FIXED quantity and it was floored
 // again.
+//
+// round 8/9 family R (engine.hpp tv_money_round / tv_money_floor_lot): this
+// lot is worth 0.1 units of account (0.0001 x 1000), so the broker sizes it
+// on ten-digit money — sig10(6279.0000001) = 6279.0, and the RAW double
+// floor of 6.279 / 0.0001 = 62789.99999999999 is 6.2789, one lot below the
+// nudged 6.2790 (TradingView's own floor on famr-rev-everybar 2025-04-02
+// 20:00Z: 918062.29999999992 -> 918062.29, not .30). The frozen quantity is
+// therefore 6.2789 here; the dispatch invariant this test pins — the frozen
+// value reaches the position, lot and ledger UNCHANGED — is unaffected. The
+// explicit-qty controls (I/K) are not default-sized and keep 6.2790.
 class FrozenDispatchBoundaryProbe : public BacktestEngine {
 public:
     explicit FrozenDispatchBoundaryProbe(bool explicit_qty)
@@ -432,11 +442,11 @@ void test_frozen_true_flat_market_dispatch_is_not_refloored() {
     CHECK_NEAR(eng.two_floor_qty(), 6.2790, 1e-12);
 
     CHECK(eng.position_side() == PositionSide::LONG);
-    CHECK_NEAR(eng.position_qty(), 6.2790, 1e-12);
+    CHECK_NEAR(eng.position_qty(), 6.2789, 1e-12);   // family R raw lot floor
     CHECK(eng.live_lot_count() == 1);
-    CHECK_NEAR(eng.live_lot_qty(), 6.2790, 1e-12);
+    CHECK_NEAR(eng.live_lot_qty(), 6.2789, 1e-12);
     CHECK(eng.live_lot_id() == "BOUNDARY");
-    CHECK_NEAR(eng.id_ledger_qty("BOUNDARY"), 6.2790, 1e-12);
+    CHECK_NEAR(eng.id_ledger_qty("BOUNDARY"), 6.2789, 1e-12);
 }
 
 void test_explicit_true_flat_market_keeps_single_floor() {
@@ -517,10 +527,10 @@ void test_frozen_market_reversal_is_not_refloored() {
     CHECK_NEAR(eng.one_floor_qty(), 6.2790, 1e-12);
     CHECK_NEAR(eng.two_floor_qty(), 6.2790, 1e-12);
     CHECK(eng.position_side() == PositionSide::LONG);
-    CHECK_NEAR(eng.position_qty(), 6.2790, 1e-12);
+    CHECK_NEAR(eng.position_qty(), 6.2789, 1e-12);   // family R raw lot floor (H)
     CHECK(eng.live_lot_count() == 1);
-    CHECK_NEAR(eng.live_lot_qty(), 6.2790, 1e-12);
-    CHECK_NEAR(eng.id_ledger_qty("BOUNDARY"), 6.2790, 1e-12);
+    CHECK_NEAR(eng.live_lot_qty(), 6.2789, 1e-12);
+    CHECK_NEAR(eng.id_ledger_qty("BOUNDARY"), 6.2789, 1e-12);
 }
 
 void test_explicit_market_reversal_keeps_single_floor() {

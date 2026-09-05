@@ -33,7 +33,7 @@ enum class PositionSide { FLAT, LONG, SHORT };
 // log-20260905t164404z-85800609 (diagnosis), log-20260905t180248z-0dce5ab0
 // (entry-leg admission), log-20260905t180249z-10358e84 (margin-call
 // trigger)): TradingView's broker carries MONEY at TEN SIGNIFICANT DIGITS,
-// half-up — 3 decimals at >= 1e6, 4 decimals below. Three consequences are
+// half-up — 3 decimals at >= 1e6, 4 decimals below. Five consequences are
 // pinned and implemented, all scoped by tv_money_scope (below):
 //   1. SIZING — a default percent_of_equity order is floored from the
 //      ROUNDED equity (calc_qty): the lot count flips one lot early/late
@@ -41,6 +41,15 @@ enum class PositionSide { FLAT, LONG, SHORT };
 //      (~200 lab tv capital sweeps on OANDA:EURUSD 15 2025-04-01, scratch
 //      famr-adm-*: revc 998763.3420484 -> 922832.66, 998763.3420503 ->
 //      922832.67; S2 1001759.6342676 -> one lot BELOW the exact floor).
+//      The divisor is the price AS TRADINGVIEW HOLDS IT — the tick count
+//      times the mintick double (round_to_mintick; fl(1e-5) sits 8.2e-17
+//      relative above 1e-5, so tick(1.085) is one ulp above double(1.085))
+//      — and the lot floor is the RAW double floor, no 1e-6 nudge
+//      (tv_money_floor_lot): famr-rev-everybar 2025-04-02 20:00Z, close
+//      1.085, E 996097.5955029: Pine prints floor(E/close*100)/100 =
+//      918062.30 while the broker filled 918062.29 = floor(sig10(E) /
+//      tick(1.085) / 0.01), the quotient being 918062.29999999992 (round 9
+//      family R follow-up, campaign note log-20260905t210117z-ab914192).
 //   2. ADMISSION — a default 100 %-of-equity, margin-100 MARKET entry is
 //      DROPPED iff the exact sizing equity is below the ROUNDED cost,
 //      E_s < tv_money_round(Q x tick(close_S)); for a reversal only the
@@ -58,17 +67,51 @@ enum class PositionSide { FLAT, LONG, SHORT };
 // Where equity ~ 1e6 and a lot is worth ~0.011 (EURUSD: qty step 0.01 at
 // price ~1.1) the 0.0005 rounding crosses a lot boundary on ~9 % of all-in
 // placements; on F / AAPL / indices (a lot is 10..250k) it never does.
-// NOT implemented (campaign note log-20260905t180249z-4bd857ad): the sweeps'
-// whole-order rejection band sig10(E) in [sig10(cost), sig10(cost)+0.0004]
-// — the same feature range holds 3086 admitted probe placements, so the
-// drop depends on state the placement does not expose; and TV's 1-unit
-// entry fill when the entry leg fails with Q == |position| + 1.00 exactly.
+//   5. WHOLE-ORDER DROP (round 9 family R follow-up, campaign notes
+//      log-20260905t205824z-af397c83 and log-20260905t210117z-ab914192;
+//      the residual of log-20260905t180249z-4bd857ad): once the rounded-cost
+//      admission (2) has passed, TradingView's broker runs its fill-time
+//      margin check on the PRICE scale — the price at which the rounded
+//      equity exactly buys Q, P = sig10( sig10(E_s) / Q ), must reach the
+//      sizing price as the broker holds it, tick(close_S) = ticks x
+//      fl(mintick). If P < tick(close_S) the WHOLE default market order is
+//      dropped: the flat open does not fill and a reversal keeps its
+//      position (the close leg is dropped too). P is rounded to ten
+//      significant digits (1e-9 at ~1.08), so the comparison is a decimal
+//      tie whenever sig10(E_s) - Q x close_S is within 0.5e-9 x Q (~0.00046
+//      USD on EURUSD) — the sweeps' "band" — and a tie is decided by the
+//      ulp of the tick-built price: dropped iff double(close_S) sits more
+//      than 2.2e-17 below the decimal close (the half-ulp minus the 8.9e-17
+//      the fl(1e-5) product carries). Pinned on 507 famr3 sweep decisions
+//      (famr3-F6: 153 bare-capital longs at C = sig10(cost) + 0.0002, 83
+//      filled / 70 dropped, a pure function of the close; F7 7-digit ties
+//      54/27 — the 10 closes where F7 fills and F6 drops all have sig10(B)
+//      - B >= 0.000462, P rounding UP to close + 1e-9; F6h at + 0.0006
+//      153/153 filled; T/A/B/R1/R2 reversals the same law), the taro probe
+//      + every-bar sensors 3086/3086 admits, 1631/1631 whole drops, 64/64
+//      close-only, and every one of the 52 famr-adm band tapes (revb b06..
+//      b28, revd00..03, revL L24..L33, S100..S103, S307..S317). NOT
+//      implemented: TV's 1-unit entry fill when the entry leg fails with
+//      Q == |position| + 1.00 exactly (revL L23, taro 2025-09-15 16:15Z).
+// tv_money_round is the NEAREST DOUBLE of the decimal rounding (the
+// division by an exact power of ten is correctly rounded): rule 5 compares
+// its result with a tick-built price at the ulp, so a floor(x/u+0.5)*u
+// construction (n x fl(1e-9), 6.7e-17 above the decimal) would decide the
+// ties wrongly — 100/507 on the famr3 sweeps.
 inline double tv_money_round(double value) {
     if (!std::isfinite(value) || value == 0.0) return value;
     const double magnitude = std::floor(std::log10(std::abs(value)));
     const double scale = std::pow(10.0, 9.0 - magnitude);
     const double rounded = std::floor(std::abs(value) * scale + 0.5) / scale;
     return value < 0.0 ? -rounded : rounded;
+}
+// The broker's lot floor on ten-digit money (rule 1): the RAW double floor
+// of qty / step, no representation nudge — the nudge would promote the
+// 918062.29999999992 quotient above to 918062.30, one lot more than TV.
+inline double tv_money_floor_lot(double qty, double step) {
+    if (!(step > 0.0) || !std::isfinite(qty) || qty <= 0.0) return qty;
+    const double floored = std::floor(qty / step) * step;
+    return floored < qty ? floored : qty;
 }
 
 // Forward declaration of an internal enum used by some BacktestEngine
@@ -2224,8 +2267,17 @@ protected:
                 double cash = reserve_percent_commission(equity * (default_qty_value_ / 100.0)) / active_account_currency_fx();
                 // Reject (qty 0) on a non-finite / non-positive fill price — a
                 // degenerate $0/NaN print must NOT size as the raw % number.
-                return (std::isfinite(basis) && basis > 0)
-                    ? apply_qty_step(cash / (basis * syminfo_.pointvalue)) : 0.0;
+                if (!(std::isfinite(basis) && basis > 0)) return 0.0;
+                // round 8 family R, rule 1 (tv_money_floor_lot above): on
+                // ten-digit money the broker's lot floor is the raw double
+                // floor of sig10(E) / tick(close) — the 1e-6 nudge of
+                // apply_qty_step would hand the everybar 1.085 placement one
+                // lot more than TradingView filled.
+                if (tv_money_scope(basis)) {
+                    return tv_money_floor_lot(cash / (basis * syminfo_.pointvalue),
+                                              qty_step_);
+                }
+                return apply_qty_step(cash / (basis * syminfo_.pointvalue));
             }
             case QtyType::CASH:
                 return (std::isfinite(basis) && basis > 0)
