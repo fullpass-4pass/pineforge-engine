@@ -2517,6 +2517,15 @@ protected:
     Series<double> coof_checkpoint_src_hlc3_;
     Series<double> coof_checkpoint_src_ohlc4_;
     Series<double> coof_checkpoint_src_hlcc4_;
+    // issue #178 (JOAT aureate, round 9): the chart-close tracker
+    // (prev_chart_close_ / last_chart_close_) is base-owned script state
+    // too. Every historical fill recalculation and the ordinary close
+    // execution start from this checkpoint and push the bar's slot again
+    // (history_slot_is_new_), so without rolling the tracker back the close
+    // execution of a bar whose open filled an order read prev_chart_close_
+    // = the recalc's own close: its true range lost the gap to close[1].
+    double coof_checkpoint_prev_chart_close_ = std::numeric_limits<double>::quiet_NaN();
+    double coof_checkpoint_last_chart_close_ = std::numeric_limits<double>::quiet_NaN();
 
     // --- Session predicate bar-state tracking ---
     // Tracks whether the previous bar was inside the regular session.
