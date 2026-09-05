@@ -407,10 +407,23 @@ public:
 
 // --- StdDev (Standard Deviation) ---
 
+// TradingView's ta.stdev (biased, the default) is NOT the two-pass
+// sum-of-squared-deviations of its documentation: it is
+//     sqrt(Sxx / n - m * m),  m = Sx / n,
+// with Sx = math.sum(src, n) and Sxx = math.sum(src * src, n) the same
+// sliding-window Kahan sums as ta.sma (window_sum.hpp) -- so the value carries
+// the cancellation error of that form and of those running sums. Pinned
+// 2026-09-05 (round 9, family W) on a full-precision NYSE:F@15 oracle
+// (pineforge-workflow famw-f15-sd-*: 7,029/7,029 bars bit-exact; the
+// two-pass form is exact on none of them). The unbiased variant
+// (biased = false) is unpinned and keeps the two-pass window arithmetic.
 class StdDev {
     int length_;
     bool biased_;
-    std::deque<double> buffer_;
+    std::deque<double> buffer_;      // unbiased path only
+    KahanWindowSum sum_x_;           // Sx  (biased path)
+    KahanWindowSum sum_xx_;          // Sxx (biased path)
+    int bar_count_;
 
 public:
     explicit StdDev(int length, bool biased = true);
@@ -419,6 +432,7 @@ public:
 
 private:
     double held_stdev() const;
+    double biased_value() const;
 };
 
 // --- Supertrend ---

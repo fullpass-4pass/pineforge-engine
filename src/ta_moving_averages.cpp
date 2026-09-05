@@ -40,7 +40,23 @@ namespace pineforge {
 //     x), the emitted sum is the newest-first direct re-sum of the window
 //     with c reset (block 63 of both tapes drops an 18-unit / 182-unit
 //     residue to exactly 1.1 there; block 69 reads (0.7 + 0.3) + 0.7000000000000001
-//     = 1.7000000000000002, the oldest-first order gives 1.7).
+//     = 1.7000000000000002, the oldest-first order gives 1.7);
+//   * round 9 (family W, jayentriken stochRSI on six lanes) generalised that
+//     trigger on a full-coverage NYSE:F@15 oracle (pineforge-workflow
+//     famw-f15-kdhi-*: 7,035 bars of math.sum(stoch, 3), k, math.sum(k, 3),
+//     d, every value exported as its exact double): the re-sum fires whenever
+//     the compensation is UNDER-applied to the incoming source, i.e. with
+//     y0 = fl(x - c), |y0 - x| < |c| -- fully swallowed (round 7) or rounded
+//     toward x (c = 1.25 ulp(x) applied as 1 ulp; a 1.5-ulp tie resolved
+//     toward x). An exact subtraction or one rounded away from x continues.
+//     Bit-exact 7,018/7,018 on math.sum(stoch, 3) (round-7 trigger 6,849) and
+//     every k vs d sign / ta.crossover event on the lane (round 7: 24 signs,
+//     12 events wrong). The re-summed bar stores its raw source as its ring
+//     addend (c is 0 after the re-sum). Known open pin: on residue-only
+//     inputs (|x| ~ 1e-15 comparable to |c|) TradingView's decision is a
+//     SIGNED comparison (it flips under negation of the series) that this
+//     magnitude form reproduces on 6,991/7,016 math.sum(k, 3) bars; no k vs d
+//     decision on the lane depends on those bits.
 //
 // The stochRSI consequence (round-7 family D, jayentriken): k = sma(stoch, 3)
 // and d = sma(k, 3) sit on ALGEBRAIC ties whenever stoch plateaus; TradingView
@@ -53,7 +69,8 @@ namespace pineforge {
 //   c_pre = c
 //   if t >= n: y = -y[t-n] - c; T = S + y; c = (T - S) - y; S = T
 //   y = x - c; T = S + y; c = (T - S) - y; S = T; store y
-//   if c_pre != 0 and (x - c_pre) == x: S = (x + x[1]) + ... + x[n-1]; c = 0
+//   if c_pre != 0 and |fl(x - c_pre) - x| < |c_pre|:
+//       S = (x + x[1]) + ... + x[n-1]; c = 0; store x instead of y
 //   sma = S / n
 
 KahanWindowSum::KahanWindowSum(int length)
@@ -81,13 +98,23 @@ void KahanWindowSum::enter(double src, double comp_before) {
     sum_ = t;
     addends_.push_front(y);
     values_.push_front(src);
-    if (comp_before != 0.0 && (src - comp_before) == src) {
-        double total = 0.0;
-        for (double v : values_) {   // newest first
-            total += v;
+    if (comp_before != 0.0) {
+        // Round-9 pin (family W): the re-sum fires whenever the carried
+        // compensation is UNDER-applied to the incoming source -- the
+        // compensated addend fl(src - c) landed closer to src than the exact
+        // src - c would have (fully swallowed, the round-7 case, or rounded
+        // toward src: c = 1.25 ulp(src) applied as 1 ulp). An exact
+        // subtraction, or one that rounds away from src, continues.
+        const double y0 = src - comp_before;
+        if (std::fabs(y0 - src) < std::fabs(comp_before)) {
+            double total = 0.0;
+            for (double v : values_) {   // newest first
+                total += v;
+            }
+            sum_ = total;
+            comp_ = 0.0;
+            addends_.front() = src;      // the re-summed bar stores its raw source
         }
-        sum_ = total;
-        comp_ = 0.0;
     }
 }
 
