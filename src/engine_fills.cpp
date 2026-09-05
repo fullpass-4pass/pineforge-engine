@@ -3314,6 +3314,19 @@ void BacktestEngine::sort_orders_by_fill_phase(const Bar& bar) {
                 ShortSeedCollisionRole::MATERIALIZE_LONG;
         }
     }
+    // Round 9 family X: does the book hold a MARKET entry opposing the open
+    // position (a pending reversal)? Read once from the immutable book so
+    // the comparator's rank below is a pure function of each order.
+    bool opposite_market_pending = false;
+    if (position_side_ != PositionSide::FLAT) {
+        const bool pos_long = position_side_ == PositionSide::LONG;
+        for (const PendingOrder& order : pending_orders_) {
+            if (order.type == OrderType::MARKET && order.is_long != pos_long) {
+                opposite_market_pending = true;
+                break;
+            }
+        }
+    }
     std::stable_sort(pending_orders_.begin(), pending_orders_.end(),
         [&](const PendingOrder& a, const PendingOrder& b) {
             auto fill_phase = [&](const PendingOrder& o) {
@@ -3324,10 +3337,15 @@ void BacktestEngine::sort_orders_by_fill_phase(const Bar& bar) {
                 bool exit_style = order_is_exit_style(o, position_side_);
                 const bool suppress_entry_bar_leg =
                     exit_style && position_open_bar_ == bar_index_;
+                // Round 9 family X: a dormant bracket's stop / limit legs
+                // are dead (finding-311 leg-scoped) — only its trail leg
+                // can still fill, on the path.
                 bool has_stop = !std::isnan(o.stop_price)
+                    && !o.dormant_bracket
                     && !(suppress_entry_bar_leg
                          && o.coof_suppress_stop_on_entry_bar);
                 bool has_limit = !std::isnan(o.limit_price)
+                    && !o.dormant_bracket
                     && !(suppress_entry_bar_leg
                          && o.coof_suppress_limit_on_entry_bar);
                 bool has_trail = !std::isnan(o.trail_points) || !std::isnan(o.trail_price);
@@ -3377,6 +3395,37 @@ void BacktestEngine::sort_orders_by_fill_phase(const Bar& bar) {
                 const int ra = sbmt_sell_rank(a);
                 const int rb = sbmt_sell_rank(b);
                 if (ra != rb) return ra < rb;
+                // Round 9 family X (lab tv famx-nifty-gap-{declrev,ctrl,
+                // admit90}, NSE:NIFTY 15m 2025-04-15 03:45Z gap open
+                // 23343.85 over a short's 22997.5 stop): TradingView judges
+                // the pending opposite MARKET entry (the all-in reversal)
+                // at the open BEFORE the position's own priced bracket that
+                // gaps at that same open. Declined, the reversal kills the
+                // stop (finding-311) and the bar prints 'Margin call' 4 +
+                // 'Exit Short' 39 with NO long; admitted, the flip closes
+                // the position at the open and the stop never prints
+                // (admit90). Without the reversal the live stop fills the
+                // whole position at the open. The engine's source-order
+                // tie-break processed the older stop first, went flat, and
+                // then admitted the entry as a from-flat open with a trim
+                // (the probe's extra 46-lot long). A per-order rank keyed
+                // to a precomputed book fact keeps the comparator a strict
+                // weak order.
+                if (opposite_market_pending) {
+                    auto gapped_bracket_rank = [&](const PendingOrder& o) {
+                        if (o.type != OrderType::EXIT) return 0;
+                        if (!order_is_exit_style(o, position_side_)) return 0;
+                        if (o.suppress_as_declined_reversal_close) return 0;
+                        const bool priced = !std::isnan(o.stop_price)
+                            || !std::isnan(o.limit_price)
+                            || !std::isnan(o.trail_points)
+                            || !std::isnan(o.trail_price);
+                        return priced ? 1 : 0;
+                    };
+                    const int ga = gapped_bracket_rank(a);
+                    const int gb = gapped_bracket_rank(b);
+                    if (ga != gb) return ga < gb;
+                }
             }
             if (retained_child_parent_first_incarnation != 0) {
                 auto effective_seq = [&](const PendingOrder& order) {
@@ -4194,7 +4243,10 @@ void BacktestEngine::apply_filled_order_to_state(
     // WITHOUT consuming the order — unlike the suppressed close leg above, a
     // dormant bracket must SURVIVE in the book (a later margin-call partial
     // revives it; a fresh same-(id,from_entry) strategy.exit replaces it).
-    if (order.dormant_bracket) {
+    // Round 9 family X: a dormant order whose TRAIL leg is live fills
+    // through this kernel like any other trail exit (its stop / limit were
+    // masked when the candidate was evaluated).
+    if (order.dormant_bracket && !dormant_bracket_trail_leg_live(order)) {
         return;
     }
     // Fill-local proof that KI-54 admitted this order as a flat open on its
@@ -6629,6 +6681,41 @@ void BacktestEngine::suppress_declined_reversal_close_legs(
     }
 }
 
+// Round 9 family X (lab tv scratchpad/r9/famX/pins, note
+// log-20260905t173310z-c6f35398): finding-311's KILL is leg-scoped. After a
+// declined all-in reversal TradingView never fills the position's standing
+// STOP or LIMIT legs again (famx-aapl-stop-laterbar: a 208.0 stop breached
+// on 07-31 18:00Z, 19:45Z and every 08-01 bar never prints; famx-aapl-
+// limit-declrev: the 213.44 limit crossed on 08-01 never prints; the
+// control tapes fill both), but the TRAIL leg of the very same
+// strategy.exit stays live: famx-aapl-stoptrail-declrev prints 'Exit Long'
+// 08-01 13:30Z @213.46 (the omitted-offset activation) while its 208.0
+// stop is dead, famx-aapl-trailoff1-declrev @213.57 (offset 1), OANDA:
+// XAUUSD 2026-02-12 16:00Z @4955.207 and NYSE:F 2025-06-09 13:30Z @10.40
+// after declines (the probe rows the engine slid to the next open). The
+// decline itself kills (famx-aapl-stop-noexit-declrev issues no exit with
+// the reversal). A dormant order therefore keeps its trail leg eligible;
+// evaluate_fill_price masks the dead legs.
+bool BacktestEngine::dormant_bracket_trail_leg_live(const PendingOrder& o) const {
+    // The trail leg of a killed bracket is live from the bar AFTER the
+    // decline, never on the decline bar itself. TradingView's declined
+    // reversal is a flip attempt at that bar's open (the reversal MARKET
+    // order's fill): the position's own brackets are held dormant for the
+    // rest of that bar and the trail resumes next bar (a same-side re-issue
+    // usually replaces it first). Pinned by BINANCE:BTCUSDT 15m 2025-04-07
+    // (long, reversal declined at the 13:45 open; TV holds the trail through
+    // the 13:45 crash — high 78498 past the 77786 activation — and exits at
+    // the 14:00 re-issue @78365.48; 5d73b5d fired the old trail intrabar at
+    // 13:45 @77792) and BINANCE:ETHUSDT.P 15m 2025-06-16 (short, reversal
+    // declined at the 22:30 open; TV holds through the 22:30 crash and exits
+    // at the 22:45 re-issue @2553.52; 5d73b5d fired at the 2599.44 activation
+    // on 22:30). AAPL/XAUUSD/F fire on a LATER bar, unaffected.
+    return o.dormant_bracket
+        && o.type == OrderType::EXIT
+        && o.dormant_reversal_kill_bar != bar_index_
+        && (!std::isnan(o.trail_points) || !std::isnan(o.trail_price));
+}
+
 void BacktestEngine::mark_position_brackets_dormant_on_declined_reversal() {
     if (position_side_ == PositionSide::FLAT) return;
     // Round 7 family N mechanism 2 (note log-20260905t112259z-33f32db4; lab
@@ -6681,6 +6768,10 @@ void BacktestEngine::mark_position_brackets_dormant_on_declined_reversal() {
         o.dormant_reissue_pending = false;
         o.dormant_original_stop_price =
             std::numeric_limits<double>::quiet_NaN();
+        // Round 9 family X: the bar the decline killed this bracket on. Its
+        // trail leg is held for the rest of THIS bar and resumes next bar
+        // (dormant_bracket_trail_leg_live).
+        o.dormant_reversal_kill_bar = bar_index_;
     }
 }
 
@@ -6714,6 +6805,13 @@ BacktestEngine::OrderEligibility BacktestEngine::classify_order_eligibility(
             && cycle_filled_entry_ids_.count(order.from_entry) == 0) {
             return OrderEligibility::Remove;
         }
+    }
+    // Round 9 family X: the kill is LEG-scoped — only the stop and limit
+    // legs die; a trail leg (trail_points / trail_price, with or without an
+    // offset) keeps resolving, so a dormant order that carries one stays
+    // eligible and evaluate_fill_price masks its stop / limit (see
+    // dormant_bracket_trail_leg_live).
+    if (order.dormant_bracket && !dormant_bracket_trail_leg_live(order)) {
         return OrderEligibility::Skip;
     }
     if (opposing_pass == 1) {
@@ -7061,9 +7159,13 @@ BacktestEngine::FillEvaluation BacktestEngine::evaluate_fill_price(
         is_entry_bar && order.coof_suppress_stop_on_entry_bar;
     const bool suppress_limit =
         is_entry_bar && order.coof_suppress_limit_on_entry_bar;
-    const double stop_price = suppress_stop
+    // Round 9 family X (finding-311 is leg-scoped): a bracket killed by a
+    // declined reversal reaches this kernel only for its live TRAIL leg;
+    // its stop and limit legs stay dead until REVIVE-A/B.
+    const bool dormant_priced_legs = order.dormant_bracket;
+    const double stop_price = (suppress_stop || dormant_priced_legs)
         ? std::numeric_limits<double>::quiet_NaN() : order.stop_price;
-    const double limit_price = suppress_limit
+    const double limit_price = (suppress_limit || dormant_priced_legs)
         ? std::numeric_limits<double>::quiet_NaN() : order.limit_price;
     bool has_stop = !std::isnan(stop_price);
     bool has_limit = !std::isnan(limit_price);

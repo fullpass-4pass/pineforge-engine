@@ -839,6 +839,10 @@ struct PendingOrder {
     // when a margin-call partial re-registers the surviving position's exits,
     // or is replaced wholesale by a fresh same-(id,from_entry) strategy.exit
     // call (which arms the NEW call's prices, the ordinary re-issue path).
+    // Round 9 family X (lab tv famx-aapl-{stoptrail,trailoff1,stop-laterbar,
+    // limit}-declrev + controls): the kill is LEG-scoped — the stop and
+    // limit legs die, the TRAIL leg keeps filling (activation / trailing
+    // level as usual). The flag therefore means "stop and limit dead".
     bool dormant_bracket = false;
     // Round 7 family M mechanism 2a (campaign pin log-20260905t111645z-
     // e1783b94, lab tv tapes scratchpad/r7/pins/m1d-mcbar-stop-{rev,norev};
@@ -874,6 +878,12 @@ struct PendingOrder {
     // reversal) keeps its revive: that is the 1D 07-14 row. Cleared once the
     // bar's pass has run (settle_dormant_bracket_reissues).
     int dormant_hold_bar = -1;
+    // Round 9 family X: the bar index a declined reversal killed this
+    // bracket on. The revived trail leg is held for the rest of that bar and
+    // is live only from the next bar (BTC 2025-04-07 13:45, ETH 2025-06-16
+    // 22:30: TV holds the trail through the decline bar's crash and exits at
+    // the next-bar re-issue).
+    int dormant_reversal_kill_bar = -1;
     // Qty this deferred close debited from id_unclosed_qty_[<bare id>] in
     // compute_close_target_qty's default-FIFO branch at strategy.close CALL
     // time. On the false->true suppression transition it is re-credited to that
@@ -3605,6 +3615,11 @@ private:
     // finding-311: mark the live position's standing strategy.exit brackets
     // dormant when an in-position reversal entry is declined at fill.
     void mark_position_brackets_dormant_on_declined_reversal();
+    // Round 9 family X: the kill is leg-scoped — a dormant bracket's trail
+    // leg (trail_points / trail_price) stays live; its stop / limit die. Not
+    // on the decline bar itself (dormant_reversal_kill_bar): the flip attempt
+    // holds the brackets for the rest of that bar.
+    bool dormant_bracket_trail_leg_live(const PendingOrder& o) const;
     // finding-311: a margin-call partial re-registers the surviving
     // position's exit brackets (revive with original prices). When the
     // margin-call event price makes a revived bracket marketable, the whole
