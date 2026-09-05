@@ -131,6 +131,7 @@ set(TEST_SOURCES
     test_dual_entry_placement_sizing
     test_fams_same_bar_market_tx
     test_default_flat_market_gross_admission
+    test_tv_money_precision
     test_live_position_market_gross_admission
     test_lower_tf_parse_extra
     test_ta_ma_warmup_extra

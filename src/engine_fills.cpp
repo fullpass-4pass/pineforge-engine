@@ -944,7 +944,14 @@ void BacktestEngine::process_margin_call(const Bar& bar) {
     // A carried 1x long has no adverse-price liquidation. A just-filled 1x
     // long with no event is likewise ineligible, while a pending-but-exempt
     // event is consumed above and deliberately performs no affordability trim.
-    if (long_full_margin && !long_opening_affordability) return;
+    // round 8 family R: it does carry TradingView's 10-significant-digit
+    // trigger (tv_money_long_margin_call) — the broker marks the position
+    // value on rounded money, so a long whose free cash is below the rounding
+    // residual is liquidated one contract at the first such path point.
+    if (long_full_margin && !long_opening_affordability) {
+        tv_money_long_margin_call(bar);
+        return;
+    }
 
     // A leveraged position filled at the bar CLOSE has no post-fill adverse
     // path on that bar, so its first price liquidation remains next-bar-only.
@@ -1042,6 +1049,10 @@ void BacktestEngine::process_margin_call(const Bar& bar) {
                 : std::max(0.005, std::abs(opening_equity) * 1e-12);
         if (opening_equity >= required_margin - converted_ledger_guard) {
             run_post_opening_adverse_pass();
+            // round 8 family R: the affordable 1x long still walks the
+            // post-fill path on rounded money (taro 2025-08-13 05:45Z: filled
+            // at the 1.16788 open, one contract at the 1.1677 low).
+            if (long_full_margin) tv_money_long_margin_call(bar);
             return;
         }
         q_min = qty - opening_equity / margin_per_unit;
@@ -1123,9 +1134,13 @@ void BacktestEngine::process_margin_call(const Bar& bar) {
         const double equity_adv = percent_commission_live_equity(adverse);
         if (!std::isfinite(equity_adv)) return;
         const double margin_per_unit_adv = adverse * pv * fx * m;
-        const double req_margin_adv = qty * margin_per_unit_adv;
+        // round 8 family R: the required margin is rounded money in scope
+        // (tv_money_required_margin) — the restore quantity moves by a lot
+        // across its floor on a knife-edge deficit (famr-adm-rev-01000).
+        const double req_margin_adv =
+            tv_money_required_margin(qty * margin_per_unit_adv, adverse);
         if (equity_adv >= req_margin_adv) return;
-        q_min = qty - equity_adv / margin_per_unit_adv;
+        q_min = (req_margin_adv - equity_adv) / margin_per_unit_adv;
         // finding-446: the adverse extreme is a raw bar price (an identity
         // on the short side, whose mark above is already the rounded high).
         raw_exit_fill_base = bar_fill_price(adverse);
@@ -1312,6 +1327,136 @@ void BacktestEngine::process_margin_call(const Bar& bar) {
     run_post_opening_adverse_pass();
 }
 
+// round 8 family R (campaign note log-20260905t180249z-10358e84; lab tv
+// tapes famr-adm-revL L18..L33 and the taro-s-c-c-ma-simplified-2-color
+// OANDA:EURUSD@15 probe): TradingView's broker marks a position's required
+// margin on money rounded to TEN SIGNIFICANT DIGITS. A margin-100 long has
+// no adverse-price liquidation, but at every bar path point p (the open, the
+// two extremes in the bar's leg order, the close — on the opening bar only
+// the points after the fill) the broker tests
+//
+//     equity(p)  <  tv_money_round(|qty| x p x pv x fx)
+//
+// with the EXACT equity on the left: a long whose free cash is smaller than
+// the value's rounding residual (up to 0.0005 at >= 1e6, 0.00005 below) is
+// margin-called there with a deficit below one lot, which the broker covers
+// with its one-contract minimum (the fallback process_margin_call fits on
+// 974 ETHUSDT.P events). Pins: revL L18..L22 (cash 0.00013..0.00029) trimmed
+// 1 @ 1.08151 = the fill bar's high; L23 (0.00033) 1 @ 1.08228 = the fourth
+// bar's close; L24/L25 (0.00037/0.00041) 1 @ 1.08213 = the sixth bar's high;
+// L26..L33 (>= 0.00045) never — 16/16; the probe's six 'Margin call 1' rows
+// at the exact bar, point and price (2025-08-13 05:45Z L 1.1677, 09-15 16:00Z
+// C 1.17653, 09-17 09:45Z C 1.18457, 10-03 01:45Z H 1.17293, 11-25 06:45Z H
+// 1.15217, 12-30 06:15Z H 1.17798); 0 false fires over 612 every-bar sensor
+// longs (their equity sits below 1e6). One broker event per bar, plain
+// close-calc dispatch only (the pinned tapes), scoped by tv_money_scope.
+// Shorts keep the finite-price cascade: the same rounding moves their
+// liquidation price by ~1e-10, below a tick.
+bool BacktestEngine::tv_money_long_margin_call(const Bar& bar) {
+    if (!margin_call_enabled_) return false;
+    if (position_side_ != PositionSide::LONG) return false;
+    if (!std::isfinite(margin_long_)
+        || std::abs(margin_long_ / 100.0 - 1.0) >= 1e-12) return false;
+    if (last_margin_call_event_bar_ == bar_index_) return false;
+    if (intrabar_exit_margin_call_bar_ == bar_index_) return false;
+    if (process_orders_on_close_ || calc_on_order_fills_
+        || bar_magnifier_enabled_ || coof_scheduler_active_
+        || stream_warmup_mode_ || stream_phase_ != StreamPhase::IDLE) {
+        return false;
+    }
+    if (!std::isfinite(bar.close) || !tv_money_scope(bar.close)) return false;
+    // Pinned on same-currency accounts only. A converted (quote -> account
+    // FX series) ledger is cent-rounded in TradingView's export and already
+    // carries its own sub-half-cent tolerance on the opening path; the
+    // 10-digit residual has no tape there.
+    if (!account_currency_fx_timestamps_.empty()) return false;
+    const double qty = position_qty_;
+    const double pv = syminfo_.pointvalue;
+    const double fx = active_account_currency_fx();
+    if (!std::isfinite(qty) || !(qty > 0.0) || !std::isfinite(pv)
+        || !std::isfinite(fx) || !(fx > 0.0)) return false;
+    if (!std::isfinite(position_entry_price_) || !std::isfinite(initial_capital_)
+        || !std::isfinite(net_profit_sum_)) return false;
+    // The grid must be able to express the one-contract minimum.
+    if (!(qty_step_ > 0.0) || qty_step_ > 1.0) return false;
+
+    const bool high_first = internal::bar_path_uses_high_first(bar);
+    double path[4];
+    internal::fill_bar_path_points_ordered(bar, high_first, path);
+    int start = 0;
+    if (position_open_bar_ == bar_index_) {
+        // Opening bar: only the waypoints strictly after the fill (a market
+        // fill at the open reads as position 0 -> the open itself excluded).
+        double fill_pos = pyramid_entries_.empty()
+            ? 0.0 : pyramid_entries_.front().entry_path_position;
+        if (!std::isfinite(fill_pos) || fill_pos < 0.0) fill_pos = 0.0;
+        int seg = static_cast<int>(std::floor(fill_pos + internal::kPathPosEps));
+        if (seg < 0) seg = 0;
+        start = seg + 1;
+    }
+    double fire_price = std::numeric_limits<double>::quiet_NaN();
+    double deficit = 0.0;
+    for (int i = start; i < 4; ++i) {
+        const double p = path[i];
+        if (!std::isfinite(p) || !(p > 0.0)) continue;
+        const double value = qty * p * pv * fx;
+        const double equity = percent_commission_live_equity(p);
+        if (!std::isfinite(value) || !std::isfinite(equity)) continue;
+        const double rounded_value = tv_money_round(value);
+        // Only a ROUNDING deficit is this trigger's: the exact ledger must
+        // still cover the position (a real shortfall — a fee, an adverse
+        // mark — belongs to the established paths and their tolerances).
+        // Strict, with a float guard far below the pinned margins (the
+        // closest fire is 3.4e-6 under, revL L23): flat p0000 (C == cost, so
+        // equity == value == its rounding at the fill bar's low, up to the
+        // ulp of 925000 x 1.08094) is not called.
+        if (equity + 1e-7 >= value && equity + 1e-7 < rounded_value) {
+            fire_price = p;
+            deficit = rounded_value - equity;
+            break;
+        }
+    }
+    if (!std::isfinite(fire_price)) return false;
+    // The restore quantity is sub-lot by construction (the deficit is a
+    // rounding residual); the broker closes one whole contract, capped at
+    // the position — the fallback process_margin_call fits.
+    const double raw_q_min = deficit / (fire_price * pv * fx);
+    if (!std::isfinite(raw_q_min) || raw_q_min < 0.0) return false;
+    double qty_liq = std::min(1.0, qty);
+    const bool full_position_cap = qty_liq >= qty - kQtyEpsilon;
+    if (!full_position_cap) {
+        const double gridded = apply_exit_qty_step(qty_liq);
+        const double grid_guard = std::max(1e-12, std::abs(qty_liq) * 1e-12);
+        if (std::abs(gridded - qty_liq) > grid_guard) return false;
+    }
+    if (raw_q_min >= 1.0) {
+        // Not a rounding-residual deficit: leave it to the ordinary paths.
+        return false;
+    }
+    if (qty_liq >= qty - kQtyEpsilon) qty_liq = qty;
+    if (!std::isfinite(qty_liq) || qty_liq <= kQtyEpsilon) return false;
+
+    const double raw_exit_fill_base = bar_fill_price(fire_price);
+    const size_t trades_before = trades_.size();
+    if (qty_liq >= qty - kQtyEpsilon) {
+        execute_market_exit(raw_exit_fill_base);
+    } else {
+        execute_partial_exit_qty(raw_exit_fill_base, qty_liq,
+                                 PositionReductionCause::MARGIN_CALL);
+    }
+    if (trades_.size() == trades_before) return false;
+    ++broker_fill_event_seq_;
+    last_margin_call_event_bar_ = bar_index_;
+    for (size_t ti = trades_before; ti < trades_.size(); ++ti) {
+        trades_[ti].exit_comment = "Margin call";
+        trades_[ti].exit_id = "__margin_call__";
+    }
+    if (position_side_ != PositionSide::FLAT) {
+        revive_position_brackets_after_margin_call_partial(raw_exit_fill_base);
+    }
+    return true;
+}
+
 void BacktestEngine::revive_position_brackets_after_margin_call_partial(
         double margin_call_event_price) {
     const double mc_price = margin_call_event_price;
@@ -1496,9 +1641,11 @@ bool BacktestEngine::margin_call_slice_before_priced_exit(
     const double equity_adv = percent_commission_live_equity(adverse_mark);
     if (!std::isfinite(equity_adv)) return false;
     const double margin_per_unit_adv = adverse_mark * pv * fx * m;
-    const double req_margin_adv = qty * margin_per_unit_adv;
+    // round 8 family R: rounded required margin in scope (process_margin_call).
+    const double req_margin_adv =
+        tv_money_required_margin(qty * margin_per_unit_adv, adverse);
     if (equity_adv >= req_margin_adv) return false;
-    double q_min = qty - equity_adv / margin_per_unit_adv;
+    double q_min = (req_margin_adv - equity_adv) / margin_per_unit_adv;
     if (!std::isfinite(q_min) || q_min <= kQtyEpsilon) return false;
 
     // Slice quantity: floor-before-4x, representation guards, and the
@@ -1904,9 +2051,11 @@ bool BacktestEngine::margin_call_slice_at_bar_open(const Bar& bar) {
     if (!std::isfinite(margin_per_unit_open) || !(margin_per_unit_open > 0.0)) {
         return false;
     }
-    const double req_margin_open = qty * margin_per_unit_open;
+    // round 8 family R: rounded required margin in scope (process_margin_call).
+    const double req_margin_open =
+        tv_money_required_margin(qty * margin_per_unit_open, open);
     if (equity_open >= req_margin_open) return false;
-    double q_min = qty - equity_open / margin_per_unit_open;
+    double q_min = (req_margin_open - equity_open) / margin_per_unit_open;
     if (!std::isfinite(q_min) || q_min <= kQtyEpsilon) return false;
 
     // Slice quantity: floor-before-4x, representation guards, and the
@@ -4291,7 +4440,77 @@ void BacktestEngine::apply_filled_order_to_state(
     // including a flat open, would be declined forever. The KI-72 branch above
     // now catches that non-positive-qty case explicitly (clean decline); this
     // gate keeps its own > 0 guards so the solvent-path arithmetic is unchanged.
-    if (!std::isnan(order.sizing_equity) && !std::isnan(order.sizing_price)
+    // round 8 family R (OANDA:EURUSD@15; campaign notes
+    // log-20260905t164404z-85800609 and log-20260905t180248z-0dce5ab0;
+    // tv_money_round / tv_money_scope, engine.hpp): TradingView's broker runs
+    // the all-in admission on 10-significant-digit money. A default 100 %-of-
+    // equity, margin-100 MARKET entry is admitted iff the exact sizing equity
+    // covers the ROUNDED cost at the signal close,
+    //
+    //     E_s >= tv_money_round(|frozen_qty| x tick(close_S) x pv x fx)
+    //
+    // — strict: flat p0000 (C == cost == round(cost)) fills. When it fails a
+    // FLAT open is dropped (bare account: famr-adm-revL L06..L17 and
+    // FL00..02, C = 1000000.0015396 .. 1000000.0019980 rejected against
+    // round(1000000.0018862) = 1000000.002; L18 = 1000000.0020196 admitted)
+    // and a REVERSAL keeps only its closing leg (affordability_close_only —
+    // the position goes flat at the fill, no new position): 24/24 close-leg-
+    // only rejections of the taro probe + the every-bar sensors have
+    // E_s < round(cost) and 0/3086 admissions do. It runs AHEAD of the exact
+    // fill-price checks below: under the family-G gap reject (Q x open > E_s)
+    // TV still filled the closing leg 39 times (1 whole drop) when this
+    // rounded check failed, and whole-dropped 1597 times when it passed.
+    // Same-direction adds are out of scope (no tape). Also documented and
+    // NOT implemented: the sweeps' whole-order rejection band above the
+    // rounded cost (famr-adm-revb/revd/S1/S3: E in [B, B + 0.00046) dropped
+    // entirely, matched by 35 taro/sensor whole drops but contradicted by
+    // 3086 admissions with the same placement features — note
+    // log-20260905t180249z-4bd857ad) and TV's 1-unit entry fill when the
+    // entry leg fails with Q == |position| + 1.00 exactly (revL L23, taro
+    // 2025-09-15 16:15Z).
+    if (order.type == OrderType::MARKET
+        && !order.affordability_close_only
+        && !std::isnan(order.sizing_equity) && !std::isnan(order.sizing_mark)
+        && !std::isnan(order.frozen_default_qty)
+        && order.sizing_equity > 0.0 && order.frozen_default_qty > 0.0
+        && order.sizing_mark > 0.0
+        && std::isfinite(order.sizing_price) && order.sizing_price > 0.0
+        && default_qty_type_ == QtyType::PERCENT_OF_EQUITY
+        && std::abs(default_qty_value_ - 100.0) < 1e-12
+        && tv_money_scope(order.sizing_price)) {
+        const double margin_dir = order.is_long ? margin_long_ : margin_short_;
+        const PositionSide requested_side =
+            order.is_long ? PositionSide::LONG : PositionSide::SHORT;
+        const bool flat_open = position_side_ == PositionSide::FLAT;
+        const bool reversal_entry =
+            position_side_ != PositionSide::FLAT
+            && position_side_ != requested_side;
+        if ((flat_open || reversal_entry)
+            && std::isfinite(margin_dir) && std::abs(margin_dir - 100.0) < 1e-12) {
+            const double fx_s =
+                std::isfinite(order.sizing_fx) && order.sizing_fx > 0.0
+                    ? order.sizing_fx : active_account_currency_fx();
+            // The cost at the price the quantity was floored against (the
+            // slipped sizing price; == tick(close_S) at slippage 0, every
+            // pinned tape): by the floor invariant the EXACT cost never
+            // exceeds the equity there, so only the rounding can fail it.
+            const double cost_s = order.frozen_default_qty * order.sizing_price
+                                  * syminfo_.pointvalue * fx_s;
+            if (order.sizing_equity + 1e-9 < tv_money_round(cost_s)) {
+                if (!reversal_entry) {
+                    decline_and_cancel();
+                    return;
+                }
+                order.affordability_close_only = true;
+            }
+        }
+    }
+    // A reversal reduced to its closing leg (family R above, or the placement
+    // half) needs no opening admission: the KI-54 / gap gates below judge an
+    // OPENING quantity, and declining the close leg here would turn TV's
+    // flat-at-the-open into a held position.
+    if (!order.affordability_close_only
+        && !std::isnan(order.sizing_equity) && !std::isnan(order.sizing_price)
         && !std::isnan(order.frozen_default_qty)
         && order.sizing_equity > 0.0 && order.frozen_default_qty > 0.0
         && default_qty_type_ == QtyType::PERCENT_OF_EQUITY
