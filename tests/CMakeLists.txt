@@ -175,6 +175,7 @@ set(TEST_SOURCES
     test_trail_open_arm_subtick_offset
     test_trail_fill_snap
     test_trail_ref_entry_bar_extreme
+    test_trail_close_restart_no_fold
     test_trail_activation_tick_bar
     test_session_predicates_daily_chart
 )
