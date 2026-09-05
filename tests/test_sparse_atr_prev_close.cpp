@@ -346,12 +346,108 @@ static void test_engine_prev_chart_close_rolls_back_with_coof_checkpoint() {
     CHECK(second_run_ok);
 }
 
+// 6. The same rollback with a fill recalculation on EVERY bar (round 9, JOAT aureate): the tracker is
+//    bar history and rolls back with the COOF checkpoint. On a bar whose open
+//    fills the previous close's market order, the fill recalculation AND the
+//    ordinary close execution both read prev_chart_close() == close[1] of
+//    the chart, so an every-bar ta.atr fed with it reproduces the chart-close
+//    RMA on every close execution. Before the fix the close execution read
+//    the recalc's own close (the full script bar), i.e. true range high - low
+//    (TradingView pin: lab tv i178-coof-atr-sense-aapl15, ta.atr(14) ==
+//    ta.rma(ta.tr(true), 14) on 4315/4315 executions).
+class CoofEveryBarAtrProbe : public BacktestEngine {
+public:
+    ta::ATR atr_{3};
+    ta::ATR atr_ckpt_{3};
+    struct Seen { int bar; bool recalc; double prev; double atr; };
+    std::vector<Seen> seen;
+    CoofEveryBarAtrProbe() {
+        calc_on_order_fills_ = true;
+        pyramiding_ = 0;
+        initial_capital_ = 1'000'000'000;
+        default_qty_type_ = QtyType::FIXED;
+        default_qty_value_ = 1.0;
+        syminfo_mintick_ = 0.01;
+        slippage_ = 0;
+        commission_type_ = CommissionType::PERCENT;
+        commission_value_ = 0.0;
+    }
+    // The generated script's checkpoint discipline for its TA objects.
+    void snapshot_script_state() override { atr_ckpt_ = atr_; }
+    void restore_script_state() override { atr_ = atr_ckpt_; }
+    void commit_script_state() override { atr_ckpt_ = atr_; }
+    void on_bar(const Bar&) override {
+        const double v = history_advances_new_bar()
+            ? atr_.compute(current_bar_.high, current_bar_.low, current_bar_.close, prev_chart_close())
+            : atr_.recompute(current_bar_.high, current_bar_.low, current_bar_.close, prev_chart_close());
+        seen.push_back({bar_index_, coof_fill_recalc_active_, prev_chart_close(), v});
+        // JOAT's shape reduced to its sensor: a reversing market order at every
+        // close-time execution, so every bar's open carries a fill recalc.
+        if (!coof_fill_recalc_active_) {
+            if (bar_index_ % 2 == 0) strategy_entry("L", true);
+            else strategy_entry("S", false);
+        }
+    }
+};
+
+// Ten chart bars that GAP: open != previous close on 1, 3, 4, 6, 8, so the
+// chart-close true range differs from high - low there (the every-bar shape
+// of chart() above has no gaps and cannot tell the two apart).
+static std::vector<Bar> gap_chart_every_bar() {
+    return {
+        mk(0, 100, 101,  99, 100),   // TR 2 (first bar)
+        mk(1, 104, 105, 103, 104),   // prev 100 -> TR 5; high - low 2
+        mk(2, 104, 106, 103, 105),   // prev 104 -> TR 3
+        mk(3, 110, 111, 109, 110),   // prev 105 -> TR 6; high - low 2
+        mk(4, 108, 109, 107, 108),   // prev 110 -> TR 3; high - low 2
+        mk(5, 108, 110, 106, 107),   // prev 108 -> TR 4
+        mk(6, 100, 101,  99, 100),   // prev 107 -> TR 8; high - low 2
+        mk(7, 100, 102,  98, 101),   // prev 100 -> TR 4
+        mk(8, 105, 106, 104, 105),   // prev 101 -> TR 5; high - low 2
+        mk(9, 105, 107, 103, 104),   // prev 105 -> TR 4
+    };
+}
+
+static void test_engine_prev_chart_close_survives_coof_recalc_every_bar() {
+    std::printf("test_engine_prev_chart_close_survives_coof_recalc_every_bar\n");
+    const auto bars = gap_chart_every_bar();
+    CoofEveryBarAtrProbe p;
+    p.run(bars.data(), (int)bars.size());
+    int recalcs = 0, closes = 0;
+    RefRma3 ref;
+    std::vector<double> want;
+    for (int i = 0; i < (int)bars.size(); ++i)
+        want.push_back(ref.step(tr_against(bars[i], i == 0 ? kNaN : bars[i - 1].close)));
+    for (const auto& s : p.seen) {
+        CHECK(s.bar >= 0 && s.bar < (int)bars.size());
+        if (s.bar < 0 || s.bar >= (int)bars.size()) continue;
+        // Every execution of bar i — recalc or close — reads the chart's close[1].
+        if (s.bar == 0) CHECK(std::isnan(s.prev));
+        else CHECK(near(s.prev, bars[s.bar - 1].close));
+        if (s.recalc) { ++recalcs; continue; }
+        ++closes;
+        if (std::isnan(want[s.bar])) CHECK(std::isnan(s.atr));
+        else CHECK(near(s.atr, want[s.bar]));
+    }
+    CHECK(closes == (int)bars.size());
+    // Bars 1..9 open with a fill of the previous close's market order.
+    CHECK(recalcs >= (int)bars.size() - 1);
+    // The pinned numbers: seed (2 + 5 + 3) / 3 on bar 2 (high - low would seed
+    // (2 + 2 + 3) / 3), then (6 + 2 * seed) / 3 on bar 3 (high - low: 2).
+    for (const auto& s : p.seen) {
+        if (s.recalc) continue;
+        if (s.bar == 2) CHECK(near(s.atr, (2.0 + 5.0 + 3.0) / 3.0));
+        if (s.bar == 3) CHECK(near(s.atr, (6.0 + 2.0 * ((2.0 + 5.0 + 3.0) / 3.0)) / 3.0));
+    }
+}
+
 int main() {
     test_atr_four_arg_reads_chart_prev_close();
     test_atr_four_arg_recompute_is_idempotent();
     test_tr_four_arg();
     test_engine_prev_chart_close_tracker();
     test_engine_prev_chart_close_rolls_back_with_coof_checkpoint();
+    test_engine_prev_chart_close_survives_coof_recalc_every_bar();
     std::printf("\n%d passed, %d failed\n", g_pass, g_fail);
     return g_fail == 0 ? 0 : 1;
 }
