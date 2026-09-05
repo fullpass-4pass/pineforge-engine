@@ -4500,7 +4500,26 @@ void BacktestEngine::apply_filled_order_to_state(
         const bool reversal_entry =
             position_side_ != PositionSide::FLAT
             && position_side_ != requested_side;
-        if ((flat_open || reversal_entry)
+        // The broker judges a TRUE-FLAT placement (nothing held when the
+        // order was placed) and a bare REVERSAL (one strategy.entry against
+        // the held side; the position is still open at this fill). An entry
+        // placed while a position was open and filling FLAT because a
+        // separate close order of the same bar took the position first (the
+        // strategy.close + strategy.entry pair, created_after_position_
+        // close_in_bar) is NOT judged: TradingView fills it and lets the
+        // margin-call machinery absorb the deficit — demete1226 2025-04-04
+        // 02:30Z (long 913809.48 closed one pip below the signal close, the
+        // short 913809.48 costs 9.14 USD more than the cash left: filled,
+        // 6008.48 'Margin call' at 1.10718) and 2025-04-07 08:00Z (E_s in
+        // the rule-5 tie band, the open six pips up: filled, 1 unit + 13681.2
+        // 'Margin call'). Judging that shape on E_s dropped the 08:00Z short
+        // (8a4b831), judging it on the post-close cash dropped every gap-down
+        // pair (ae1d99a, demete 99.2 -> 69.6 %); the bare-entry scripts and
+        // every from-flat pin are untouched either way.
+        const bool true_flat_placement =
+            order.created_position_side == PositionSide::FLAT
+            && !order.created_after_position_close_in_bar;
+        if (((flat_open && true_flat_placement) || reversal_entry)
             && std::isfinite(margin_dir) && std::abs(margin_dir - 100.0) < 1e-12) {
             const double fx_s =
                 std::isfinite(order.sizing_fx) && order.sizing_fx > 0.0
@@ -4511,24 +4530,11 @@ void BacktestEngine::apply_filled_order_to_state(
             // exceeds the equity there, so only the rounding can fail it.
             const double cost_s = order.frozen_default_qty * order.sizing_price
                                   * syminfo_.pointvalue * fx_s;
-            // The equity the broker judges the order against is the equity
-            // at the moment it judges it: a bare REVERSAL (one order, the
-            // position still open at this fill) is judged at the signal close
-            // with the frozen sizing equity — 4782/4782 taro + every-bar
-            // reversal decisions fit E_s, 813 fail the fill-marked equity —
-            // while an entry that fills FROM FLAT is judged at its fill with
-            // the account's cash then. For a true-flat placement that is the
-            // same number as E_s (nothing to mark); for a strategy.close +
-            // strategy.entry pair it is the cash AFTER the close leg filled
-            // at this open, gap included: demete1226 2025-04-07 08:00Z (long
-            // 915248.71 closed at 1.10014, six pips above the 1.10008 signal
-            // close; E_s 1006883.2254 puts the short's 915281.82 in the
-            // rule-5 tie band, cash 1006938.15 after the close does not) —
-            // TradingView filled the short and margin-called the 0.0011
-            // deficit one unit at the fill; willowsportz pulse and algoai
-            // share the close+entry shape.
-            const double judged_equity =
-                flat_open ? current_equity() : order.sizing_equity;
+            // Both checks read the frozen signal-close equity E_s: 4782/4782
+            // taro + every-bar reversal decisions fit E_s (the fill-marked
+            // equity fails 813), and a true-flat placement has nothing to
+            // mark.
+            const double judged_equity = order.sizing_equity;
             if (judged_equity + 1e-9 < tv_money_round(cost_s)) {
                 if (!reversal_entry) {
                     decline_and_cancel();
