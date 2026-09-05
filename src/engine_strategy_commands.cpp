@@ -781,8 +781,8 @@ void BacktestEngine::strategy_entry(const std::string& id, bool is_long,
         }
     } else {
         order.type = OrderType::ENTRY;
-        order.limit_price = limit_price;
-        order.stop_price = stop_price;
+        order.limit_price = level_on_price_grid(limit_price);
+        order.stop_price = level_on_price_grid(stop_price);
         // round 7: a pure STOP reversal whose entry leg was rejected at
         // placement rests as the reversal's closing leg only (consumed by
         // apply_entry_order_fill; its fill-time admission is skipped since
@@ -2101,8 +2101,8 @@ void BacktestEngine::strategy_exit(const std::string& id, const std::string& fro
     order.from_entry = from_entry;
     order.type = OrderType::EXIT;
     order.is_long = false;
-    order.limit_price = limit_price;
-    order.stop_price = stop_price;
+    order.limit_price = level_on_price_grid(limit_price);
+    order.stop_price = level_on_price_grid(stop_price);
     order.trail_points = trail_points;
     order.trail_price = trail_price;
     order.trail_offset = trail_offset;
@@ -2454,8 +2454,8 @@ void BacktestEngine::strategy_order(const std::string& id, bool is_long, double 
         }
     } else {
         order.type = OrderType::RAW_ORDER;
-        order.limit_price = limit_price;
-        order.stop_price = stop_price;
+        order.limit_price = level_on_price_grid(limit_price);
+        order.stop_price = level_on_price_grid(stop_price);
     }
 
     pending_orders_.push_back(std::move(order));

@@ -1854,6 +1854,67 @@ protected:
         }
         return k * syminfo_mintick_;
     }
+    // round 8 family T (NYSE:F@15, pinned by 40 `lab tv` sensor tapes on
+    // NYSE:F / CME_MINI:ES1! / OANDA:EURUSD 15m, scratchpad famT/pins,
+    // 2026-09-05): TradingView stores a resting stop / limit LEVEL on the
+    // symbol's PRICE GRID (multiples of 1 / pricescale, pricescale =
+    // 10^decimals of the tick) whenever the level sits within
+    // 0.01 / pricescale^2 of a grid price — the residue a level computed
+    // as avg_price +/- k * mintick carries (9.99 + 0.05 =
+    // 10.040000000000001, 11.86 - 0.05 = 11.809999999999999) and anything
+    // up to 1e-6 on a 2-decimal symbol (10.040001 IS 10.04; 10.0400012 is
+    // not and takes the directional snap: a sell limit at 10.0400012 fills
+    // at 10.05). ES1! (tick 0.25, pricescale 100) has the same 1e-6 band
+    // (5513.7500005 IS 5513.75, 5513.750001 is not); EURUSD (pricescale
+    // 1e5) snaps only within 1e-12 (1.135560000001 IS 1.13556,
+    // 1.135560000002 is not). The engine used to compare the RAW level
+    // against the tick-quantized bar, so a bar whose quantized extreme
+    // EQUALS the level (h 10.04, or h 10.035 -> 10.04, vs
+    // 10.040000000000001) did not fill and the exit landed bars later at
+    // the same snapped price — 148 of the 179 exit-time mismatches on the
+    // F@15 lane (masayanfx-scalping 102, latibonit 17, jos-protrader 8,
+    // vasudevshenoy 6, lukeborgerding, drakkhon, rhyme17, hariss369,
+    // colasbreugnon, fast-scalper, JOAT aureate). Applied where a level is
+    // stored on a PendingOrder (strategy.entry / exit / order, and the
+    // profit / loss tick conversion), so every trigger test, gap test,
+    // marketable-at-placement test and fill snap reads the grid value —
+    // materialized as k / pricescale, the double the decimal literal
+    // parses to, bit-for-bit equal to tick_grid_price's output. A level
+    // outside the band is returned untouched (the directional fill snap
+    // and the exact trigger compare keep TV's sub-tick behaviour, round 6).
+    // A binary tick (1/128 = 0.0078125) resolves to a 7-decimal grid whose
+    // band is 1e-16: effectively untouched; a tick with no short decimal
+    // expansion has no grid and is untouched.
+    static constexpr double kLevelGridBandPoints = 0.01;  // x 1/pricescale
+    int price_grid_decimals() const {
+        if (syminfo_mintick_ <= 0.0) return -1;
+        double scaled = syminfo_mintick_;
+        for (int n = 0; n <= 10; ++n) {
+            const double k = std::floor(scaled + 0.5);
+            if (k >= 1.0 && std::abs(scaled - k) <= 1e-6 * k) return n;
+            scaled *= 10.0;
+        }
+        return -1;
+    }
+    double level_on_price_grid(double level) const {
+        if (std::isnan(level) || !std::isfinite(level)) return level;
+        const int n = price_grid_decimals();
+        if (n < 0) return level;
+        double pricescale = 1.0;
+        for (int i = 0; i < n; ++i) pricescale *= 10.0;
+        // Points as level / pointsize (pointsize = 1 / pricescale as a
+        // double): of the candidate arithmetics this is the one that
+        // reproduces every tape at the band's FP boundary (EURUSD
+        // 1.13556 + 1e-12 snaps, + 2e-12 does not; ES 5513.75 + 5e-7
+        // snaps, + 1e-6 does not; F 10.04 + 1e-6 snaps, + 1.2e-6 does not).
+        const double pointsize = 1.0 / pricescale;
+        const double p = level / pointsize;
+        const double k = std::floor(p + 0.5);
+        if (std::abs(p - k) <= kLevelGridBandPoints / pricescale) {
+            return k / pricescale;
+        }
+        return level;
+    }
     Bar broker_tick_bar(const Bar& bar) const {
         Bar b = bar;
         b.open = tick_grid_price(bar.open);

@@ -6449,10 +6449,12 @@ void BacktestEngine::materialize_relative_exit_prices_for_live_position() {
             continue;
         }
         if (std::isnan(order.limit_price) && !std::isnan(order.profit_ticks)) {
-            order.limit_price = position_entry_price_ + dir * order.profit_ticks * syminfo_mintick_;
+            order.limit_price = level_on_price_grid(
+                position_entry_price_ + dir * order.profit_ticks * syminfo_mintick_);
         }
         if (std::isnan(order.stop_price) && !std::isnan(order.loss_ticks)) {
-            order.stop_price = position_entry_price_ - dir * order.loss_ticks * syminfo_mintick_;
+            order.stop_price = level_on_price_grid(
+                position_entry_price_ - dir * order.loss_ticks * syminfo_mintick_);
         }
     }
 }
