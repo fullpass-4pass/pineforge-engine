@@ -66,7 +66,15 @@ enum class PositionSide { FLAT, LONG, SHORT };
 //      (process_margin_call): revL L18..L25 16/16, taro 6/6 one-unit trims.
 // Where equity ~ 1e6 and a lot is worth ~0.011 (EURUSD: qty step 0.01 at
 // price ~1.1) the 0.0005 rounding crosses a lot boundary on ~9 % of all-in
-// placements; on F / AAPL / indices (a lot is 10..250k) it never does.
+// placements; on F / AAPL / indices (a lot is 10..250k) it crosses one only
+// at an exact-decimal tie — and there it does (round 10 family AE, NASDAQ:
+// AAPL 2025-09-05 16:15Z: E_s 1094521.68 = 4584 x 238.77 exactly; TradingView
+// floors the ten-digit equity's raw double quotient 4583.999999999999 to
+// 4583, the float-accumulated ledger's 4584.000000000001 or a 1e-6-nudged
+// floor gives 4584, one share the account cannot pay at the 238.78 fill), so
+// rule 1 sizes every lot-stepped instrument (tv_money_lot_sizing); rules
+// 2, 3 and 5 stay scoped by tv_money_scope — outside it the exact fill-price
+// admission already decides (1094521.681 -> Q 4584 dropped on AAPL).
 //   5. WHOLE-ORDER DROP (round 9 family R follow-up, campaign notes
 //      log-20260905t205824z-af397c83 and log-20260905t210117z-ab914192;
 //      the residual of log-20260905t180249z-4bd857ad): once the rounded-cost
@@ -1893,6 +1901,12 @@ protected:
                                  * active_account_currency_fx();
         return std::isfinite(lot_value) && lot_value < 1.0;
     }
+    // Rule 1's scope (round 10 family AE): the ten-digit equity and the raw
+    // lot floor size EVERY lot-stepped instrument — integer shares included
+    // (NASDAQ:AAPL 2025-09-05 16:15Z: 1094521.68 / 238.77 floors to 4583 on
+    // TradingView, 4584 from the float-accumulated ledger or a nudged
+    // floor). Only a continuous qty_step 0 keeps the exact arithmetic.
+    bool tv_money_lot_sizing() const { return qty_step_ > 0.0; }
     // The broker's required margin at a mark is money at ten significant
     // digits where that can move a lot (famr-adm-rev-01000: the 4x trim of
     // the fill bar's short is 3900.60 from the ROUNDED 1000527.321 required
@@ -2336,7 +2350,29 @@ protected:
                 // sits within half a money unit of a lot boundary.
                 double equity = percent_commission_live_equity(
                     round_to_mintick(current_bar_.close));
-                if (tv_money_scope(basis)) equity = tv_money_round(equity);
+                // Round 10 family AE (NASDAQ:AAPL@15, fast-scalper; campaign
+                // note log-20260905t223336z-67f0f181): the rounding is NOT
+                // confined to sub-unit lots. On a cent-priced integer-share
+                // book the exact equity is a cent sum, but the engine's
+                // ledger carries float-accumulation noise (1094521.68 held
+                // as 1094521.6800000002) and the quotient by the close can
+                // sit exactly on an integer in decimal (1094521.68 / 238.77
+                // = 4584): TradingView floors the ten-digit equity's raw
+                // double quotient (4583.999999999999 -> 4583 shares); the
+                // noisy numerator (4584.000000000001) or the 1e-6 nudge of
+                // apply_qty_step both hand it 4584, one share the account
+                // cannot pay at the 238.78 fill, and the reversal is declined
+                // where TradingView admits it. Nine lab tv capital sweeps on
+                // AAPL (famae-sz-*): 897890.32 / 213.58 -> 4203 (the raw
+                // floor; 4204 in exact decimal), 897890.3200004 -> 4203 (the
+                // 4e-7 is rounded away before the division), 897890.321 ->
+                // 4204; 887295.33 / 211.11 -> 4202, .3300004 -> 4202,
+                // .331 -> 4203; 1094521.68 / 238.77 -> 4583 (the probe's
+                // row), 1094521.681 -> 4584 (dropped: 4584 x 238.78 > C).
+                // Every lot-stepped instrument therefore sizes from
+                // tv_money_round(equity) with the raw lot floor; only the
+                // corpus' continuous qty_step 0 keeps the exact arithmetic.
+                if (tv_money_lot_sizing()) equity = tv_money_round(equity);
                 if (!std::isfinite(equity)) return 0.0;
                 double cash = reserve_percent_commission(equity * (default_qty_value_ / 100.0)) / active_account_currency_fx();
                 // Reject (qty 0) on a non-finite / non-positive fill price — a
@@ -2347,7 +2383,7 @@ protected:
                 // floor of sig10(E) / tick(close) — the 1e-6 nudge of
                 // apply_qty_step would hand the everybar 1.085 placement one
                 // lot more than TradingView filled.
-                if (tv_money_scope(basis)) {
+                if (tv_money_lot_sizing()) {
                     return tv_money_floor_lot(cash / (basis * syminfo_.pointvalue),
                                               qty_step_);
                 }
