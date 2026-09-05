@@ -213,17 +213,52 @@ void test_subtick_offset_fills_at_activation_long() {
 
 void test_subtick_offset_gapped_open_arms_and_rides() {
     std::printf("test_subtick_offset_gapped_open_arms_and_rides\n");
-    // The bar opens past the activation (1.08320 <= 1.08329 for a short):
-    // the open ARMS the trail with best = open and it rides the raw running
-    // best (round 10 family AC, test_zero_offset_trail_rides: NYSE:F
-    // g2-0321-S-tp5 opens 9.915 past a 9.99 activation and TV fills at the
-    // bar's 9.86 low) for 0 / 0.5 / 0.9 alike. Low-first path (|O-L| =
-    // 0.00015 < |H-O| = 0.0002): the O->L leg lowers the best to 1.08305,
-    // the L->H leg crosses it -> a trail fill at the low.
+    // The bar opens past the activation (1.08320 <= 1.08329 for a short) and
+    // the open ARMS the trail with best = open — for 0 / 0.5 / 0.9 alike,
+    // since a sub-tick offset truncates to zero ticks. What the open then
+    // does is decided by the TICK GRID it lands on (round 10 family AC,
+    // pins4): the level the open creates is itself snapped directionally
+    // (short: ceil), so an ON-GRID open IS that level and is touched at once.
+    // 1.08320 is a whole 0.00001 tick -> the open fills, whatever the path.
     Bar gap = mk(1.08320, 1.08340, 1.08305, 1.08330);
     const double offsets[] = {0.0, 0.5, 0.9};
     for (double off : offsets) {
         ExitPathFill f = trail_fill(gap, PositionSide::SHORT,
+                                    /*trail_points=*/0.6, off,
+                                    /*entry=*/1.08330, /*best_start=*/1.08330,
+                                    /*mintick=*/0.00001);
+        CHECK(f.should_fill == true);
+        CHECK(near(f.fill_price, 1.08320));
+        CHECK(f.at_bar_open == true);
+        CHECK(near(f.path_position, 0.0));
+    }
+    // High-first twin, same on-grid open: same fill. The path never gets to
+    // matter. (Before pins4 this fixture asserted a ride to the 1.08305 low
+    // on the low-first bar and a level fill at the open on the high-first
+    // one; the ride is what a SUB-TICK open does — the twin below — and the
+    // 11 on-grid tapes in test_zero_offset_trail_rides refute it here.)
+    Bar gap_hf = mk(1.08320, 1.08330, 1.08300, 1.08310);
+    for (double off : offsets) {
+        ExitPathFill f = trail_fill(gap_hf, PositionSide::SHORT,
+                                    /*trail_points=*/0.6, off,
+                                    /*entry=*/1.08330, /*best_start=*/1.08330,
+                                    /*mintick=*/0.00001);
+        CHECK(f.should_fill == true);
+        CHECK(near(f.fill_price, 1.08320));
+        CHECK(f.at_bar_open == true);
+        CHECK(near(f.path_position, 0.0));
+    }
+    // SUB-TICK open twin — the other side of the rule. A half-tick open
+    // 1.083205 sits strictly beyond the ceiled level 1.08321, so nothing is
+    // touched at the open and the trail rides the raw running best: on this
+    // low-first bar (|O-L| = 0.000155 < |H-O| = 0.000195) the O->L leg
+    // lowers the best to the 1.08305 low and the L->H leg crosses it.
+    // NYSE:F g2-0321-S-tp5 (open 9.915 -> TV fills the 9.86 low) and
+    // f-20250929 (open 12.075 -> the 12.115 high floored to 12.11) are the
+    // tapes this stands for.
+    Bar gap_sub = mk(1.083205, 1.08340, 1.08305, 1.08330);
+    for (double off : offsets) {
+        ExitPathFill f = trail_fill(gap_sub, PositionSide::SHORT,
                                     /*trail_points=*/0.6, off,
                                     /*entry=*/1.08330, /*best_start=*/1.08330,
                                     /*mintick=*/0.00001);
@@ -233,24 +268,6 @@ void test_subtick_offset_gapped_open_arms_and_rides() {
         CHECK(f.at_bar_open == false);
         // The start of the L->H leg (segment 2 of O->L->H->C).
         CHECK(near(f.path_position, 1.0));
-    }
-    // High-first twin (|H-O| = 0.0001 < |O-L| = 0.0002): the first leg goes
-    // against the short and crosses the open-armed level 1.08320 at once —
-    // a path LEVEL fill at the open price (position 0; the consumer ceils
-    // it), not an open print. NASDAQ:AAPL 04-22 13:30Z / NYSE:F
-    // s-pre-gapdown-hf-0404-1445-tp5 (9.325 -> TV 9.33) are the tapes.
-    Bar gap_hf = mk(1.08320, 1.08330, 1.08300, 1.08310);
-    for (double off : offsets) {
-        ExitPathFill f = trail_fill(gap_hf, PositionSide::SHORT,
-                                    /*trail_points=*/0.6, off,
-                                    /*entry=*/1.08330, /*best_start=*/1.08330,
-                                    /*mintick=*/0.00001);
-        CHECK(f.should_fill == true);
-        CHECK(near(f.fill_price, 1.08320));
-        CHECK(f.is_trail == true);
-        CHECK(f.at_bar_open == false);
-        CHECK(f.open_is_trail_level == false);
-        CHECK(near(f.path_position, 0.0));
     }
 }
 

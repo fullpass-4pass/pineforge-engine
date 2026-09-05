@@ -1,10 +1,12 @@
 /*
  * test_zero_offset_trail_rides.cpp — round 10 family AC: the EXPLICIT
  * trail_offset = 0 (or sub-tick) trailing exit is a zero-distance trailing
- * stop on the raw running best once it is armed, not a one-shot fill at the
- * open when the bar already opens past the activation. Pinned with 35 `lab
+ * stop on the raw running best once it is armed. A bar that opens past its
+ * activation is NOT automatically the one-shot fill the omitted-offset shape
+ * takes: whether that open fills or the trail rides from it is decided by the
+ * TICK GRID the open lands on (rule 3). Pinned with 47 `lab
  * tv` tapes on NYSE:F 15m and NASDAQ:AAPL 15m (scratchpad/r10/famAC/pins,
- * pins2; ledger log-20260905t214404z-57eb640d and its pins2 supplement),
+ * pins2, pins4; ledger log-20260905t214404z-57eb640d and its pins2 supplement),
  * replayed here on the registry feed bars (`lab bars`, feeds 80f404ae85ef /
  * ae2b03d3736f). The seed: boztilkiserhan-serhan1-wma-rsi-trailing-scalp on
  * NYSE:F 15m re-issues strategy.exit(trail_points = close * 1.5% /
@@ -30,12 +32,30 @@
  *       (high-first flat opens fill at the open, not at the high: 9.47 not
  *       9.50, 9.57 not 9.62; short 9.27 not 9.25).
  *   (3) OPEN BEYOND THE BEST. A favourable gap raises the best to the open
- *       (arming it if it was dormant); the trail rides the path and fills on
- *       the first against-direction leg at the level = best, snapped
- *       DIRECTIONALLY (long floor 196.135 -> 196.13, 9.085 -> 9.08,
- *       12.105 -> 12.10; short ceil 9.325 -> 9.33, 9.735 -> 9.74); a
- *       with-direction first leg rides to the extreme and fills there
- *       (12.32 = the high, 9.86 = the low).
+ *       (arming it if it was dormant), and the level that open creates is
+ *       the open SNAPPED DIRECTIONALLY to the tick grid (long floor, short
+ *       ceil). Rule (2)'s at-or-through test then runs against THAT level,
+ *       which is what decides the bar:
+ *         - an ON-GRID open IS its own level, so it is touched at the open
+ *           and fills there whatever the bar's path — AAPL 05-12 211.05 (not
+ *           the 211.26 high), 04-08 186.65, 09-03 237.18, 04-14 211.44,
+ *           03-23 254.13, 07-25 214.75, 10-31 276.90, 04-17 197.13, 01-31
+ *           247.07, 08-07 218.90 (an UP bar), NYSE:F 03-23 11.89;
+ *         - a SUB-TICK open sits strictly beyond the floored / ceiled level,
+ *           nothing is touched at the open, and the trail RIDES the path
+ *           from best = the raw open: it fills on the first against-direction
+ *           leg at the level = best, snapped directionally (long floor
+ *           196.135 -> 196.13, 9.085 -> 9.08, 12.105 -> 12.10; short ceil
+ *           9.325 -> 9.33, 9.735 -> 9.74), or rides a with-direction first
+ *           leg to the extreme and fills there (12.255 -> the 12.32 high,
+ *           12.075 -> the 12.115 high floored to 12.11, 9.915 -> the 9.86
+ *           low).
+ *       The 12 pins4 tapes were built to vary the ratio |O-L|/|H-O| (1.8 to
+ *       41), |H-O| (4 to 149 ticks), the candle, the gap size and the symbol
+ *       across this branch: they separate on the tick grid and on nothing
+ *       else — in particular NOT on whether the trail was dormant, which
+ *       NYSE:F 10-21 settles on its own (the dormant tp5 and the armed tp1
+ *       give the same 12.32).
  *   (4) INTRABAR ACTIVATION. An activation first reached by a path leg is
  *       the one-shot fill at the activation itself (13.50 / 13.52 / 13.53,
  *       12.26) — unchanged.
@@ -167,8 +187,14 @@ void test_tape(const TapeCase& c) {
     CHECK(eng.last_error().empty());
     CHECK(eng.trade_count() == 1);
     if (eng.trade_count() != 1) return;
-    // The entry is the bar-1 open (on-tick in every tape by construction).
-    CHECK(near(eng.entry_price(0), c.bars[1].open));
+    // The entry is the bar-1 open, booked as a print — the nearest tick, which
+    // is the open itself wherever that open is already on the grid. TV's own
+    // tapes report exactly this for the three sub-tick entry opens in the set
+    // (NYSE:F 11.425 -> 11.43 and 12.005 -> 12.01, NASDAQ:AAPL 198.695 ->
+    // 198.70), so the print rounding is the tape's, not the harness's.
+    const double entry_print =
+        std::floor(c.bars[1].open / 0.01 + 0.5) * 0.01;
+    CHECK(near(eng.entry_price(0), entry_print, 1e-6));
     if (!near(eng.exit_price(0), c.tv_exit_price) || eng.exit_bar(0) != c.tv_exit_bar) {
         std::printf("        engine exit %.5f @bar %d, TV %.2f @bar %d\n",
                     eng.exit_price(0), eng.exit_bar(0), c.tv_exit_price,
