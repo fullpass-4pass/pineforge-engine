@@ -6,6 +6,7 @@
 // 17:00 ET; NASDAQ:AAPL (0930-1600) opens 09:30 ET Monday..Friday; a 24x7
 // UTC symbol opens at 00:00 UTC. The tz="UTC" + empty/"24x7" session forms
 // must stay bit-identical to the pre-existing UTC integer math.
+#include <cmath>
 #include <cstdio>
 #include <cstring>
 #include <string>
@@ -330,6 +331,123 @@ static void test_vwap_utc_identity_and_forex_reset() {
     CHECK(v == 220.0);
 }
 
+// TradingView's OWN ta.vwap values on OANDA:EURUSD 15m, checked against the
+// registry feed's bars (round 10 family AF).
+//
+// The synthetic reset checks above pin WHEN the cumulator rolls; this pins the
+// VALUE it produces, against numbers TradingView printed itself. A `lab tv`
+// sensor (scratchpad/r10/famAF/pins/famaf-eur-apr05.pine) ran
+// `vw = ta.vwap(close)` over the probe's own window (2025-04-01..2026-05-01)
+// and encoded ema9/vwap/cross flags per bar into the order comments; the close
+// and volume of every bar below are the registry feed's
+// (f945f31a140aedc64ca24e2ace42b9885a914ce31a2531f74179b703c025a648) and match
+// the sensor's echoed values exactly.
+//
+// The slice starts on the session open, Sunday 2026-04-05 21:00Z = 17:00 EDT:
+// TradingView reports vwap == that bar's own close there, so the cumulator is
+// demonstrably empty and this table is self-contained.
+//
+// Two anchors are excluded by TradingView's own numbers:
+//   * UTC day  -- at 2026-04-06 00:00Z TV reports 1.151216085569, NOT the
+//     bar's close 1.15156 that a midnight reset would give (asserted below).
+//   * chart timezone -- the tape this came from is stamped UTC+8, whose day
+//     rolls at 16:00Z; TV does not reset there either (23:45Z -> 00:00Z runs
+//     straight through, and 2026-04-05 21:00Z resets instead).
+// Recomputing the whole probe under a UTC-day anchor reproduces only 372 of
+// TradingView's 1346 entry bars; under this 17:00-New-York session day it
+// reproduces all 1346.
+struct EurVwapBar {
+    int64_t ts_ms;
+    double close;
+    double volume;
+    double tv_vwap;   // TradingView's ta.vwap(close), 12 decimals as printed
+};
+
+static void test_vwap_oanda_eurusd_matches_tradingview() {
+    std::printf("test_vwap_oanda_eurusd_matches_tradingview\n");
+    static const EurVwapBar kBars[] = {
+    { 1775422800000LL, 1.15232, 27.0, 1.15232 },  // 2026-04-05 21:00Z
+    { 1775423700000LL, 1.15228, 85.0, 1.152289642857 },  // 2026-04-05 21:15Z
+    { 1775424600000LL, 1.15206, 272.0, 1.152126979167 },  // 2026-04-05 21:30Z
+    { 1775425500000LL, 1.15213, 29.0, 1.152127191283 },  // 2026-04-05 21:45Z
+    { 1775426400000LL, 1.15106, 2001.0, 1.151242580779 },  // 2026-04-05 22:00Z
+    { 1775427300000LL, 1.15114, 2445.0, 1.151190963161 },  // 2026-04-05 22:15Z
+    { 1775428200000LL, 1.15114, 1988.0, 1.151176166204 },  // 2026-04-05 22:30Z
+    { 1775429100000LL, 1.1515, 859.0, 1.151212264469 },  // 2026-04-05 22:45Z
+    { 1775430000000LL, 1.15124, 1054.0, 1.151215601598 },  // 2026-04-05 23:00Z
+    { 1775430900000LL, 1.15094, 748.0, 1.151193919857 },  // 2026-04-05 23:15Z
+    { 1775431800000LL, 1.15094, 776.0, 1.151174759821 },  // 2026-04-05 23:30Z
+    { 1775432700000LL, 1.15098, 972.0, 1.151157941542 },  // 2026-04-05 23:45Z
+    { 1775433600000LL, 1.15156, 1903.0, 1.151216085569 },  // 2026-04-06 00:00Z
+    { 1775434500000LL, 1.1515, 1218.0, 1.151240138416 },  // 2026-04-06 00:15Z
+    { 1775435400000LL, 1.15164, 1105.0, 1.151268677819 },  // 2026-04-06 00:30Z
+    { 1775436300000LL, 1.15118, 1046.0, 1.151263065707 },  // 2026-04-06 00:45Z
+    { 1775437200000LL, 1.15084, 1410.0, 1.151229811016 },  // 2026-04-06 01:00Z
+    { 1775438100000LL, 1.15105, 1138.0, 1.15121908419 },  // 2026-04-06 01:15Z
+    { 1775439000000LL, 1.15089, 908.0, 1.151204131805 },  // 2026-04-06 01:30Z
+    { 1775439900000LL, 1.1507, 573.0, 1.151190079778 },  // 2026-04-06 01:45Z
+    { 1775440800000LL, 1.15194, 2307.0, 1.151265747463 },  // 2026-04-06 02:00Z
+    { 1775441700000LL, 1.15244, 2498.0, 1.151381404069 },  // 2026-04-06 02:15Z
+    { 1775442600000LL, 1.1521, 1318.0, 1.151416902924 },  // 2026-04-06 02:30Z
+    { 1775443500000LL, 1.15206, 1277.0, 1.151446277855 },  // 2026-04-06 02:45Z
+    { 1775444400000LL, 1.15214, 777.0, 1.15146503689 },  // 2026-04-06 03:00Z
+    };
+    const int n = (int)(sizeof(kBars) / sizeof(kBars[0]));
+    // TV prints 12 decimals on a ~1.15 quote, so half an ulp of the printed
+    // value is 5e-13; allow that and nothing more.
+    const double kTol = 5e-13;
+
+    ta::VWAP vw;
+    for (int i = 0; i < n; ++i) {
+        const double got = vw.compute(kBars[i].close, kBars[i].volume, kBars[i].ts_ms, NY, FX);
+        const double want = kBars[i].tv_vwap;
+        if (!(std::fabs(got - want) <= kTol)) {
+            std::printf("  FAIL  %s:%d  bar %d (ts %lld): vwap %.12f, TradingView %.12f\n",
+                        __FILE__, __LINE__, i, (long long)kBars[i].ts_ms, got, want);
+            ++tests_failed;
+        } else {
+            ++tests_passed;
+        }
+    }
+    // The session's first bar carries its own close: the reset bar is not
+    // seeded from the previous session.
+    CHECK(kBars[0].tv_vwap == kBars[0].close);
+
+    // Negative control -- a UTC-day anchor is a different series. Replaying the
+    // same bars with the tz-less (UTC-keyed) overload must diverge at the first
+    // bar of the new UTC day, 2026-04-06 00:00Z, where it resets to that bar's
+    // own close while TradingView keeps cumulating.
+    ta::VWAP utc_vw;
+    double utc_at_midnight = na<double>();
+    double session_at_midnight = na<double>();
+    ta::VWAP session_vw;
+    for (int i = 0; i < n; ++i) {
+        const double u = utc_vw.compute(kBars[i].close, kBars[i].volume, kBars[i].ts_ms);
+        const double s = session_vw.compute(kBars[i].close, kBars[i].volume, kBars[i].ts_ms, NY, FX);
+        if (kBars[i].ts_ms == utc_ms(2026, 4, 6, 0, 0)) {
+            utc_at_midnight = u;
+            session_at_midnight = s;
+        }
+    }
+    CHECK(!is_na(utc_at_midnight));
+    CHECK(utc_at_midnight == 1.15156);                              // reset to the bar's close
+    CHECK(std::fabs(session_at_midnight - 1.151216085569) <= kTol); // TradingView's value
+    CHECK(std::fabs(utc_at_midnight - session_at_midnight) > 1e-4);
+
+    // The 2026-04-05 22:00Z bar is the one family AF was opened on: the engine
+    // sees ema9 above vwap and enters, TradingView computes the same crossover
+    // (its sensor row reads d=+0.00060587593021|CO) and then declines the
+    // order at percent_of_equity=100. The vwap underneath it is identical, so
+    // that residual is an admission question, not a ta.vwap one.
+    ta::VWAP probe;
+    double v2200 = na<double>();
+    for (int i = 0; i < n; ++i) {
+        const double v = probe.compute(kBars[i].close, kBars[i].volume, kBars[i].ts_ms, NY, FX);
+        if (kBars[i].ts_ms == utc_ms(2026, 4, 5, 22, 0)) v2200 = v;
+    }
+    CHECK(std::fabs(v2200 - 1.151242580779) <= kTol);
+}
+
 static void test_session_length_edge_cases() {
     std::printf("test_session_length_edge_cases\n");
     // "0000-0000" is a full day whose trading date is its open date.
@@ -373,6 +491,7 @@ int main() {
     test_tokyo_open_on_previous_utc_date();
     test_utc_identity_with_tz_less_forms();
     test_vwap_utc_identity_and_forex_reset();
+    test_vwap_oanda_eurusd_matches_tradingview();
     test_session_length_edge_cases();
     std::printf("\n=== Results: %d passed, %d failed ===\n", tests_passed, tests_failed);
     return tests_failed > 0 ? 1 : 0;
