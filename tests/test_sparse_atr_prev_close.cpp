@@ -227,11 +227,131 @@ static void test_engine_prev_chart_close_tracker() {
     }
 }
 
+
+// 5. issue #178 follow-up (round 9: the first cut of this fix regressed JOAT
+//    aureate on NASDAQ:AAPL / NYSE:F / OANDA:EURUSD @15 — an UNCONDITIONAL
+//    ta.atr(14) under calc_on_order_fills = true). Under COOF every historical
+//    fill recalculation and the ordinary close execution of a bar start from
+//    the bar-start checkpoint and push the bar's history slot again, so the
+//    chart-close tracker must roll back with that checkpoint: the close
+//    execution of a bar whose open filled an order still reads the previous
+//    CHART bar's close, never the recalc's own close (which turns the true
+//    range max(h-l, |h-close[1]|, |l-close[1]|) into h-l and drops the gap —
+//    exactly what an overnight gap on a stock lane exposes).
+//    Pinned on TradingView 2026-09-06 (lab tv i178-joat-coof-atr-aapl15,
+//    NASDAQ:AAPL 15, 2025-04-01..07-01, rangeProof covered, tv_trades.csv
+//    sha256 4c7ac673dd35d1c290e51cc4d1ccf076ef315ef3bd013c6988b8f9b9c3198caa):
+//    the qty-encoded ta.atr(14) at the close execution of every fill bar
+//    equals the every-bar RMA over chart-close true ranges (e.g. 2025-05-02
+//    13:30Z, the post-earnings gap: atr 1.596219 with close[1] = 212.85).
+static std::vector<Bar> gapped_chart() {
+    return {
+        mk(0, 100, 101,  99, 100),
+        mk(1, 104, 106, 103, 105),   // fill bar, gap up:   TR vs 100 = 6, h-l = 3
+        mk(2, 105, 107, 104, 106),
+        mk(3, 100, 101,  98,  99),   // fill bar, gap down: TR vs 106 = 8, h-l = 3
+        mk(4,  99, 100,  97,  98),
+        mk(5, 103, 105, 102, 104),   // fill bar, gap up:   TR vs 98 = 7, h-l = 3
+        mk(6, 104, 106, 103, 105),
+        mk(7, 100, 101,  99, 100),   // fill bar, gap down: TR vs 105 = 6, h-l = 2
+        mk(8, 100, 102,  99, 101),
+        mk(9, 101, 103, 100, 102),
+    };
+}
+
+class CoofAtrProbe : public BacktestEngine {
+public:
+    struct Seen { int bar; double prev; double atr; bool fill_recalc; };
+    std::vector<Seen> seen;
+    ta::ATR atr_{3};
+    ta::ATR atr_ckpt_{3};
+    CoofAtrProbe() {
+        calc_on_order_fills_ = true;
+        initial_capital_ = 1'000'000;
+        default_qty_type_ = QtyType::FIXED;
+        default_qty_value_ = 1.0;
+        syminfo_mintick_ = 0.01;
+    }
+    // The generated subclass checkpoints its TA members exactly like this.
+    void snapshot_script_state() override { atr_ckpt_ = atr_; }
+    void restore_script_state() override { atr_ = atr_ckpt_; }
+    void commit_script_state() override { atr_ckpt_ = atr_; }
+    void on_bar(const Bar&) override {
+        const double v = history_advances_new_bar()
+            ? atr_.compute(current_bar_.high, current_bar_.low, current_bar_.close, prev_chart_close())
+            : atr_.recompute(current_bar_.high, current_bar_.low, current_bar_.close, prev_chart_close());
+        seen.push_back({bar_index_, prev_chart_close(), v, coof_fill_recalc_active_});
+        // A market order at every even bar's close execution (entry when
+        // flat, whole close when long): each fills at the next, odd bar's
+        // open and triggers a fill recalculation there before that bar's
+        // ordinary close execution.
+        if (bar_index_ % 2 == 0 && !coof_fill_recalc_active_) {
+            if (position_side_ == PositionSide::FLAT) strategy_entry("L", true);
+            else strategy_close("L");
+        }
+    }
+};
+
+static void test_engine_prev_chart_close_rolls_back_with_coof_checkpoint() {
+    std::printf("test_engine_prev_chart_close_rolls_back_with_coof_checkpoint\n");
+    const auto bars = gapped_chart();
+    CoofAtrProbe p;
+    p.run(bars.data(), (int)bars.size());
+    CHECK(p.last_error().empty());
+    // Two closed round trips (entry filled at bar 1, closed at 3; entry at 5,
+    // closed at 7) and a third entry filled at bar 9, still open at the end.
+    CHECK(p.trade_count() == 2);
+    // Every odd bar ran twice (fill recalc + ordinary close), every even bar once.
+    int per_bar[10] = {0};
+    int recalcs = 0;
+    for (const auto& s : p.seen) {
+        if (s.bar >= 0 && s.bar < 10) ++per_bar[s.bar];
+        if (s.fill_recalc) ++recalcs;
+    }
+    CHECK(recalcs == 5);
+    for (int i = 0; i < 10; ++i) CHECK(per_bar[i] == ((i % 2 == 1) ? 2 : 1));
+    // Every execution — the recalc AND the close execution of a fill bar —
+    // sees the previous chart bar's close and the chart-close ATR.
+    RefRma3 ref;
+    std::vector<double> want;
+    for (int i = 0; i < (int)bars.size(); ++i)
+        want.push_back(ref.step(tr_against(bars[i], i > 0 ? bars[i - 1].close : kNaN)));
+    for (const auto& s : p.seen) {
+        if (s.bar == 0) CHECK(std::isnan(s.prev));
+        else CHECK(near(s.prev, bars[s.bar - 1].close));
+        if (std::isnan(want[s.bar])) CHECK(std::isnan(s.atr));
+        else CHECK(near(s.atr, want[s.bar]));
+    }
+    // The pinned arithmetic: seed (2 + 6 + 3) / 3 on bar 2, then bar 3's
+    // gap-down true range 8 (not h-l = 3) enters as (8 + 2 * 11/3) / 3.
+    CHECK(near(want[2], 11.0 / 3.0));
+    CHECK(near(want[3], (8.0 + 2.0 * (11.0 / 3.0)) / 3.0));
+    // Handle reuse under COOF: the checkpointed tracker resets too.
+    CoofAtrProbe q;
+    q.run(bars.data(), 4);
+    q.run(bars.data(), (int)bars.size());
+    bool second_run_ok = true;
+    int second_first = -1;
+    for (size_t k = 0; k < q.seen.size(); ++k) {
+        if (second_first < 0 && k > 0 && q.seen[k].bar == 0) second_first = (int)k;
+    }
+    CHECK(second_first > 0);
+    if (second_first > 0) {
+        for (size_t k = second_first; k < q.seen.size(); ++k) {
+            const auto& s = q.seen[k];
+            if (s.bar == 0) { if (!std::isnan(s.prev)) second_run_ok = false; }
+            else if (!near(s.prev, bars[s.bar - 1].close)) second_run_ok = false;
+        }
+    }
+    CHECK(second_run_ok);
+}
+
 int main() {
     test_atr_four_arg_reads_chart_prev_close();
     test_atr_four_arg_recompute_is_idempotent();
     test_tr_four_arg();
     test_engine_prev_chart_close_tracker();
+    test_engine_prev_chart_close_rolls_back_with_coof_checkpoint();
     std::printf("\n%d passed, %d failed\n", g_pass, g_fail);
     return g_fail == 0 ? 0 : 1;
 }

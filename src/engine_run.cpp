@@ -220,6 +220,8 @@ void BacktestEngine::snapshot_coof_script_state() {
         coof_checkpoint_src_ohlc4_ = _src_ohlc4_;
         coof_checkpoint_src_hlcc4_ = _src_hlcc4_;
     }
+    coof_checkpoint_prev_chart_close_ = prev_chart_close_;   // issue #178
+    coof_checkpoint_last_chart_close_ = last_chart_close_;
     snapshot_script_state();
     coof_checkpoint_contains_current_bar_ = false;
 }
@@ -236,6 +238,8 @@ void BacktestEngine::restore_coof_script_state() {
         _src_ohlc4_ = coof_checkpoint_src_ohlc4_;
         _src_hlcc4_ = coof_checkpoint_src_hlcc4_;
     }
+    prev_chart_close_ = coof_checkpoint_prev_chart_close_;   // issue #178
+    last_chart_close_ = coof_checkpoint_last_chart_close_;
     restore_script_state();
 }
 
@@ -251,6 +255,8 @@ void BacktestEngine::commit_coof_script_state() {
         coof_checkpoint_src_ohlc4_ = _src_ohlc4_;
         coof_checkpoint_src_hlcc4_ = _src_hlcc4_;
     }
+    coof_checkpoint_prev_chart_close_ = prev_chart_close_;   // issue #178
+    coof_checkpoint_last_chart_close_ = last_chart_close_;
     commit_script_state();
     coof_checkpoint_contains_current_bar_ = true;
 }
@@ -746,6 +752,8 @@ void BacktestEngine::reset_run_state() {
     _src_volume_.clear();
     prev_chart_close_ = std::numeric_limits<double>::quiet_NaN();  // issue #178
     last_chart_close_ = std::numeric_limits<double>::quiet_NaN();
+    coof_checkpoint_prev_chart_close_ = std::numeric_limits<double>::quiet_NaN();
+    coof_checkpoint_last_chart_close_ = std::numeric_limits<double>::quiet_NaN();
     _src_hl2_.clear();
     _src_hlc3_.clear();
     _src_ohlc4_.clear();
