@@ -171,6 +171,7 @@ set(TEST_SOURCES
     test_close_id_retires_ledger
     test_trail_open_arm_subtick_offset
     test_trail_fill_snap
+    test_famx_declined_reversal_trail_leg
     test_trail_activation_tick_bar
     test_session_predicates_daily_chart
 )
