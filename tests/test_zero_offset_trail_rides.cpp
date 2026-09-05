@@ -4,9 +4,10 @@
  * stop on the raw running best once it is armed. A bar that opens past its
  * activation is NOT automatically the one-shot fill the omitted-offset shape
  * takes: whether that open fills or the trail rides from it is decided by the
- * TICK GRID the open lands on (rule 3). Pinned with 47 `lab
+ * TICK GRID the open lands on (rule 3). Pinned with 76 `lab
  * tv` tapes on NYSE:F 15m and NASDAQ:AAPL 15m (scratchpad/r10/famAC/pins,
- * pins2, pins4; ledger log-20260905t214404z-57eb640d and its pins2 supplement),
+ * pins2, pins3, pins4, pins5; ledger log-20260905t214404z-57eb640d, its pins2
+ * supplement and the pins4/pins5 notes of 2026-09-05 23:2xZ),
  * replayed here on the registry feed bars (`lab bars`, feeds 80f404ae85ef /
  * ae2b03d3736f). The seed: boztilkiserhan-serhan1-wma-rsi-trailing-scalp on
  * NYSE:F 15m re-issues strategy.exit(trail_points = close * 1.5% /
@@ -32,30 +33,37 @@
  *       (high-first flat opens fill at the open, not at the high: 9.47 not
  *       9.50, 9.57 not 9.62; short 9.27 not 9.25).
  *   (3) OPEN BEYOND THE BEST. A favourable gap raises the best to the open
- *       (arming it if it was dormant), and the level that open creates is
- *       the open SNAPPED DIRECTIONALLY to the tick grid (long floor, short
- *       ceil). Rule (2)'s at-or-through test then runs against THAT level,
- *       which is what decides the bar:
- *         - an ON-GRID open IS its own level, so it is touched at the open
- *           and fills there whatever the bar's path — AAPL 05-12 211.05 (not
- *           the 211.26 high), 04-08 186.65, 09-03 237.18, 04-14 211.44,
- *           03-23 254.13, 07-25 214.75, 10-31 276.90, 04-17 197.13, 01-31
- *           247.07, 08-07 218.90 (an UP bar), NYSE:F 03-23 11.89;
- *         - a SUB-TICK open sits strictly beyond the floored / ceiled level,
- *           nothing is touched at the open, and the trail RIDES the path
- *           from best = the raw open: it fills on the first against-direction
- *           leg at the level = best, snapped directionally (long floor
- *           196.135 -> 196.13, 9.085 -> 9.08, 12.105 -> 12.10; short ceil
- *           9.325 -> 9.33, 9.735 -> 9.74), or rides a with-direction first
- *           leg to the extreme and fills there (12.255 -> the 12.32 high,
- *           12.075 -> the 12.115 high floored to 12.11, 9.915 -> the 9.86
- *           low).
- *       The 12 pins4 tapes were built to vary the ratio |O-L|/|H-O| (1.8 to
- *       41), |H-O| (4 to 149 ticks), the candle, the gap size and the symbol
- *       across this branch: they separate on the tick grid and on nothing
- *       else — in particular NOT on whether the trail was dormant, which
- *       NYSE:F 10-21 settles on its own (the dormant tp5 and the armed tp1
- *       give the same 12.32).
+ *       (arming it if it was dormant). TradingView places the fresh stop at
+ *       that open snapped DIRECTIONALLY to the tick grid (long floor, short
+ *       ceil) and tests it at once against the open's PRINT (the nearest
+ *       tick, floor(x / tick + 0.5) in doubles — bar_fill_price):
+ *         - print AT the stop (it rounds toward the stop side; an on-grid
+ *           open trivially): the exit fills at the open, a level fill booked
+ *           at that stop, whatever the bar's path — on-grid AAPL 05-12
+ *           211.05 (not the 211.26 high), 04-08 186.65, 09-03 237.18, 04-14
+ *           211.44, 03-23 254.13, 07-25 214.75, 10-31 276.90, 04-17 197.13,
+ *           01-31 247.07, 08-07 218.90, armed-before-the-bar 05-16 212.31,
+ *           07-23 215.00, 09-05 239.96; NYSE:F 03-23 11.89, 05-20 10.80,
+ *           07-25 11.33, 03-16 11.84, short 03-31 9.58, 03-12 11.96;
+ *           sub-tick with the print toward the stop: long 272.335 ->
+ *           272.33, 271.835 -> 271.83; short 208.955 -> 208.96, 227.125 ->
+ *           227.13, 234.445 -> 234.45, 217.005 -> 217.01, 193.665 ->
+ *           193.67, 221.025 -> 221.03, 189.945 -> 189.95, NYSE:F 9.515 ->
+ *           9.52, 14.335 -> 14.34;
+ *         - print one tick BEYOND the stop (it rounds away from it): nothing
+ *           is touched at the open and the trail RIDES the path from best =
+ *           the raw open: it fills on the first against-direction leg at the
+ *           level = best, snapped directionally (long floor 196.135 ->
+ *           196.13, 9.085 -> 9.08, 12.105 -> 12.10; short ceil 9.325 ->
+ *           9.33, 9.735 -> 9.74), or rides a with-direction first leg to the
+ *           extreme and fills there (12.255 -> the 12.32 high, 12.075 ->
+ *           12.11, 203.575 -> 203.78, 211.895 -> 212.39, 253.205 -> 254.32,
+ *           226.185 -> 226.95; short 9.915 -> the 9.86 low, 9.575 -> 9.51).
+ *       The 41 pins4 / pins5 tapes vary the ratio |O-L|/|H-O|, |H-O|, the
+ *       candle, the gap size, the symbol, the side and the dormant / armed
+ *       state across this branch: they separate on the print-vs-level test
+ *       and on nothing else (the sibling on-grid-only rule 9befe0e is
+ *       refuted by every sub-tick open whose print rounds toward the stop).
  *   (4) INTRABAR ACTIVATION. An activation first reached by a path leg is
  *       the one-shot fill at the activation itself (13.50 / 13.52 / 13.53,
  *       12.26) — unchanged.
