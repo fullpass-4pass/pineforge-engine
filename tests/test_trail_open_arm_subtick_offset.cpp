@@ -216,10 +216,11 @@ void test_subtick_offset_gapped_open_arms_and_rides() {
     // The bar opens past the activation (1.08320 <= 1.08329 for a short) and
     // the open ARMS the trail with best = open — for 0 / 0.5 / 0.9 alike,
     // since a sub-tick offset truncates to zero ticks. What the open then
-    // does is decided by the TICK GRID it lands on (round 10 family AC,
-    // pins4): the level the open creates is itself snapped directionally
-    // (short: ceil), so an ON-GRID open IS that level and is touched at once.
-    // 1.08320 is a whole 0.00001 tick -> the open fills, whatever the path.
+    // does is decided by its PRINT against the level it creates (round 10
+    // family AC, pins4 / pins5): the level is the open snapped directionally
+    // (short: ceil) and the print is the nearest tick; an ON-GRID open is
+    // both at once and is touched at the open. 1.08320 is a whole 0.00001
+    // tick -> the open fills, whatever the path.
     Bar gap = mk(1.08320, 1.08340, 1.08305, 1.08330);
     const double offsets[] = {0.0, 0.5, 0.9};
     for (double off : offsets) {
@@ -248,14 +249,15 @@ void test_subtick_offset_gapped_open_arms_and_rides() {
         CHECK(f.at_bar_open == true);
         CHECK(near(f.path_position, 0.0));
     }
-    // SUB-TICK open twin — the other side of the rule. A half-tick open
-    // 1.083205 sits strictly beyond the ceiled level 1.08321, so nothing is
-    // touched at the open and the trail rides the raw running best: on this
-    // low-first bar (|O-L| = 0.000155 < |H-O| = 0.000195) the O->L leg
-    // lowers the best to the 1.08305 low and the L->H leg crosses it.
-    // NYSE:F g2-0321-S-tp5 (open 9.915 -> TV fills the 9.86 low) and
-    // f-20250929 (open 12.075 -> the 12.115 high floored to 12.11) are the
-    // tapes this stands for.
+    // SUB-TICK open twins — the other side of the rule is decided by the
+    // open's PRINT (nearest tick, floor(x / tick + 0.5) in doubles) against
+    // the ceiled level. 1.083205 / 0.00001 = 108320.49999.. prints 1.08320,
+    // one tick BELOW the ceiled level 1.08321 (away from a short's stop):
+    // nothing is touched at the open and the trail rides the raw running
+    // best — on this low-first bar (|O-L| = 0.000155 < |H-O| = 0.000195) the
+    // O->L leg lowers the best to the 1.08305 low and the L->H leg crosses
+    // it. NYSE:F g2-0321-S-tp5 (open 9.915 -> TV fills the 9.86 low) and
+    // s-dsub-0313-tp2 (9.575 -> the 9.51 low) are the tapes this stands for.
     Bar gap_sub = mk(1.083205, 1.08340, 1.08305, 1.08330);
     for (double off : offsets) {
         ExitPathFill f = trail_fill(gap_sub, PositionSide::SHORT,
@@ -268,6 +270,23 @@ void test_subtick_offset_gapped_open_arms_and_rides() {
         CHECK(f.at_bar_open == false);
         // The start of the L->H leg (segment 2 of O->L->H->C).
         CHECK(near(f.path_position, 1.0));
+    }
+    // 1.083215 / 0.00001 = 108321.5 prints 1.08322 = the ceiled level: the
+    // print sits AT the short's stop and the exit fills at the open, a level
+    // fill the consumer ceils to 1.08322, whatever the path (NASDAQ:AAPL
+    // 04-29 13:30Z short open 208.955 -> TV 208.96, 02-04 227.125 -> 227.13;
+    // NYSE:F 03-06 14:30Z 9.515 -> 9.52: round 10 family AC pins4 / pins5).
+    Bar gap_sub_at = mk(1.083215, 1.08340, 1.08305, 1.08330);
+    for (double off : offsets) {
+        ExitPathFill f = trail_fill(gap_sub_at, PositionSide::SHORT,
+                                    /*trail_points=*/0.6, off,
+                                    /*entry=*/1.08330, /*best_start=*/1.08330,
+                                    /*mintick=*/0.00001);
+        CHECK(f.should_fill == true);
+        CHECK(near(f.fill_price, 1.083215));
+        CHECK(f.at_bar_open == true);
+        CHECK(f.open_is_trail_level == true);
+        CHECK(near(f.path_position, 0.0));
     }
 }
 

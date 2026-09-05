@@ -283,19 +283,6 @@ inline double trail_offset_to_ticks(double trail_offset) {
 // (engine.hpp) spells it so it compares EQUAL to a feed print bit for bit;
 // a genuinely sub-tick level (best 196.135 - 1 tick = 196.125) stays raw
 // and takes the directional fill snap downstream.
-// True when a price is already a point of the symbol's tick grid — i.e. the
-// directional level snap (long floor / short ceil) would leave it untouched.
-// The zero-offset trail's arming open uses it: an on-grid open IS the level
-// it creates and fills there, a sub-tick open sits strictly beyond it and
-// rides (round 10 family AC, try_exit_open_gap_fill). Same 1e-6-of-a-tick
-// tolerance as snap_trail_level_to_tick_grid, so the two agree on what the
-// grid is.
-inline bool price_is_on_tick_grid(double price, double mintick) {
-    if (std::isnan(price) || !(mintick > 0.0)) return false;
-    const double r = price / mintick;
-    return std::abs(r - std::floor(r + 0.5)) <= 1e-6;
-}
-
 inline double snap_trail_level_to_tick_grid(double price, double mintick) {
     if (std::isnan(price) || !(mintick > 0.0)) return price;
     const double r = price / mintick;

@@ -749,7 +749,10 @@ ExitTrailState compute_exit_trail_state(bool is_long, double trail_points,
     // RIDES: the level is the raw running best itself (zero distance), an
     // open at or past it fills at the open print, a with-direction leg
     // raises it, an against-direction leg fills at it (directional level
-    // snap). Only an activation FIRST reached intrabar, by a path leg, is
+    // snap). An open BEYOND the best (or past a dormant activation) is
+    // decided by its print against the directionally snapped open
+    // (try_exit_open_gap_fill): a print on the stop side fills at the open,
+    // one beyond it rides. Only an activation FIRST reached intrabar, by a path leg, is
     // the one-shot fill at the activation level (the trail_activation_level
     // route in select_exit_segment_levels). Round 10 family AC, pinned with
     // 14 `lab tv` tapes on NYSE:F 15m (scratchpad/r10/famAC/pins,
@@ -851,32 +854,51 @@ bool try_exit_open_gap_fill(const Bar& bar, double tick_open, bool is_long,
     //
     // An EXPLICIT zero-offset trail rides the raw running best once armed
     // (round 10 family AC), so an open BEYOND the best does not gap through
-    // anything — it raises the best to itself. The level that open creates is
-    // the open snapped DIRECTIONALLY to the tick grid (long floor, short
-    // ceil), and the ordinary at-or-through test then runs against THAT
-    // level: an ON-GRID open IS its own level, so it is touched at the open
-    // and fills there whatever the bar's path; a SUB-TICK open sits strictly
-    // beyond the floored / ceiled level, nothing is touched at the open, and
-    // the trail rides the path from best = the raw open. Pinned by 47 `lab
-    // tv` tapes (scratchpad/r10/famAC/pins, pins2, pins4) that separate
-    // perfectly on that one variable and on no other — not the bar's path,
-    // its candle, the gap size, the symbol, nor whether the trail was dormant:
-    //   on-grid  NASDAQ:AAPL 05-12 13:30Z O 211.05 -> 211.05 (not the 211.26
-    //            high the ride booked), 04-08 186.65, 09-03 237.18, 10-31
-    //            276.90, 01-31 247.07; NYSE:F 03-23 13:30Z O 11.89 -> 11.89
-    //   sub-tick NYSE:F 10-21 13:30Z O 12.255 -> the 12.32 high, 09-29 13:30Z
-    //            O 12.075 -> 12.11 (the 12.115 high floored), 03-21 short
-    //            O 9.915 -> the 9.86 low
-    const bool zero_offset_open_is_level =
+    // anything — it raises the best to itself (arming the trail if it was
+    // dormant and the open sits past the activation). TradingView then places
+    // the fresh stop at that open snapped DIRECTIONALLY to the tick grid (long
+    // floor, short ceil) and tests it at once against the open's PRINT — the
+    // nearest tick (tick_quantized_price: floor(open / mintick + 0.5), the
+    // rounding bar_fill_price books and the production tick_open). The print
+    // sits AT the stop exactly when it rounds toward the stop side (long:
+    // print <= open, short: print >= open; an on-grid open is the trivial
+    // case, print == open == stop): the exit fills at the open as a LEVEL
+    // fill (open_is_trail_level, the consumer's directional snap books the
+    // stop = the print). When the print rounds away from the stop it is one
+    // tick beyond it, nothing is touched at the open, and the trail rides the
+    // path from best = the raw open (observe_exit_trail_open). Pinned by 76
+    // `lab tv` tapes (scratchpad/r10/famAC/pins..pins5) that separate on this
+    // one variable and on no other — not the bar's path, its candle, the gap
+    // size, the symbol, the side, nor whether the trail was dormant:
+    //   on-grid   NASDAQ:AAPL 05-12 13:30Z O 211.05 -> 211.05 (not the 211.26
+    //             high the ride booked), armed-before-the-bar 05-16 212.31,
+    //             07-23 215.00, 09-05 239.96; NYSE:F 05-20 10.80, 07-25 11.33,
+    //             03-16 11.84, short 03-31 9.58, 03-12 11.96, 03-23 11.89
+    //   sub-tick, print toward the stop (x / 0.01 fraction below .5 for a
+    //             long, at/above .5 for a short in doubles): long 04-28
+    //             272.335 -> 272.33, 12-19 271.835 -> 271.83; short 04-29
+    //             208.955 -> 208.96, 02-04 227.125 -> 227.13, 03-06 234.445
+    //             -> 234.45, 03-31 217.005 -> 217.01, 05-23 193.665 -> 193.67,
+    //             03-11 221.025 -> 221.03, 04-10 189.945 -> 189.95; NYSE:F
+    //             short 03-06 9.515 -> 9.52, 01-09 14.335 -> 14.34
+    //   sub-tick, print away from the stop: long NYSE:F 10-21 12.255 -> the
+    //             12.32 high, 09-29 12.075 -> 12.11 (the 12.115 high floored),
+    //             AAPL 05-29 203.575 -> 203.78, 07-30 211.895 -> 212.39, 09-25
+    //             253.205 -> 254.32, 08-22 226.185 -> 226.95; short NYSE:F
+    //             03-21 9.915 -> the 9.86 low, 03-13 9.575 -> 9.51
+    const bool zero_offset_open_arms =
         trail.has_trail && trail.zero_offset_rides
-        && price_is_on_tick_grid(bar.open, trail.mintick)
         && (trail.trail_active
-            || (is_long ? bar.open >= trail.activation_level
-                        : bar.open <= trail.activation_level));
+                ? (is_long ? bar.open > trail.best_price : bar.open < trail.best_price)
+                : (is_long ? bar.open >= trail.activation_level
+                           : bar.open <= trail.activation_level));
+    const double open_print = tick_quantized_price(bar.open, trail.mintick);
+    const bool zero_offset_print_at_level =
+        zero_offset_open_arms
+        && (is_long ? open_print <= bar.open : open_print >= bar.open);
     if (is_long) {
         if (!std::isnan(trail_level) && bar.open <= trail_level) return fill_at_open(false);
-        if (zero_offset_open_is_level && (std::isnan(trail.best_price)
-                                          || bar.open > trail.best_price)) {
+        if (zero_offset_print_at_level) {
             return fill_at_open(false, /*trail_level_at_open=*/true);
         }
         if (trail.exits_at_activation && !trail.zero_offset_rides
@@ -887,8 +909,7 @@ bool try_exit_open_gap_fill(const Bar& bar, double tick_open, bool is_long,
         if (has_limit && tick_open >= limit_price) return fill_at_open(true);
     } else {
         if (!std::isnan(trail_level) && bar.open >= trail_level) return fill_at_open(false);
-        if (zero_offset_open_is_level && (std::isnan(trail.best_price)
-                                          || bar.open < trail.best_price)) {
+        if (zero_offset_print_at_level) {
             return fill_at_open(false, /*trail_level_at_open=*/true);
         }
         if (trail.exits_at_activation && !trail.zero_offset_rides
@@ -984,11 +1005,12 @@ void update_exit_trail_state(bool is_long, bool rising, bool falling,
 // compute_exit_trail_state. An omitted-offset exit-at-activation trail whose
 // open already sits past its activation has been filled by
 // try_exit_open_gap_fill before this runs, so for it this is a pure
-// best-price observation; an explicit zero-offset trail is ARMED here by
-// such an open (best = open) and rides the path from it (round 10 family
-// AC: NYSE:F 10-21 13:30Z opens 12.255 past a 12.04 activation and TV
-// fills at the bar's 12.32 high, 03-21 13:30Z short opens 9.915 past 9.99
-// and fills at the 9.86 low).
+// best-price observation; an explicit zero-offset trail whose open print
+// did not already touch the level it creates (try_exit_open_gap_fill) is
+// ARMED here by such an open (best = open) and rides the path from it
+// (round 10 family AC: NYSE:F 10-21 13:30Z opens 12.255 past a 12.04
+// activation and TV fills at the bar's 12.32 high, 03-21 13:30Z short opens
+// 9.915 past 9.99 and fills at the 9.86 low).
 void observe_exit_trail_open(bool is_long, double open, ExitTrailState* trail) {
     if (!trail->has_trail) return;
     if (is_long) {
