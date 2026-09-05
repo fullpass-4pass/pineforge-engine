@@ -151,6 +151,7 @@ set(TEST_SOURCES
     test_margin_call_1x_long_entry_fill
     test_margin_call_gap_open
     test_entry_bar_margin_path
+    test_famad_carried_margin_path
     test_m_admission_36
     test_chart_tf_security_split_feed
     test_risk_max_intraday_loss_tv
