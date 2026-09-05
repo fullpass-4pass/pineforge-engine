@@ -82,7 +82,15 @@ enum class PositionSide { FLAT, LONG, SHORT };
 //      USD on EURUSD) — the sweeps' "band" — and a tie is decided by the
 //      ulp of the tick-built price: dropped iff double(close_S) sits more
 //      than 2.2e-17 below the decimal close (the half-ulp minus the 8.9e-17
-//      the fl(1e-5) product carries). Pinned on 507 famr3 sweep decisions
+//      the fl(1e-5) product carries). The equity judged is the equity at
+//      the moment the broker judges the order: a bare reversal at the
+//      signal close (E_s; 4782/4782 taro + every-bar decisions, the fill-
+//      marked equity fails 813), an entry filling FROM FLAT at its fill
+//      with the cash then — the same number for a true-flat placement, the
+//      post-close cash for a strategy.close + strategy.entry pair (demete1226
+//      2025-04-07 08:00Z: a six-pip gap up lifts the cash 55 USD past the
+//      tie, TV fills and margin-calls the 0.0011 deficit one unit). Pinned
+//      on 507 famr3 sweep decisions
 //      (famr3-F6: 153 bare-capital longs at C = sig10(cost) + 0.0002, 83
 //      filled / 70 dropped, a pure function of the close; F7 7-digit ties
 //      54/27 — the 10 closes where F7 fills and F6 drops all have sig10(B)
