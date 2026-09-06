@@ -6,7 +6,10 @@ machine:    spark2 (all accuracy and performance measurements)
 cpu:        ARM Cortex-X925 + Cortex-A725, 20 cores
 memory:     121 GB
 os:         Ubuntu 24.04.4 LTS aarch64, kernel 6.17.0-1031-nvidia
-perf pin:   taskset -c 5-9, one job at a time, box otherwise idle (load < 1.4 gate)
+perf pin:   taskset -c 5-9 (5 cores), one job at a time, box otherwise idle (load < 1.30 gate,
+            and no accuracy pass running). Both engines get the identical pin; note that
+            PineForge is single-threaded here and PyneCore is CPython, so neither uses more
+            than one core - the pin is for isolation from the other 15 cores, not headroom.
 accuracy:   xargs -P 30 (oversubscribed on purpose; wall times in the accuracy tables
             are therefore NOT the performance numbers — use performance.csv for those)
 
