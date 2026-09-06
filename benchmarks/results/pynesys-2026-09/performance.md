@@ -20,14 +20,23 @@
 
 Speedup PyneCore 6.9.1 / PineForge (per-strategy median ratio): geomean 6.3×, min 3.6×, median 5.6×, max 34.5× over 100 strategies.
 
-## End-to-end wall time per strategy — set C (5 strategies; process start + load + run + write)
+## End-to-end wall time per strategy — set B (14 strategies; process start + load + run + write)
 
 | engine | strategies | failures | median_of_medians_s | min_median_s | max_median_s | median_p95_s | peakRss_median_MB | peakRss_max_MB | cold_first_run_median_s |
 |---|---|---|---|---|---|---|---|---|---|
-| pf | 5 | 0 | 0.115 | 0.111 | 0.132 | 0.116 | 48.707 | 48.715 |  |
-| pc691 | 4 | 0 | 1.198 | 0.644 | 1.217 | 1.202 | 45.395 | 45.633 | 1.202 |
+| pf | 14 | 0 | 0.276 | 0.225 | 0.362 | 0.280 | 97.371 | 97.418 |  |
+| pc691 | 13 | 0 | 3.026 | 1.516 | 566.375 | 3.027 | 70.629 | 75.402 | 3.029 |
 
-Speedup PyneCore 6.9.1 / PineForge (per-strategy median ratio): geomean 8.9×, min 5.8×, median 10.4×, max 10.5× over 4 strategies.
+Speedup PyneCore 6.9.1 / PineForge (per-strategy median ratio): geomean 15.0×, min 6.5×, median 9.7×, max 2420.4× over 13 strategies.
+
+## End-to-end wall time per strategy — set C (36 strategies; process start + load + run + write)
+
+| engine | strategies | failures | median_of_medians_s | min_median_s | max_median_s | median_p95_s | peakRss_median_MB | peakRss_max_MB | cold_first_run_median_s |
+|---|---|---|---|---|---|---|---|---|---|
+| pf | 36 | 2 | 0.124 | 0.080 | 0.536 | 0.126 | 48.707 | 97.414 |  |
+| pc691 | 32 | 5 | 1.266 | 0.239 | 102.896 | 1.278 | 48.262 | 74.934 | 1.279 |
+
+Speedup PyneCore 6.9.1 / PineForge (per-strategy median ratio): geomean 13.0×, min 3.0×, median 10.5×, max 779.5× over 31 strategies.
 
 ## In-process throughput — set A (bars/s; PineForge: dlopen'd .so, run_backtest; PyneCore: ScriptRunner in one interpreter)
 
@@ -37,6 +46,15 @@ Speedup PyneCore 6.9.1 / PineForge (per-strategy median ratio): geomean 8.9×, m
 | pc691 | 100 | 0 | 80,199 | 10,209 | 220,592 | 0.674 |
 
 In-process speedup PineForge / PyneCore 6.9.1: geomean 59×, min 25×, median 65×, max 194× over 100 strategies.
+
+## In-process throughput — set C (bars/s; PineForge: dlopen'd .so, run_backtest; PyneCore: ScriptRunner in one interpreter)
+
+| engine | strategies | failures | bars_per_s_median | bars_per_s_min | bars_per_s_max | median_run_s |
+|---|---|---|---|---|---|---|
+| pf | 30 | 0 | 3,408,098 | 306,571 | 75,821,713 | 0.007 |
+| pc691 | 26 | 4 | 42,150 | 4,120 | 99,234 | 0.937 |
+
+In-process speedup PineForge / PyneCore 6.9.1: geomean 76×, min 39×, median 74×, max 134× over 25 strategies.
 
 ## Scaling — bars/s vs feed size (20 public strategies, in-process, median of 3)
 

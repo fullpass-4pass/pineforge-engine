@@ -553,12 +553,35 @@ PyneCore's *local* transform is essentially free — its translation cost is the
 the table above (2.55 s median, plus an account and a 300/day quota). PineForge pays ~1.9 s of
 local `g++` once per strategy and then runs 65× faster forever.
 
-> **Coverage of this stage.** Everything above is set A, measured serialized and core-pinned on
-> an idle box after the two harness fixes in [Known limitations](#known-limitations) item 2. The
-> equivalent end-to-end and in-process runs for sets B and C were still accumulating when this
-> revision was written; whatever had completed is in
-> [`performance.csv`](performance.csv)/[`performance.md`](performance.md) with its own row
-> counts, and a partial set is labelled as partial rather than averaged into a headline.
+### Results — sets C and B (30-strategy seeded sample each)
+
+Sets B and C at full size are days of serialized wall time — one PyneCore multi-timeframe script
+takes 100 s and one took **566 s**, and every strategy is run 3–5× per engine. They are therefore
+timed on a **lane-stratified sample of 30 strategies**, seed `20260906` (set A stays whole at
+100). Sample sizes are printed with every number.
+
+| set | feed | e2e: PineForge median | e2e: PyneCore median | e2e speedup (geomean / median / max) | in-process speedup | pairs |
+|---|---|---:|---:|---:|---:|---:|
+| **A** (100, whole) | ETHUSDT.P 15m, 53,929 bars | 0.147 s | 0.992 s | 6.3× / 5.6× / 34.5× | **59×** | 100 |
+| **C** (sample) | 15 lanes, 1,240 – 175,261 bars | 0.124 s | 1.266 s | **13.0×** / 10.5× / 779.5× | **76×** | 31 e2e, 25 in-proc |
+| **B** (sample) | ETHUSDT.P 15m, 222,295 bars | 0.276 s | 3.026 s | **15.0×** / 9.7× / 2420.4× | *(still running)* | 13 |
+
+**The gap widens with the difficulty of the work.** On the easy 100-strategy suite it is 6×
+end-to-end; on 15 real market lanes it is 13×; on the 222k-bar corpus it is 15×, and the tails
+are extreme — the worst PyneCore case in the set-B sample is 566 s against PineForge's 0.234 s
+(2,420×), and in set C 102.9 s against 0.132 s (779×). Those are multi-timeframe strategies:
+they are exactly the scripts that also cost PyneCore accuracy.
+
+Memory is the one place PyneCore wins, mildly: on the 222k-bar corpus feed PineForge peaks at
+97 MB against PyneCore's 71 MB, and on set C the two are level (49 MB vs 48 MB).
+
+> **Coverage of this stage.** Set A is whole and complete on all six protocol items. Set C is
+> complete on the sample (36 strategies reached end-to-end, 30 in-process). Set B's end-to-end
+> run was still accumulating when this revision was written — 14 of 30 strategies — and its
+> in-process run had not started; both are labelled with their `n` in
+> [`performance.md`](performance.md) rather than averaged into a headline. To refresh:
+> `PF_PERF_SAMPLE=30 PF_PERF_SEED=20260906 python3 perf.py e2e B 3` then `… inproc B 3`, then
+> `perf_report.py`.
 
 
 ## Known limitations
