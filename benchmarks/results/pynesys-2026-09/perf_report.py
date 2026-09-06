@@ -75,12 +75,34 @@ if cc:
 # determinism
 de = rows("determinism")
 if de:
-    ds = []
-    for S in sorted({r["set"] for r in de}):
+    # determinism.py appends, and set B was measured twice (the second time in place, after the
+    # /dev/shm scratch copy broke a relative ohlcv_csv path in three corpus probes). Keep the
+    # LAST record per (set, slug, engine) and count only the engines a record actually carries.
+    latest, harness_failed = {}, 0
+    for r in de:
         for eng in ("pf", "pc691"):
-            rs = [r for r in de if r["set"] == S]
-            ds.append(dict(set=S, engine=eng, reran=len(rs), byte_identical=sum(1 for r in rs if r[eng]["identical"]), differing=sum(1 for r in rs if r[eng]["identical"] is False), rerun_failed=sum(1 for r in rs if r[eng]["identical"] is None)))
-    md.append("## Determinism — 20 random scripts per set re-run (seed 20260906), output CSV bytes compared\n\n" + tbl(ds, list(ds[0].keys())) + "\n")
+            if eng not in r: continue
+            k = (r["set"], r["slug"], eng); prev = latest.get(k)
+            if r[eng]["identical"] is None: harness_failed += 1
+            # a re-run that never reached the strategy (the /dev/shm scratch copy broke a
+            # relative ohlcv_csv path on three corpus probes) carries no information about
+            # determinism, so a completed re-run of the same probe wins over a failed one
+            if prev is None or (prev["identical"] is None and r[eng]["identical"] is not None):
+                latest[k] = r[eng]
+    ds = []
+    for S in sorted({k[0] for k in latest}):
+        for eng in ("pf", "pc691"):
+            vs = [v for k, v in latest.items() if k[0] == S and k[2] == eng]
+            if not vs: continue
+            ds.append(dict(set=S, engine=eng, reran=len(vs),
+                           byte_identical=sum(1 for v in vs if v["identical"] is True),
+                           differing=sum(1 for v in vs if v["identical"] is False),
+                           rerun_failed=sum(1 for v in vs if v["identical"] is None)))
+    md.append("## Determinism — 20 random scripts per set re-run (seed 20260906), output CSV bytes compared\n\n" + tbl(ds, list(ds[0].keys()))
+               + f"\n{harness_failed} re-run(s) never reached the strategy (the scratch copy broke a relative ohlcv_csv"
+                 " path in three corpus probes); those probes were re-run in place and are counted from that run."
+                 " Both records are kept in perf/determinism.jsonl.\n")
+    out += [dict(table="determinism", set=d["set"], engine=d["engine"], key="all", metric="byte_identical", value=d["byte_identical"]) for d in ds]
 (OUT/"performance.md").write_text("\n".join(md))
 cols = sorted({k for r in out for k in r})
 with open(OUT/"performance.csv", "w", newline="") as f:

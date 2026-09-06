@@ -163,12 +163,16 @@ output compared byte-for-byte:
 | B | 20 / 20 identical | 20 / 20 identical |
 | C | 20 / 20 identical | 20 / 20 identical |
 
+120 of 120 re-runs byte-identical, on both engines, on all three sets — the same table is in
+[`performance.md`](performance.md).
+
 *(Three set-B PineForge re-runs first failed inside the harness's `/dev/shm` scratch copy: those
 corpus probes carry a **relative** `ohlcv_csv` in `inputs.json` that `run_strategy.py` resolves
 against the working directory, so at the scratch depth it pointed outside the tree and the run
-died with `FileNotFoundError` before reaching the strategy. Re-run in place they are
-byte-identical. Both the failed and the corrected records are kept in
-`perf/determinism.jsonl`.)*
+died with `FileNotFoundError` before reaching the strategy — never reaching the strategy, it says
+nothing about determinism. Re-run in place they are byte-identical. Both the failed and the
+corrected records are kept in `perf/determinism.jsonl` and the count of failed attempts is
+printed under the table.)*
 
 ---
 
@@ -437,26 +441,98 @@ is quoted because it is what a user actually waits for, and because the *quota* 
 is a hard constraint this benchmark ran into. PyneCore's local first-run (AST transform) cost is
 measured separately in the timing stage below.
 
-> **Status of the timing stage.** The end-to-end, in-process, scaling and parameter-sweep
-> numbers were still being re-measured when this document was written — the first pass had to be
-> discarded because of the RSS bug in [Known limitations](#known-limitations) item 2(c). They
-> land in [`performance.csv`](performance.csv) and a table is appended here. **If
-> `performance.csv` is absent from this directory, that stage had not finished** — the absence is
-> the honest state, not a suppressed result. The one timing already established and stable is
-> process startup, measured over 7 runs each:
->
-> | case | median |
-> |---|---:|
-> | `python3 -c pass` (system) | 9 ms |
-> | `python -c "import pynecore"` | 71 ms |
-> | `pyne 6.9.1 --help` | 151 ms |
-> | `pyne 6.4.6 --help` | 112 ms |
-> | `run_strategy.py --help` | 48 ms |
-> | PineForge `dlopen` + load of the 53,929-bar CSV | 26 ms |
->
-> Subtract these from any end-to-end number to separate startup from execution.
+### Results — set A (100 strategies, ETHUSDT.P 15m, 53,929 bars)
 
----
+Full tables including per-strategy rows: [`performance.md`](performance.md),
+[`performance.csv`](performance.csv).
+
+**Process startup** (median of 7 runs) — subtract these to separate startup from execution:
+
+| case | median |
+|---|---:|
+| `python3 -c pass` (system) | 10 ms |
+| `python -c "import pynecore"` | 72 ms |
+| `pyne 6.9.1 --help` | 153 ms |
+| `pyne 6.4.6 --help` | 114 ms |
+| `run_strategy.py --help` | 48 ms |
+| PineForge `dlopen` + load of the 53,929-bar CSV | 26 ms |
+
+**1. End-to-end wall time per strategy** — process start + load + run + write CSV, 5 runs each:
+
+| engine | median | p95 | min | max | peak RSS median | cold first run |
+|---|---:|---:|---:|---:|---:|---:|
+| **PineForge** | **0.147 s** | 0.151 s | 0.117 s | 0.326 s | 53 MB | — |
+| PyneCore 6.9.1 | 0.992 s | 1.004 s | 0.450 s | 5.654 s | 48 MB | 1.008 s |
+
+Per-strategy speedup: **geomean 6.3×**, median 5.6×, min 3.6×, max 34.5× over all 100 pairs, no
+failures on either side. Peak RSS is effectively a tie — PyneCore is slightly *lower*. Both
+numbers include process startup, which dominates on a 54k-bar feed; that is why the in-process
+figure below is an order of magnitude larger.
+
+**2. In-process throughput** — PineForge through a `dlopen`ed `.so` re-run on a preloaded feed,
+PyneCore through its runner imported once into one interpreter:
+
+| engine | bars/s median | min | max | median run |
+|---|---:|---:|---:|---:|
+| **PineForge** | **5,455,739** | 846,473 | 9,161,235 | 0.010 s |
+| PyneCore 6.9.1 | 80,199 | 10,209 | 220,592 | 0.674 s |
+
+**Geomean 59×**, median 65×, min 25×, max 194× over 100 strategies. This is the number a sweep
+user actually gets.
+
+**3. Scaling** — bars/s against feed size, 20 strategies, in-process, median of 3:
+
+| feed | bars | PineForge bars/s | PyneCore 6.9.1 bars/s |
+|---|---:|---:|---:|
+| ETHUSDT.P 15m | 10,000 | 5,525,582 | 73,848 |
+| ETHUSDT.P 15m | 25,000 | 5,478,370 | 74,615 |
+| ETHUSDT.P 15m | 53,929 | 5,321,563 | 74,803 |
+| EURUSD 15m | 10,000 | 4,776,014 | 72,467 |
+| EURUSD 15m | 50,000 | 4,985,441 | 74,032 |
+| EURUSD 15m | 124,590 | 4,607,882 | 74,540 |
+
+Both engines are flat in bars/s across a 12× range of feed sizes — neither has a scaling
+pathology; the ratio is a constant ~65×.
+
+**4. Parameter sweep** — 100 values of one input on 5 strategies. PineForge re-runs one loaded
+`.so` through `strategy_set_input`; PyneCore has no in-process input API in its documented CLI,
+so each value is a fresh `pyne run`:
+
+| strategy | PineForge total | PyneCore total | per combination | distinct trade counts (PF / PC) |
+|---|---:|---:|---:|---:|
+| 04-macd-histogram | 0.83 s | 131.9 s | 8 ms vs 1.307 s | 91 / 90 |
+| 05-stoch-rsi | 1.06 s | 102.5 s | 11 ms vs 1.025 s | 78 / 78 |
+| 06-liquidity-sweep | 1.27 s | 129.2 s | 12 ms vs 1.283 s | 62 / 62 |
+| 08-4ema-rsi | 0.70 s | 122.5 s | 7 ms vs 1.171 s | 22 / 22 |
+| 10-market-shift | 1.95 s | 202.2 s | 19 ms vs 2.013 s | 87 / 87 |
+
+**100 – 160× on the sweep workload**, and the two engines see the same number of distinct trade
+counts across the sweep on 4 of the 5 strategies — they are exploring the same parameter surface,
+one just does it in a second instead of two minutes. This is the gap that matters for
+optimisation work.
+
+**5. Translate / compile cost per strategy** (20 strategies, local only):
+
+| step | median | max |
+|---|---:|---:|
+| PineForge codegen (Pine → C++) | 0.088 s | 0.253 s |
+| PineForge `g++ -O2` | 1.730 s | 2.501 s |
+| PineForge link | 0.080 s | 0.135 s |
+| PyneCore first run (cold `__pycache__`) | 1.337 s | 4.975 s |
+| PyneCore warm run | 1.313 s | 4.955 s |
+| **PyneCore local translate/cache cost** (cold − warm) | **0.006 s** | 0.030 s |
+
+PyneCore's *local* transform is essentially free — its translation cost is the cloud compile in
+the table above (2.55 s median, plus an account and a 300/day quota). PineForge pays ~1.9 s of
+local `g++` once per strategy and then runs 65× faster forever.
+
+> **Coverage of this stage.** Everything above is set A, measured serialized and core-pinned on
+> an idle box after the two harness fixes in [Known limitations](#known-limitations) item 2. The
+> equivalent end-to-end and in-process runs for sets B and C were still accumulating when this
+> revision was written; whatever had completed is in
+> [`performance.csv`](performance.csv)/[`performance.md`](performance.md) with its own row
+> counts, and a partial set is labelled as partial rather than averaged into a headline.
+
 
 ## Known limitations
 
