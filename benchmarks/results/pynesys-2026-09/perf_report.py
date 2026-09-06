@@ -104,6 +104,18 @@ if de:
                  " Both records are kept in perf/determinism.jsonl.\n")
     out += [dict(table="determinism", set=d["set"], engine=d["engine"], key="all", metric="byte_identical", value=d["byte_identical"]) for d in ds]
 (OUT/"performance.md").write_text("\n".join(md))
+# The closed set is aggregates-only in public: its per-strategy rows name third-party
+# TradingView authors. Replace the slug of every set-C row with a stable per-lane ordinal so the
+# timing distribution stays publishable while the identity does not leave the benchmark machine.
+_anon, _seen = {}, {}
+for r in out:
+    if r.get("set") == "C" and r.get("key") and r.get("key") != "all":
+        k = r["key"]
+        if k not in _anon:
+            lane = r.get("lane") or "lane"
+            _seen[lane] = _seen.get(lane, 0) + 1
+            _anon[k] = f"C-{lane}-{_seen[lane]:02d}"
+        r["key"] = _anon[k]
 cols = sorted({k for r in out for k in r})
 with open(OUT/"performance.csv", "w", newline="") as f:
     w = csv.DictWriter(f, fieldnames=cols); w.writeheader(); [w.writerow(r) for r in out]
