@@ -1,0 +1,4 @@
+# The closed set is aggregates-only in public. report.py writes closed_rows.csv (200 per-script
+# rows naming third-party TradingView authors) into this directory; it must never be committed.
+# It was committed once, at 36efaeb, and removed by rewriting this branch - see the README.
+closed_rows.csv

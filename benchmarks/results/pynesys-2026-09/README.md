@@ -610,6 +610,12 @@ Read these before quoting any number above.
    what its CLI lets you declare*, not what either could do with a full data plane.
 4. **Set C is not reproducible from public inputs** by design — third-party scripts. Only
    aggregates are published, and the sample is 200 of 3,881 probes.
+   *Disclosure:* `report.py` also writes `closed_rows.csv`, the 200 per-script closed-set rows,
+   into this directory, and a wildcard sync committed it once (commit `36efaeb`). It was removed
+   by rewriting this branch's history and force-pushing; a `.gitignore` in this directory now
+   blocks it. If you need certainty that the blob is unreachable in the remote's object store,
+   ask GitHub to garbage-collect the repository — a force-push alone does not purge it
+   (blob `8064922`).
 5. **Set C under-measures both engines against the parity campaign's own closed test** — one
    feed per lane instead of the campaign's chart + daily aux (+ lower-timeframe) feeds, and
    lane-level facts instead of the per-probe case conf. The handicap is symmetric, so the
