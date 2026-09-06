@@ -68,12 +68,16 @@ scripts) — the same grader, unmodified, for both engines.
    plain crossover strategies. They separate on `request.security`, on
    `process_orders_on_close`, on trailing stops and on bracket/OCA exits — see
    [Feature buckets](#feature-buckets).
-3. **PyneCore cannot resolve a `request.security` context from the chart feed.** It needs a
-   separate `.ohlcv` file staged per (symbol, timeframe) and raises
-   `ValueError: No OHLCV data found for security context` otherwise — including for
-   *coarser* timeframes that PineForge derives from the chart feed by aggregation. This is the
-   single largest source of PyneCore failures in this benchmark. See
-   [Failure classes](#failure-classes).
+3. **`request.security` is where the two engines differ most — but the difference is smaller
+   than a naive run suggests, and part of it was this harness's fault.** PineForge derives any
+   coarser timeframe from the chart feed automatically. PyneCore does so too *for intraday
+   resamples*, but for daily/weekly (and for any other instrument) the **caller** must name the
+   base data with `pyne run --security 'D=<base file>'`; `pyne run --list-data` prints exactly
+   what a script needs. The first pass of this benchmark did not pass that flag, which turned
+   every such script into a `ValueError: No OHLCV data found for security context` row and
+   overstated the gap. The tables below therefore carry a **`--security supplied`** PyneCore
+   column, driven per script by its own `--list-data` output; the naive column is kept beside
+   it so the cost of the omission is visible. See [Failure classes](#failure-classes).
 
 ---
 
@@ -260,6 +264,12 @@ under-covered — a bucket where `not_run` is a large share of `n` should not be
 
 ### The decisive bucket: `request.security`
 
+> **These rows are from the first pass, which did not pass `pyne run --security`.** They
+> therefore measure a harness omission as much as an engine limitation and are superseded by the
+> `--security supplied` rows in [`tables.md`](tables.md) / [`buckets.csv`](buckets.csv). They are
+> kept here because the difference between the two is itself the finding: PyneCore needs to be
+> told which base file answers a daily/weekly `request.security`, PineForge does not.
+
 | set | engine | n | exc | strong | fail | not_run |
 |---|---|---:|---:|---:|---:|---:|
 | B | **PineForge** | 22 | **22** | 0 | 0 | 0 |
@@ -314,10 +324,14 @@ Breakdown: 240-on-1D × 6, 3-on-15 × 3, 15-on-1D × 1, 5-on-15 × 1, 60-on-1D �
 The chart feed genuinely cannot answer a finer-timeframe request; the engine refuses by name
 rather than guessing. Zero failures on sets A and B, zero timeouts anywhere.
 
-**PyneCore 6.9.1 — 52 failures.**
+**PyneCore 6.9.1 — 52 failures in the first (naive) pass.**
 - 39 × `ValueError: No OHLCV data found for security context (symbol=…)` — 29 on set C
   (NYSE:F 5, BINANCE:BTCUSDT 5, OANDA:XAUUSD 4, OANDA:EURUSD 4, CME_MINI:NQ1! 3, NSE:NIFTY 2,
-  NASDAQ:AAPL 2, CME_MINI:ES1! 2, unnamed 2) and 10 on set B.
+  NASDAQ:AAPL 2, CME_MINI:ES1! 2, unnamed 2) and 10 on set B. **Most of these are the missing
+  `--security` flag, not a PyneCore limitation** — see the `--security supplied` column. What
+  survives it is the genuinely unanswerable subset: requests *finer* than the chart feed (where
+  PineForge is refused too) and requests for a different instrument (no feed was staged for
+  either engine).
 - 13 timeouts at 600 s (10 on set B's 222k-bar feed, 3 on set C).
 
 **PyneCore 6.4.6 — 110 failures.** Complete class list, all three sets:
