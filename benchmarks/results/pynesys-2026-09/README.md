@@ -130,8 +130,20 @@ are published, never a per-script row.
   codegen `4de83dd4` and compiled with `g++ -O2 -std=c++17` on the benchmark machine. The
   campaign registry's own trade records were used only as a cross-check.
 - **PyneCore** — `pyne run <script.py> <lane.ohlcv> --trade … --strat …`, output normalised
-  into the TradingView trade-list schema (`bench.py::normalize_pyne`). The `__pycache__` is
-  cleared between versions: a 6.9.1 AST cache breaks 6.4.6 and vice versa.
+  into the TradingView trade-list schema (`bench.py::normalize_pyne`). Two rules that this
+  benchmark learned the hard way:
+  - **One version at a time.** PyneCore caches its AST-transformed script in the strategy
+    directory; a 6.9.1 cache makes 6.4.6 die with `ImportError: set_bool_na` and vice versa. The
+    cache is cleared before every run *and* the two versions are never run concurrently on the
+    same directory. Ignoring the second half fabricated ~40 errors on set B before it was caught.
+  - **Pass `--security`.** For any `request.security` the runtime cannot resolve on its own, the
+    caller must name the base data. Each script is asked what it needs with `pyne run
+    --list-data`, and every same-symbol requirement it reports is supplied as
+    `--security '<TF>=<chart .ohlcv>'`. Where `--list-data` answers "cannot be listed
+    statically", the coarser standard set (60, 240, D, W, M) is supplied — an unused
+    `--security` is accepted, so over-supplying is safe. Requests that are *finer* than the chart
+    feed or name a different instrument are recorded as unsupplied, because no such data was
+    staged for either engine. 6.4.6 has neither flag, so it runs without them.
 - **Timeout** 600 s per strategy per engine. A timeout is a row.
 
 Three feed variants are reported so a reader can see how much of any gap is a
