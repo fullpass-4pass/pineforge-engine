@@ -489,8 +489,23 @@ PyneCore through its runner imported once into one interpreter:
 | **PineForge** | **5,455,739** | 846,473 | 9,161,235 | 0.010 s |
 | PyneCore 6.9.1 | 80,199 | 10,209 | 220,592 | 0.674 s |
 
-**Geomean 59×**, median 65×, min 25×, max 194× over 100 strategies. This is the number a sweep
-user actually gets.
+**Geomean 59×**, median 65×, min 25×, max 194× over 100 strategies.
+
+**Read that ratio as an upper bound, and 6.3× as a lower bound.** The two timed regions are not
+perfectly symmetric, and the asymmetry favours PineForge:
+
+| | inside the timed region | outside it |
+|---|---|---|
+| PineForge ([`pf_tool.cpp`](pf_tool.cpp)) | `strategy_create` + `run_backtest` + `report_free` + `strategy_free` | CSV parsing (done once, before the loop); writing the trade list (the report is freed, never serialised) |
+| PyneCore ([`pc_inproc.py`](pc_inproc.py)) | re-import of the script module, `OHLCVReader` positioning, `ScriptRunner` construction, `runner.run()` — **including writing the trade CSV** | reading the `.toml` syminfo (done once) |
+
+So the in-process figure charges PyneCore for per-iteration re-import and output serialisation
+that PineForge is not charged for, while the end-to-end figure (6.3×) charges *both* engines for
+everything including process startup. The honest statement is that the execution gap on this
+workload is **somewhere between 6× and 59×**, and closer to the upper end once you subtract the
+150 ms of `pyne` process startup that dominates a 54k-bar end-to-end run. The parameter sweep
+below is the cleanest single measurement, because there both engines do exactly the work a user
+asked for and nothing else: **100 – 160×**.
 
 **3. Scaling** — bars/s against feed size, 20 strategies, in-process, median of 3:
 
