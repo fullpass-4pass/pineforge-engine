@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 """Aggregate grade.json + step json into the benchmark tables. Writes ~/pf/bench/results/*.csv|md.
 Public per-strategy rows: sets A and B. Closed set (C): aggregates only (per-script rows stay in results/closed_rows.csv on spark)."""
-import json, glob, csv, sys, collections, statistics
+import json, glob, csv, os, sys, collections, statistics
 from pathlib import Path
-sys.path.insert(0, str(Path.home()/"pf/bench/tools")); from buckets import features, primary
-B = Path.home()/"pf/bench"; OUT = B/"results"; OUT.mkdir(exist_ok=True)
+sys.path.insert(0, str(Path(__file__).resolve().parent)); sys.path.insert(0, str(Path.home()/"pf/bench/tools")); from buckets import features, primary
+B = Path(os.environ.get("PF_BENCH_ROOT", Path.home()/"pf/bench")).resolve(); OUT = B/"results"; OUT.mkdir(parents=True, exist_ok=True)
 ENGINES = ["pf", "pf_rs", "pf_raw", "pc691", "pc691_rs", "pc646", "pc646_rs", "pc691_re"]
 ENAME = {"pf": "PineForge (full feed, tape-window)", "pf_rs": "PineForge (range-start feed)", "pf_raw": "PineForge (full feed, raw)", "pc646": "PyneCore 6.4.6 (full feed)", "pc646_rs": "PyneCore 6.4.6 (range-start feed)", "pc691": "PyneCore 6.9.1 (full feed)", "pc691_rs": "PyneCore 6.9.1 (range-start feed)", "pc691_re": "PyneCore 6.9.1 (recompiled 6.0.66, full feed)"}
 TIERS = ["excellent", "strong", "moderate", "weak", "minimal"]

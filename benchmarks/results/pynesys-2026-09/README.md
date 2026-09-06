@@ -42,12 +42,14 @@ scripts) — the same grader, unmodified, for both engines.
 
 **The three things this benchmark actually shows.**
 
-1. **On the public corpus PineForge is exact.** 311 of 311 strategies grade *excellent*,
-   429,642 engine trades against 431,244 TradingView trades, **100.00 %** of in-window TV
-   trades matched, and every one of entry-time, exit-time, PnL, count and net-profit deltas is
-   `0.0000%` at both the median and the p90. That corpus is the campaign's own regression
-   suite, so read it as "the suite it was built against, it passes exactly" — set A and set C
-   are the harder, less self-selected evidence.
+1. **On the public corpus PineForge is all but exact.** 311 of 311 strategies grade
+   *excellent*, 429,642 engine trades against 431,244 TradingView trades, and **429,599 of
+   429,610** in-window TV trades matched — **99.9974 %**, i.e. 11 unmatched trades in the whole
+   corpus. Entry-time, exit-time, PnL and count deltas are `0.0000%` at both the median and the
+   p90; net-profit relative error is `0.0000%` at the median and `0.0866%` at the p90. Eleven
+   trades is a small gap, but it is a gap. That corpus is also the campaign's own regression
+   suite, so read it as "the suite it was built against, it very nearly passes exactly" — set A
+   and set C are the harder, less self-selected evidence.
 2. **The gap is concentrated in features, not in arithmetic.** Both engines are near-perfect on
    plain crossover strategies. They separate on `request.security`, on
    `process_orders_on_close`, on trailing stops and on bracket/OCA exits — see
@@ -148,10 +150,10 @@ Full tables, all engine variants and every delta percentile: [`tables.md`](table
 
 | engine | exc | strong | mod | weak | err | matched % | countΔ p90 | pnl p90 | netProfit relErr p90 |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|---:|
-| PineForge (tape-window) | **89** | 11 | 0 | 0 | 0 | **99.93** | 0.0000% | 0.0930% | 2.0523% |
-| PineForge (raw) | 84 | 16 | 0 | 0 | 0 | 99.92 | 0.0339% | 0.0968% | 18.6848% |
-| PyneCore 6.9.1 | 81 | 18 | 0 | 1 | 0 | 99.64 | 0.0351% | 0.1016% | 18.6848% |
-| PyneCore 6.4.6 | 69 | 18 | 10 | 2 | 1 | 99.11 | 0.1456% | 348.3379% | 52.6213% |
+| PineForge (tape-window) | **89** | 11 | 0 | 0 | 0 | **99.9253** | 0.0000% | 0.0930% | 2.0523% |
+| PineForge (raw) | 84 | 16 | 0 | 0 | 0 | 99.9247 | 0.0339% | 0.0968% | 18.6848% |
+| PyneCore 6.9.1 | 81 | 18 | 0 | 1 | 0 | 99.6354 | 0.0351% | 0.1016% | 18.6848% |
+| PyneCore 6.4.6 | 69 | 18 | 10 | 2 | 1 | 99.1091 | 0.1456% | 348.3379% | 52.6213% |
 
 Set A is the **cleanest version-to-version comparison of PyneCore itself**, because here both
 6.4.6 and 6.9.1 run the *same* committed `strategy_pyne.py` (PyneComp 6.0.31). 6.9.1 is a
@@ -162,18 +164,24 @@ stops and brackets) become excellent.
 
 | engine | exc | strong | mod | weak | min | err | timeout | not_run | matched % |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|---:|
-| PineForge (tape-window) | **311** | 0 | 0 | 0 | 0 | 0 | 0 | 0 | **100.00** |
-| PineForge (range-start) | 282 | 24 | 0 | 1 | 4 | 0 | 0 | 0 | 99.38 |
-| PineForge (raw) | 267 | 34 | 2 | 2 | 6 | 0 | 0 | 0 | 99.22 |
-| PyneCore 6.9.1 | 90 | 31 | 0 | 2 | 1 | 10 | 10 | **167** | 99.31 |
-| PyneCore 6.9.1 (range-start) | 117 | 15 | 0 | 2 | 0 | 10 | 0 | **167** | 99.63 |
-| PyneCore 6.4.6 | 57 | 24 | 4 | 2 | 2 | 55 | 0 | **167** | 97.92 |
-| PyneCore 6.4.6 (range-start) | 92 | 14 | 7 | 6 | 0 | 25 | 0 | **167** | 98.77 |
+| PineForge (tape-window) | **311** | 0 | 0 | 0 | 0 | 0 | 0 | 0 | **99.9974** |
+| PineForge (range-start) | 282 | 24 | 0 | 1 | 4 | 0 | 0 | 0 | 99.3812 |
+| PineForge (raw) | 267 | 34 | 2 | 2 | 6 | 0 | 0 | 0 | 99.2230 |
+| PyneCore 6.9.1 | 90 | 31 | 0 | 2 | 1 | 10 | 10 | **167** | 99.3120 |
+| PyneCore 6.9.1 (range-start) | 117 | 15 | 0 | 2 | 0 | 10 | 0 | **167** | 99.6316 |
+| PyneCore 6.4.6 | 57 | 24 | 4 | 2 | 2 | 55 | 0 | **167** | 97.9191 |
+| PyneCore 6.4.6 (range-start) | 92 | 14 | 7 | 6 | 0 | 25 | 0 | **167** | 98.7654 |
 
 The 167 `not_run` are strategies whose Pine → Python compile was blocked by the PyneComp daily
 quota (see [Known limitations](#known-limitations)). They are **not** compile failures — zero
 genuine compiler errors were seen anywhere in this benchmark — and the PyneCore percentages
 here must be read against the 144 that actually ran, not against 311.
+
+**`matched %` is not comparable across engines when their failure counts differ.** It is
+computed only over the strategies an engine actually ran, so PineForge's set-B figure is over
+429,610 in-window TV trades while PyneCore 6.9.1's is over 171,362 (124 strategies finished:
+144 ran, 20 errored or timed out) and 6.4.6's over 115,332 (89 finished). Compare the tier
+counts and the failure counts; use `matched %` only within one engine's column.
 
 **Do not read the 6.4.6 column here as an accuracy result.** Sets B and C were compiled by
 **PyneComp v6.0.66**, which targets the PyneCore 6.9.x API. 40 of 6.4.6's 55 set-B errors are
@@ -197,6 +205,30 @@ about execution fidelity. For the version comparison, use set A.
 This is the honest set: 200 third-party scripts nobody wrote for either engine, on 15 different
 instrument/timeframe lanes including seven daily lanes with real sessions, holidays and
 timezones. PineForge takes 140 excellent + 29 strong; PyneCore 6.9.1 takes 67 + 60.
+
+> **Set C is a *reduced-input* replication of the parity campaign's closed test, and its
+> absolute PineForge numbers are deliberately lower than the campaign's own.** The campaign
+> measures the same population at 3,825 excellent + 55 strong + 1 moderate of 3,881
+> (99.97 % excellent-or-strong, `README.md` "The closed test, lane by lane", 2026-09-06). This
+> benchmark gets 169 of 200 because it hands **both** engines a deliberately thin input set:
+>
+> - **chart feed only.** The campaign's lane templates pin a `feeds.chart` *and* a `feeds.daily`
+>   aux feed (the CME and equity 15m lanes carry TradingView's own daily bars), plus
+>   lower-timeframe data where a script uses `request.security_lower_tf`. Here each engine got
+>   one feed per lane. That alone produces all 13 of PineForge's failures and degrades the
+>   48-strategy `request.security` bucket for both engines.
+> - **lane-level facts instead of the campaign's per-probe case conf.** Closed probes ship a
+>   `metrics.json` but no `inputs.json`; the symbol facts, session, timezone, mintick,
+>   pointvalue and qty step come from the lane manifest, and the TV tape timezone is assumed
+>   rather than read per probe.
+> - **200 probes of 3,881**, and engine `76518c6b` rather than the campaign's then-active
+>   baseline `86049406`.
+>
+> So: do **not** quote set C as PineForge's parity score (it understates it), and do not quote
+> the campaign's 99.97 % as this benchmark's result (that measurement has inputs PyneCore was
+> not given). What set C is good for — and the only thing it is quoted for here — is the
+> **head-to-head**: both engines received byte-identical inputs, so the tier gap between the
+> columns is real.
 
 **Per-lane tier counts for both engines are in [`tables.md`](tables.md)** (15 rows per engine)
 and in [`accuracy_closed_aggregates.csv`](accuracy_closed_aggregates.csv). The lane sample
@@ -351,15 +383,19 @@ Protocol (see [`perf.py`](perf.py) for the exact code):
    only. That is symmetric, but it means the security bucket measures *what each engine can
    derive from one feed*, not what each could do with a full data plane.
 4. **Set C is not reproducible from public inputs** by design — third-party scripts. Only
-   aggregates are published, and the sample is 200 of 3,881 probes; the campaign's own full
-   population is measured elsewhere.
-5. **PineForge is the home team.** The corpus (set B) is the campaign's regression suite and
+   aggregates are published, and the sample is 200 of 3,881 probes.
+5. **Set C under-measures both engines against the parity campaign's own closed test** — one
+   feed per lane instead of the campaign's chart + daily aux (+ lower-timeframe) feeds, and
+   lane-level facts instead of the per-probe case conf. The handicap is symmetric, so the
+   head-to-head holds, but neither column is either engine's best achievable score. See the
+   note under [set C](#set-c--closed-campaign-sample-200-script-lane-probes-15-lanes-165223-tv-trades).
+6. **PineForge is the home team.** The corpus (set B) is the campaign's regression suite and
    PineForge is tuned against it; a 311/311 result there is a statement about regression
    coverage, not about generalisation. Set C is the set to argue from.
-6. **The engine's main branch moved during the run.** Everything was built and measured at
+7. **The engine's main branch moved during the run.** Everything was built and measured at
    engine `76518c6b`, which was `origin/main` at 10:13Z; main advanced to `86049406` later the
    same day. The benchmark keeps the sha it measured.
-7. **No PyneCore "fast mode" was benchmarked** — PyneCore ships no documented JIT/numba/compiled
+8. **No PyneCore "fast mode" was benchmarked** — PyneCore ships no documented JIT/numba/compiled
    execution mode; if one exists it was not found in its docs and is not measured here.
 
 ---
