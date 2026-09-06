@@ -1,0 +1,58 @@
+PineForge vs PyneSys/PyneCore benchmark — versions, hardware, provenance
+generated 2026-09-06 (campaign scenario custom:benchmark/r13-bench-pynesys)
+
+[hardware / OS]
+machine:    spark2 (all accuracy and performance measurements)
+cpu:        ARM Cortex-X925 + Cortex-A725, 20 cores
+memory:     121 GB
+os:         Ubuntu 24.04.4 LTS aarch64, kernel 6.17.0-1031-nvidia
+perf pin:   taskset -c 5-9, one job at a time, box otherwise idle (load < 1.4 gate)
+accuracy:   xargs -P 30 (oversubscribed on purpose; wall times in the accuracy tables
+            are therefore NOT the performance numbers — use performance.csv for those)
+
+[toolchain]
+python:     3.12.3
+uv:         0.12.10 (aarch64-unknown-linux-gnu)
+node:       v22.23.2
+cmake:      3.28.3
+g++:        13.3.0 (Ubuntu 13.3.0-6ubuntu2~24.04.1), -O2 -std=c++17 -fPIC
+ccache:     4.9.1
+
+[PineForge]
+engine:     76518c6b79cea8410b462a892994deaebd4bdc9a
+            (github.com/pineforge-4pass/pineforge-engine origin/main as of 2026-09-06T10:13Z;
+             main advanced to 86049406d8f675d7ad237f519d1a023ae21f6096 later the same day —
+             the benchmark keeps the sha it was built and measured with)
+codegen:    4de83dd450cb6b7f00a2600ad4428f05ceec4e6d
+            (github.com/pineforge-4pass/pineforge-codegen-oss origin/main, still current)
+runner:     engine scripts/run_strategy.py (Pine -> C++ -> libpineforge.a -> strategy.so)
+grader:     engine scripts/verify_corpus.py::analyze_strategy, called by benchmarks/compare.py
+            (strict profile; production profile for trail_* scripts) — the same grader the
+            parity campaign uses, unmodified
+
+[PyneSys / PyneCore]
+pynecore:   6.4.6 (the lock in pineforge-engine/benchmarks/uv.lock) and
+            6.9.1 (current PyPI at 2026-09-06)
+pynecomp:   v6.0.66 — the cloud Pine->Python compiler that produced every strategy_pyne.py
+            re-compiled for this benchmark (banner line in each generated file)
+            NOTE set A keeps its pre-existing sources compiled by PyneComp 6.0.31; the
+            compiler-drift re-compile of set A could NOT be run (see [quota] below)
+runner:     pyne run <script.py> <lane.ohlcv> --trade <csv> --strat <csv>, normalised to the
+            TradingView trade-list schema by tools/spark/bench.py::normalize_pyne
+
+[data]
+corpus:     pineforge-corpus b46cd80c247a53b19e23cb0c12c4451d624ce9a6
+assets:     pineforge-benchmarks-assets bb97c51dcdd5192d33991db77fe7b3321016d3b0
+lane feeds: the campaign registry lane_input_templates fixedInputs feed-<lane>-chart
+            documents, fetched by content sha with lab evidence get; per-lane sha256,
+            bar count and symbol facts in results/lanes.csv
+tv tapes:   set A/B = the corpus/assets tv_trades.csv; set C = the campaign registry tape
+            pinned by each probe (TradingView deep-backtest export, full precision)
+
+[quota / coverage limits — see README "Known limitations"]
+PyneComp daily quota is 300 compiles/day (hourly 120). It was exhausted at
+2026-09-06T11:02Z (Daily 300/300, reset 2026-09-07T00:00:00Z). Compile outcome:
+  set C (closed, 154 distinct scripts):  154/154 compiled, 0 compile errors
+  set B (public corpus, 312 scripts):    145/312 compiled, 0 compile errors, 167 blocked
+  set A (public suite, 100 scripts):     0/100 re-compiled with 6.0.66 (never queued)
+A quota-blocked compile is reported as not_run, NEVER as a compile failure.
