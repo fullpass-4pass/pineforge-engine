@@ -5,8 +5,12 @@ import json, glob, csv, os, sys, collections, statistics
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent)); sys.path.insert(0, str(Path.home()/"pf/bench/tools")); from buckets import features, primary
 B = Path(os.environ.get("PF_BENCH_ROOT", Path.home()/"pf/bench")).resolve(); OUT = B/"results"; OUT.mkdir(parents=True, exist_ok=True)
-ENGINES = ["pf", "pf_rs", "pf_raw", "pc691", "pc691_rs", "pc646", "pc646_rs", "pc691_re"]
-ENAME = {"pf": "PineForge (full feed, tape-window)", "pf_rs": "PineForge (range-start feed)", "pf_raw": "PineForge (full feed, raw)", "pc646": "PyneCore 6.4.6 (full feed)", "pc646_rs": "PyneCore 6.4.6 (range-start feed)", "pc691": "PyneCore 6.9.1 (full feed)", "pc691_rs": "PyneCore 6.9.1 (range-start feed)", "pc691_re": "PyneCore 6.9.1 (recompiled 6.0.66, full feed)"}
+# pc646_sec is deliberately absent: PyneCore 6.4.6 has no --security and no --list-data (the
+# facility arrived between 6.4.6 and 6.9.1), so that variant supplied no arguments and is just a
+# duplicate of pc646 — kept on disk, not shown as a column.
+ENGINES = ["pf", "pf_rs", "pf_raw", "pc691_sec", "pc691", "pc691_rs", "pc646", "pc646_rs", "pc691_re"]
+ENAME = {"pf": "PineForge (full feed, tape-window)", "pf_rs": "PineForge (range-start feed)", "pf_raw": "PineForge (full feed, raw)", "pc646": "PyneCore 6.4.6 (full feed)", "pc646_rs": "PyneCore 6.4.6 (range-start feed)", "pc691": "PyneCore 6.9.1 (full feed)", "pc691_rs": "PyneCore 6.9.1 (range-start feed)", "pc691_re": "PyneCore 6.9.1 (recompiled 6.0.66, full feed)",
+         "pc691_sec": "PyneCore 6.9.1 (full feed, --security supplied)", "pc646_sec": "PyneCore 6.4.6 (full feed, --security supplied)"}
 TIERS = ["excellent", "strong", "moderate", "weak", "minimal"]
 def rj(p, d=None):
     try: return json.load(open(p))
@@ -57,15 +61,25 @@ def summary(rs, e):
     c = tier_counts(rs, e); ok = [r for r in rs if r[f"{e}_status"] == "ok" and r[f"{e}_tier"]]
     tv = sum(r["tvTrades"] for r in rs); et = sum((r[f"{e}_engineTrades"] or 0) for r in ok); tvw = sum((r[f"{e}_tvInWindow"] or 0) for r in ok); m = sum((r[f"{e}_matched"] or 0) for r in ok)
     d = dict(engine=ENAME[e], n=len(rs), **{t: c.get(t, 0) for t in TIERS}, compile_fail=c.get("compile_fail", 0), build_fail=c.get("build_fail", 0), run_error=c.get("run_error", 0), timeout=c.get("timeout", 0), not_run=c.get("not_run", 0),
-             tvTrades=tv, engineTrades=et, tvInWindow=tvw, matched=m, matchedPct=round(100*m/max(tvw, 1), 2))
+             tvTrades=tv, engineTrades=et, tvInWindow=tvw, matched=m, matchedPct=round(100*m/max(tvw, 1), 4))
     for k in ("countDelta", "entryP90", "exitP90", "pnlP90", "netProfitRelErr", "maxEquityDev"):
         xs = [r[f"{e}_{k}"] for r in ok]; d[f"{k}_median"] = pct(xs, 0.5); d[f"{k}_p90"] = pct(xs, 0.9)
     d["wall_median_s"] = pct([r[f"{e}_wallS"] for r in ok], 0.5); d["wall_p95_s"] = pct([r[f"{e}_wallS"] for r in ok], 0.95)
     return d
+# column kinds: the deltas are fractions and are printed as percentages of any size (a 3.48
+# relative error is 348.30%, not "3.483"); seconds stay seconds; counts stay integers.
+PCT_KEYS = {f"{k}_{q}" for k in ("countDelta", "entryP90", "exitP90", "pnlP90", "netProfitRelErr", "maxEquityDev") for q in ("median", "p90")}
+SEC_KEYS = {"wall_median_s", "wall_p95_s"}
 def md_table(ds, keys):
     h = "| " + " | ".join(keys) + " |\n|" + "---|"*len(keys) + "\n"
-    fmt = lambda v: "" if v is None else (f"{v:.4%}" if isinstance(v, float) and v < 1 and v >= 0 else (f"{v:.3f}" if isinstance(v, float) else str(v)))
-    return h + "".join("| " + " | ".join(fmt(d.get(k)) for k in keys) + " |\n" for d in ds)
+    def fmt(k, v):
+        if v is None: return ""
+        if k in PCT_KEYS and isinstance(v, (int, float)): return f"{v*100:.4f}%"
+        if k in SEC_KEYS and isinstance(v, (int, float)): return f"{v:.3f}"
+        if k in ("matchedPct",) and isinstance(v, (int, float)): return f"{v:.4f}"
+        if k in ("excellentPct", "excellentStrongPct") and isinstance(v, (int, float)): return f"{v:.1f}"
+        return f"{v:.3f}" if isinstance(v, float) else str(v)
+    return h + "".join("| " + " | ".join(fmt(k, d.get(k)) for k in keys) + " |\n" for d in ds)
 md = []; agg = []
 KEYS = ["engine", "n", "excellent", "strong", "moderate", "weak", "minimal", "compile_fail", "build_fail", "run_error", "timeout", "not_run", "tvTrades", "engineTrades", "matchedPct", "countDelta_median", "countDelta_p90", "entryP90_median", "entryP90_p90", "exitP90_median", "exitP90_p90", "pnlP90_median", "pnlP90_p90", "netProfitRelErr_median", "netProfitRelErr_p90", "maxEquityDev_median", "wall_median_s", "wall_p95_s"]
 for S, title in (("A", "Set A: public benchmark suite (100, ETHUSDT 15m, 53,929 bars)"), ("B", "Set B: public corpus (312, ETHUSDT.P 15m, 222,295 bars)"), ("C", "Set C: closed campaign sample (200 script-lane probes, 15 lanes)")):
@@ -78,7 +92,7 @@ for S, title in (("A", "Set A: public benchmark suite (100, ETHUSDT 15m, 53,929 
 rc = [r for r in rows if r["set"] == "C"]
 if rc:
     lane_order = ["eth", "btcusdt", "btcusdt-1d", "es1", "es1-1d", "nq1", "nq1-1d", "aapl", "nifty", "nifty-1d", "f", "f-1d", "eurusd", "xauusd", "xauusd-1d"]
-    for e in ("pf", "pf_rs", "pc691", "pc691_rs", "pc646"):
+    for e in ("pf", "pf_rs", "pc691_sec", "pc691", "pc691_rs", "pc646"):
         ds = []
         for lane in lane_order:
             rs = [r for r in rc if r["lane"] == lane]

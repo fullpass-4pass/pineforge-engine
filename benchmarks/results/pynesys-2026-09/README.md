@@ -8,8 +8,8 @@ compiled) and [PyneCore](https://github.com/PyneSys/pynecore) (Pine → Python v
 Both engines get the same Pine source, the same OHLCV feed, the same input overrides, and the
 same grader. Every strategy that fails to compile, fails to build, crashes or times out is a
 **row** in the tables below with its message class. Nothing is dropped to make a number look
-better; the two places where this benchmark is *incomplete* are stated in
-[Known limitations](#known-limitations) and carried as `not_run` counts in every table.
+better, and every place where this benchmark is *incomplete* or *handicapped* is stated in
+[Known limitations](#known-limitations) and carried as a `not_run` count in the tables.
 
 - **Versions, hardware, provenance:** [`versions.txt`](versions.txt)
 - **Raw tables:** [`tables.md`](tables.md)
@@ -26,12 +26,19 @@ better; the two places where this benchmark is *incomplete* are stated in
   (PineForge in-process timer), and the stage scripts [`run_set.sh`](run_set.sh),
   [`perf1.sh`](perf1.sh), [`perfgate.sh`](perfgate.sh).
 
-  These are the files that ran, with three deliberate edits made afterwards, all recorded here:
-  `report.py` and `perf_report.py` now read `PF_BENCH_ROOT` instead of a hard-coded
-  `~/pf/bench` (so the reproducer can drive them), `report.py` keeps four decimals of
-  `matchedPct` instead of two (see the note on set B), and `bench.py`'s CLI dispatch moved
-  below the last function definition — as measured it sat above `cmd_fixperiod`, so the
-  `fixperiod` subcommand would have raised `NameError`. No measurement path was changed.
+  Plus the two re-measurement drivers written when this benchmark's own bugs were found:
+  [`secrun.sh`](secrun.sh) (`--security` re-run) and [`rerunB.sh`](rerunB.sh) (set B, one
+  PyneCore version at a time). Every fix is described in
+  [Known limitations](#known-limitations) item 2, and every number above is from after the fix.
+
+  Cosmetic edits made after the final measurement, listed so the diff is not a surprise:
+  `report.py` and `perf_report.py` read `PF_BENCH_ROOT` rather than a hard-coded `~/pf/bench`
+  (so the reproducer can drive them); `report.py` prints four decimals of `matchedPct` instead
+  of two, formats delta columns as percentages of any size (a 3.48 relative error was printing
+  as `3.483`) and drops engine variants with nothing but `not_run` rows; and `bench.py`'s CLI
+  dispatch moved below the last function definition, since as measured it sat above
+  `cmd_fixperiod` and that subcommand would have raised `NameError`. None of these touch a
+  measurement path.
 
 ---
 
@@ -41,14 +48,17 @@ better; the two places where this benchmark is *incomplete* are stated in
 |---|---:|---:|---:|
 | **PineForge** excellent | **89** | **311** | **140** |
 | **PineForge** excellent + strong | **100 / 100** | **311 / 311** | **169 / 200** |
-| PyneCore 6.9.1 excellent | 81 | 90 *(of 144 run)* | 67 |
-| PyneCore 6.9.1 excellent + strong | 99 / 100 | 121 *(of 144 run)* | 127 / 200 |
-| PyneCore 6.4.6 excellent | 69 | 57 *(of 144 run)* | 43 |
-| PyneCore 6.4.6 excellent + strong | 87 / 100 | 81 *(of 144 run)* | 92 / 200 |
+| PyneCore 6.9.1 excellent | 81 | 90 *(of 144 run)* | 68 |
+| PyneCore 6.9.1 excellent + strong | 99 / 100 | 121 *(of 144 run)* | 130 / 200 |
+| PyneCore 6.4.6 excellent | 69 | 76 *(of 144 run)* | 43 |
+| PyneCore 6.4.6 excellent + strong | 87 / 100 | 105 *(of 144 run)* | 92 / 200 |
 | PineForge failures (error/timeout) | 0 | 0 | 13 |
-| PyneCore 6.9.1 failures | 0 | 20 | 32 |
-| PyneCore 6.4.6 failures | 1 | 55 | 54 |
+| PyneCore 6.9.1 failures | 0 | 15 | 21 |
+| PyneCore 6.4.6 failures | 1 | 25 | 54 |
 | TradingView trades graded | 167,301 | 431,244 | 165,223 |
+
+PyneCore 6.9.1 is quoted here in its **best** configuration — with the auxiliary data it asks
+for supplied via `pyne run --security` (see below). 6.4.6 has no such option.
 
 Tiers are the PineForge parity campaign's canonical grades, produced by the engine's own
 `scripts/verify_corpus.py::analyze_strategy` (strict profile; production profile for `trail_*`
@@ -64,20 +74,22 @@ scripts) — the same grader, unmodified, for both engines.
    trades is a small gap, but it is a gap. That corpus is also the campaign's own regression
    suite, so read it as "the suite it was built against, it very nearly passes exactly" — set A
    and set C are the harder, less self-selected evidence.
-2. **The gap is concentrated in features, not in arithmetic.** Both engines are near-perfect on
-   plain crossover strategies. They separate on `request.security`, on
-   `process_orders_on_close`, on trailing stops and on bracket/OCA exits — see
+2. **The gap is concentrated in features, not in arithmetic.** On the 100-strategy public suite
+   the two current engines are close (89 vs 81 excellent, both 99+ excellent-or-strong). On the
+   200 third-party closed scripts they separate: 140 vs 68 excellent, 169 vs 130
+   excellent-or-strong. The separation lives in `request.security`, `process_orders_on_close`,
+   bracket/OCA exits, `var`/`varip` state and trailing stops — see
    [Feature buckets](#feature-buckets).
-3. **`request.security` is where the two engines differ most — but the difference is smaller
-   than a naive run suggests, and part of it was this harness's fault.** PineForge derives any
-   coarser timeframe from the chart feed automatically. PyneCore does so too *for intraday
-   resamples*, but for daily/weekly (and for any other instrument) the **caller** must name the
-   base data with `pyne run --security 'D=<base file>'`; `pyne run --list-data` prints exactly
-   what a script needs. The first pass of this benchmark did not pass that flag, which turned
-   every such script into a `ValueError: No OHLCV data found for security context` row and
-   overstated the gap. The tables below therefore carry a **`--security supplied`** PyneCore
-   column, driven per script by its own `--list-data` output; the naive column is kept beside
-   it so the cost of the omission is visible. See [Failure classes](#failure-classes).
+3. **Multi-timeframe is the sharpest split, and it is a real one — but smaller than a careless
+   run makes it look.** PineForge derives any *coarser* timeframe from the chart feed itself and
+   refuses only *finer* requests, by name. PyneCore 6.9.1 also resamples intraday coarser
+   timeframes automatically, but for daily/weekly the **caller** must name the base data with
+   `pyne run --security 'D=<base file>'` (`--list-data` prints what a script needs). Supplying
+   it removes 21 of PyneCore's 52 failures — and turns most of them into low tiers or 600-second
+   timeouts rather than into matches: on set C's 48 `request.security` scripts PineForge gets
+   21 excellent + 9 strong, PyneCore 6.9.1 with the data supplied gets 4 + 10. PyneCore **6.4.6
+   has no `--security` option at all**, so on that version the daily/weekly case is simply
+   unreachable.
 
 ---
 
@@ -173,6 +185,10 @@ Full tables, all engine variants and every delta percentile: [`tables.md`](table
 | PyneCore 6.9.1 | 81 | 18 | 0 | 1 | 0 | 99.6354 | 0.0351% | 0.1016% | 18.6848% |
 | PyneCore 6.4.6 | 69 | 18 | 10 | 2 | 1 | 99.1091 | 0.1456% | 348.3379% | 52.6213% |
 
+No set-A strategy uses `request.security`, so the `--security supplied` run is byte-for-byte
+identical to the plain one for both PyneCore versions. That equality is this benchmark's control
+— it is what proved that an earlier set-A discrepancy was a harness race, not the flag.
+
 Set A is the **cleanest version-to-version comparison of PyneCore itself**, because here both
 6.4.6 and 6.9.1 run the *same* committed `strategy_pyne.py` (PyneComp 6.0.31). 6.9.1 is a
 clear improvement on 6.4.6: +12 excellent, and the 10 *moderate* 6.4.6 scripts (all trailing
@@ -185,40 +201,54 @@ stops and brackets) become excellent.
 | PineForge (tape-window) | **311** | 0 | 0 | 0 | 0 | 0 | 0 | 0 | **99.9974** |
 | PineForge (range-start) | 282 | 24 | 0 | 1 | 4 | 0 | 0 | 0 | 99.3812 |
 | PineForge (raw) | 267 | 34 | 2 | 2 | 6 | 0 | 0 | 0 | 99.2230 |
+| PyneCore 6.9.1 (`--security` supplied) | 90 | 31 | 0 | 7 | 1 | 2 | 13 | **167** | 99.0090 |
 | PyneCore 6.9.1 | 90 | 31 | 0 | 2 | 1 | 10 | 10 | **167** | 99.3120 |
-| PyneCore 6.9.1 (range-start) | 117 | 15 | 0 | 2 | 0 | 10 | 0 | **167** | 99.6316 |
-| PyneCore 6.4.6 | 57 | 24 | 4 | 2 | 2 | 55 | 0 | **167** | 97.9191 |
-| PyneCore 6.4.6 (range-start) | 92 | 14 | 7 | 6 | 0 | 25 | 0 | **167** | 98.7654 |
+| PyneCore 6.9.1 (range-start) | 117 | 15 | 0 | 2 | 0 | 10 | 0 | **167** | 99.6294 |
+| PyneCore 6.4.6 | 76 | 29 | 7 | 5 | 2 | 25 | 0 | **167** | 97.7850 |
+| PyneCore 6.4.6 (range-start) | 92 | 14 | 7 | 6 | 0 | 25 | 0 | **167** | 98.7676 |
+
+Supplying the security data on set B moves 8 scripts out of the error column, but 3 of them
+land in the timeout column and 5 in *weak* — the excellent and strong counts do not move at all.
 
 The 167 `not_run` are strategies whose Pine → Python compile was blocked by the PyneComp daily
 quota (see [Known limitations](#known-limitations)). They are **not** compile failures — zero
 genuine compiler errors were seen anywhere in this benchmark — and the PyneCore percentages
 here must be read against the 144 that actually ran, not against 311.
 
-**`matched %` is not comparable across engines when their failure counts differ.** It is
-computed only over the strategies an engine actually ran, so PineForge's set-B figure is over
-429,610 in-window TV trades while PyneCore 6.9.1's is over 171,362 (124 strategies finished:
-144 ran, 20 errored or timed out) and 6.4.6's over 115,332 (89 finished). Compare the tier
-counts and the failure counts; use `matched %` only within one engine's column.
+**A withdrawn claim, kept visible.** An earlier revision of this document reported 55 set-B
+errors for PyneCore 6.4.6, 40 of them `ImportError: cannot import name 'set_bool_na'` and
+`ModuleNotFoundError: No module named 'pynecore.core.broker'`, and read them as *PyneComp
+6.0.66 output does not run on PyneCore 6.4.6*. **That was this harness's bug, not PyneCore's.**
+The set-B runs put both PyneCore versions in one 30-wide parallel pool, and PyneCore caches its
+AST-transformed script inside the strategy directory, so the two versions overwrote each other's
+cache. Re-running one version at a time — the only change — gives 6.4.6 **76 excellent and 25
+errors**, and all 40 of those import errors disappear. The table above is that re-run
+([`rerunB.sh`](rerunB.sh)). Sets A and C were never affected: they were always run one version
+per stage.
 
-**Do not read the 6.4.6 column here as an accuracy result.** Sets B and C were compiled by
-**PyneComp v6.0.66**, which targets the PyneCore 6.9.x API. 40 of 6.4.6's 55 set-B errors are
-pure API skew — 32 × `ImportError: cannot import name 'set_bool_na' from 'pynecore.types.na'`
-and 8 × `ModuleNotFoundError: No module named 'pynecore.core.broker'` — i.e. *today's compiler
-output does not run on that runtime*, which is a real compatibility finding but not a statement
-about execution fidelity. For the version comparison, use set A.
+What survives as genuine version skew is small — 3 × `ImportError: pine_loop`, 1 ×
+`chart.point` — and it is dwarfed by the real 6.4.6 limitation: that version has **no
+`--security` option at all**, so 58 of its 80 failures across all three sets are security
+contexts it has no way to be given. See [Failure classes](#failure-classes).
+
+**`matched %` also differs in what it is computed over.** Each engine's figure covers only the
+strategies it finished, so on set B PineForge's is over 429,610 in-window TV trades and
+PyneCore 6.9.1's over far fewer. Compare tier counts and failure counts; read `matched %` only
+within one engine's column.
+
 
 ### Set C — closed campaign sample (200 script-lane probes, 15 lanes, 165,223 TV trades)
 
 | engine | exc | strong | mod | weak | min | err | timeout | matched % |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|
-| PineForge (tape-window) | **140** | 29 | 8 | 3 | 7 | 13 | 0 | **98.92** |
-| PineForge (range-start) | 157 | 18 | 5 | 3 | 4 | 13 | 0 | 98.98 |
-| PineForge (raw) | 93 | 59 | 20 | 3 | 12 | 13 | 0 | 97.16 |
-| PyneCore 6.9.1 | 67 | 60 | 21 | 10 | 10 | 29 | 3 | 95.69 |
-| PyneCore 6.9.1 (range-start) | 107 | 38 | 13 | 10 | 3 | 29 | 0 | 98.26 |
-| PyneCore 6.4.6 | 43 | 49 | 27 | 8 | 19 | 54 | 0 | 90.28 |
-| PyneCore 6.4.6 (range-start) | 60 | 45 | 25 | 5 | 11 | 54 | 0 | 90.87 |
+| PineForge (tape-window) | **140** | 29 | 8 | 3 | 7 | 13 | 0 | **98.9187** |
+| PineForge (range-start) | 157 | 18 | 5 | 3 | 4 | 13 | 0 | 98.9817 |
+| PineForge (raw) | 93 | 59 | 20 | 3 | 12 | 13 | 0 | 97.1624 |
+| PyneCore 6.9.1 (`--security` supplied) | 68 | 62 | 22 | 14 | 13 | 19 | 2 | 95.5654 |
+| PyneCore 6.9.1 | 67 | 60 | 21 | 10 | 10 | 29 | 3 | 95.6897 |
+| PyneCore 6.9.1 (range-start) | 107 | 38 | 13 | 10 | 3 | 29 | 0 | 98.2572 |
+| PyneCore 6.4.6 | 43 | 49 | 27 | 8 | 19 | 54 | 0 | 90.2836 |
+| PyneCore 6.4.6 (range-start) | 60 | 45 | 25 | 5 | 11 | 54 | 0 | 90.8742 |
 
 This is the honest set: 200 third-party scripts nobody wrote for either engine, on 15 different
 instrument/timeframe lanes including seven daily lanes with real sessions, holidays and
@@ -264,103 +294,108 @@ under-covered — a bucket where `not_run` is a large share of `n` should not be
 
 ### The decisive bucket: `request.security`
 
-> **These rows are from the first pass, which did not pass `pyne run --security`.** They
-> therefore measure a harness omission as much as an engine limitation and are superseded by the
-> `--security supplied` rows in [`tables.md`](tables.md) / [`buckets.csv`](buckets.csv). They are
-> kept here because the difference between the two is itself the finding: PyneCore needs to be
-> told which base file answers a daily/weekly `request.security`, PineForge does not.
+Counts are excellent / strong / failed. PyneCore 6.9.1 is shown both ways — without the
+`--security` flag and with the data its own `--list-data` asks for — because the difference is
+itself a result.
 
-| set | engine | n | exc | strong | fail | not_run |
+| set | engine | n | exc | strong | failed | not_run |
 |---|---|---:|---:|---:|---:|---:|
 | B | **PineForge** | 22 | **22** | 0 | 0 | 0 |
-| B | PyneCore 6.9.1 | 22 | 1 | 0 | **20** | 1 |
-| B | PyneCore 6.4.6 | 22 | 0 | 0 | **21** | 1 |
+| B | PyneCore 6.9.1 (`--security` supplied) | 22 | 1 | 0 | 15 | 1 |
+| B | PyneCore 6.9.1 | 22 | 1 | 0 | 20 | 1 |
+| B | PyneCore 6.4.6 *(no `--security` option)* | 22 | 0 | 0 | 21 | 1 |
 | C | **PineForge** | 48 | **21** | 9 | 13 | 0 |
-| C | PyneCore 6.9.1 | 48 | 3 | 8 | **32** | 0 |
-| C | PyneCore 6.4.6 | 48 | 1 | 2 | **43** | 0 |
+| C | PyneCore 6.9.1 (`--security` supplied) | 48 | 4 | 10 | 21 | 0 |
+| C | PyneCore 6.9.1 | 48 | 3 | 8 | 32 | 0 |
+| C | PyneCore 6.4.6 *(no `--security` option)* | 48 | 1 | 2 | 43 | 0 |
 
-PineForge derives a higher-timeframe security context from the chart feed by aggregation and
-only refuses when a *finer* timeframe is requested (which is genuinely underivable). PyneCore
-requires a separate data file per security context and fails on both directions.
+Reading it honestly:
 
-### Other buckets (set C, the unbiased set)
+- Giving PyneCore 6.9.1 the data it asks for **does** help — set C failures fall from 32 to 21,
+  set B from 20 to 15 — and anyone benchmarking PyneCore on multi-timeframe scripts must pass
+  the flag or they are measuring their own omission.
+- It does **not** close the gap. Even fully supplied, PyneCore 6.9.1 reaches 4 excellent + 10
+  strong of set C's 48, against PineForge's 21 + 9 on the identical inputs. The scripts that
+  stop erroring mostly become *weak*/*minimal* or exceed the 600-second ceiling.
+- The 13 PineForge failures in this bucket are all requests for a timeframe **finer** than the
+  chart feed, which no engine can answer from that feed; PyneCore is refused there too.
+- PyneCore **6.4.6 has no `--security` and no `--list-data`** (checked with `pyne run --help`
+  on that venv). The facility arrived between 6.4.6 and 6.9.1, so on 6.4.6 a daily or weekly
+  `request.security` is simply unreachable. That is a clean version-to-version finding.
 
-| bucket | n | PineForge exc / strong / fail | PyneCore 6.9.1 exc / strong / fail |
-|---|---:|---:|---:|
-| `process_orders_on_close` | 31 | **18** / 5 / 7 | 4 / 8 / 13 |
-| brackets (stop/limit/OCA) | 74 | **49** / 15 / 3 | 28 / 26 / 10 |
-| `var` / `varip` state | 134 | **88** / 21 / 11 | 31 / 42 / 29 |
-| arrays / matrices | 24 | **8** / 5 / 9 | 2 / 7 / 11 |
-| `trail_*` | 10 | **9** / 1 / 0 | 3 / 1 / 1 |
-| partial closes (`qty_percent`) | 15 | **9** / 4 / 1 | 5 / 1 / 6 |
-| `pyramiding > 1` | 10 | 2 / 0 / 6 | 2 / 1 / 6 |
-| `calc_on_order_fills` | 5 | **2** / 1 / 0 | 1 / 4 / 0 |
-| `margin_long/short < 100` | 5 | **3** / 0 / 0 | 3 / 0 / 1 |
+### Other buckets, set C (the unbiased set)
 
-Two honest notes on this table. `pyramiding > 1` is the one bucket where the two engines are
-level and *both* are weak — 6 of PineForge's 10 failures there are the finer-timeframe
-`request.security` refusal, because pyramiding scripts in this sample tend to be multi-timeframe.
-And on set A, at 100 easy strategies, the buckets are near-parity for PineForge and PyneCore
-6.9.1 (only `arrays` separates them, 6/7 vs 4/7 excellent) — the feature gap only opens on the
-harder sets.
+Counts are excellent / strong / failed, on identical inputs.
+
+| bucket | n | PineForge | PyneCore 6.9.1 (`--security`) | PyneCore 6.4.6 |
+|---|---:|---:|---:|---:|
+| `var` / `varip` state | 134 | **88** / 21 / 11 | 32 / 43 / 19 | 20 / 28 / 48 |
+| brackets (stop/limit/OCA) | 74 | **49** / 15 / 3 | 28 / 26 / 6 | 14 / 16 / 19 |
+| `process_orders_on_close` | 31 | **18** / 5 / 7 | 4 / 8 / 10 | 1 / 5 / 20 |
+| arrays / matrices | 24 | **8** / 5 / 9 | 2 / 7 / 11 | 3 / 3 / 14 |
+| partial closes (`qty_percent`) | 15 | **9** / 4 / 1 | 5 / 1 / 2 | 4 / 0 / 7 |
+| `trail_*` | 10 | **9** / 1 / 0 | 3 / 1 / 0 | 1 / 0 / 5 |
+| `pyramiding > 1` | 10 | 2 / 0 / 6 | 2 / 1 / 6 | 1 / 0 / 7 |
+| `calc_on_order_fills` | 5 | **2** / 1 / 0 | 1 / 4 / 0 | 0 / 1 / 0 |
+| `margin_long/short < 100` | 5 | **3** / 0 / 0 | 3 / 0 / 0 | 0 / 1 / 2 |
+| UDTs | 2 | **2** / 0 / 0 | 1 / 1 / 0 | 1 / 0 / 1 |
+
+Two honest notes. `pyramiding > 1` is the one bucket where the engines are level and *both* are
+weak — 6 of PineForge's 10 failures there are the finer-timeframe `request.security` refusal,
+because the pyramiding scripts in this sample happen to be multi-timeframe. And on set A, at 100
+easier strategies, PineForge and PyneCore 6.9.1 are near-parity across every bucket (only
+`arrays` separates them, 6/7 vs 4/7 excellent) — the feature gap opens on the harder sets.
 
 Set-B buckets are the strongest single statement in the benchmark — `brackets` 59/59, `udt`
 29/29, `var_state` 82/82, `arrays` 22/22, `security` 22/22, all excellent for PineForge — but
 they are also the most self-selected, since that corpus *is* the campaign's regression suite.
-The PyneCore counterparts there are additionally depressed by quota `not_run`s
-(`udt` 28 of 29 not run, `pyramiding` 8 of 10, `var_state` 38 of 82), so they should not be
-quoted as PyneCore's bucket score.
+The PyneCore counterparts there are additionally depressed by quota `not_run`s (`udt` 28 of 29
+not run, `pyramiding` 8 of 10, `var_state` 38 of 82), so they should not be quoted as PyneCore's
+bucket score.
 
----
 
 ## Failure classes
 
-Every failure, verbatim class, no aggregation into "other".
+Every failure across all three sets, verbatim class, nothing aggregated into "other".
 
 **PineForge — 13 failures, all on set C, all one class.**
+
 `RuntimeError: pineforge engine rejected run: request.security: requested timeframe '<X>' is
 finer than input '<Y>'. Use request.security_lower_tf for sub-chart data.`
 Breakdown: 240-on-1D × 6, 3-on-15 × 3, 15-on-1D × 1, 5-on-15 × 1, 60-on-1D × 1, 30-on-1D × 1.
 The chart feed genuinely cannot answer a finer-timeframe request; the engine refuses by name
-rather than guessing. Zero failures on sets A and B, zero timeouts anywhere.
+rather than guessing. **Zero failures on sets A and B, zero timeouts anywhere.**
 
-**PyneCore 6.9.1 — 52 failures in the first (naive) pass.**
-- 39 × `ValueError: No OHLCV data found for security context (symbol=…)` — 29 on set C
-  (NYSE:F 5, BINANCE:BTCUSDT 5, OANDA:XAUUSD 4, OANDA:EURUSD 4, CME_MINI:NQ1! 3, NSE:NIFTY 2,
-  NASDAQ:AAPL 2, CME_MINI:ES1! 2, unnamed 2) and 10 on set B. **Most of these are the missing
-  `--security` flag, not a PyneCore limitation** — see the `--security supplied` column. What
-  survives it is the genuinely unanswerable subset: requests *finer* than the chart feed (where
-  PineForge is refused too) and requests for a different instrument (no feed was staged for
-  either engine).
-- 13 timeouts at 600 s (10 on set B's 222k-bar feed, 3 on set C).
-
-**PyneCore 6.4.6 — 110 failures.** Complete class list, all three sets:
+**PyneCore 6.9.1 with `--security` supplied — 36 failures** (15 on set B, 21 on set C):
 
 | n | class |
 |---:|---|
-| 51 | `ValueError: No OHLCV data found for security context` |
-| 32 | `ImportError: cannot import name 'set_bool_na' from 'pynecore.types.na'` * |
-| 8 | `ModuleNotFoundError: No module named 'pynecore.core.broker'` * |
-| 4 | `ValueError: Invalid timeframe: None` |
+| 18 | `ValueError: No OHLCV data found for security context` — the residue after supplying what `--list-data` asks for: requests *finer* than the chart feed, and requests for a different instrument. Neither engine was given data for these. |
+| 15 | timeout at the 600 s ceiling — multi-timeframe scripts that now run instead of erroring, but take minutes (162 s – 373 s observed, several over the ceiling) where PineForge takes under a second |
+| 3 | `ValueError: OHLCV timestamps must be strictly increasing: 1619557200000 follows …` |
+
+**PyneCore 6.9.1 without the flag — 52 failures**: 39 security-context `ValueError`, 13
+timeouts. The 21-failure difference is the cost of not passing `--security`.
+
+**PyneCore 6.4.6 — 80 failures** (1 on set A, 25 on set B, 54 on set C):
+
+| n | class |
+|---:|---|
+| 58 | `ValueError: No OHLCV data found for security context` — unavoidable on this version: 6.4.6 has no `--security` option |
+| 5 | `ValueError: Invalid timeframe: None` |
+| 3 | `AssertionError` |
+| 3 | `ValueError: list.remove(x): x not in list` |
 | 3 | `TypeError: '<' not supported between instances of 'NoneType' and 'float'` |
-| 3 | `ImportError: cannot import name 'pine_loop' from 'pynecore'` * |
-| 2 | `AssertionError` |
-| 2 | `ValueError: list.remove(x): x not in list` |
+| 3 | `ImportError: cannot import name 'pine_loop' from 'pynecore'` — genuine PyneComp-6.0.66-vs-6.4.6 API skew |
 | 1 | `TypeError: _Input.string() takes from 2 to 3 positional arguments but 4` (the single set-A failure) |
-| 1 | `AttributeError: module 'pynecore.lib.chart' has no attribute 'point'` * |
+| 1 | `AttributeError: module 'pynecore.lib.chart' has no attribute 'point'` — API skew |
 | 1 | `ValueError: Invalid date format: 2020-01-01 00:00` |
 | 1 | `AssertionError: Start must be positive and not greater than max!` |
 | 1 | `NameError: name 'swingHigh' is not defined` |
 
-`*` = the 44 failures that are **compiler/runtime API skew**, not execution behaviour: the
-script was emitted by PyneComp 6.0.66 against the PyneCore 6.9.x API and 6.4.6 has no such
-symbol. Subtract them and 6.4.6 has 66 real runtime failures, 51 of which are the same
-security-context limitation as 6.9.1.
+Only 4 of the 80 are compiler/runtime API skew. An earlier revision of this document claimed 44,
+on numbers corrupted by a race in our own harness; see the note under [set B](#set-b--public-corpus-311-strategies-with-a-tape-222295-bars-431244-tv-trades).
 
-The one set-A 6.4.6 failure is on its own terms — `_Input.string()` arity — since set A runs
-the 6.0.31-compiled sources that 6.4.6 was contemporary with.
-
----
 
 ## Performance
 
@@ -388,45 +423,84 @@ Protocol (see [`perf.py`](perf.py) for the exact code):
    `g++ -O2` for PineForge, versus PyneCore's local import / first-run cost (the cloud compile
    is network-bound and excluded).
 
-> **Status:** the performance stage was still running when this document was written. The
-> numbers land in [`performance.csv`](performance.csv) and a table is appended here; the raw
-> per-run records are in `perf/*.jsonl` on the benchmark machine. If `performance.csv` is
-> absent from this directory, the stage had not finished — that absence is the honest state,
-> not an omission of a bad result.
+### Translate / compile cost (measured, independent of the timing stage)
+
+| | PineForge | PyneCore |
+|---|---|---|
+| pipeline | Pine → C++ (`pineforge-codegen`) → `g++ -O2` → `strategy.so`, all local | Pine → Python by the **PyneSys cloud compiler**, then run by the local runtime |
+| median per strategy | **1.42 s** on set A, **1.35 s** on set B (codegen 0.09 s + `g++ -O2` ~1.3 s) | **2.55 s** per compile (p90 2.85 s, range 2.46 – 3.81 s over 298 timed compiles) |
+| needs | a C++ toolchain | a PyneSys account, a network round-trip, and 300 compiles/day |
+| reproducible offline | yes | no — and the quota is what left 167 corpus strategies unmeasured here |
+
+The PyneCore figure is wall-clock for the cloud round trip, so it mixes compute and network; it
+is quoted because it is what a user actually waits for, and because the *quota* attached to it
+is a hard constraint this benchmark ran into. PyneCore's local first-run (AST transform) cost is
+measured separately in the timing stage below.
+
+> **Status of the timing stage.** The end-to-end, in-process, scaling and parameter-sweep
+> numbers were still being re-measured when this document was written — the first pass had to be
+> discarded because of the RSS bug in [Known limitations](#known-limitations) item 2(c). They
+> land in [`performance.csv`](performance.csv) and a table is appended here. **If
+> `performance.csv` is absent from this directory, that stage had not finished** — the absence is
+> the honest state, not a suppressed result. The one timing already established and stable is
+> process startup, measured over 7 runs each:
+>
+> | case | median |
+> |---|---:|
+> | `python3 -c pass` (system) | 9 ms |
+> | `python -c "import pynecore"` | 71 ms |
+> | `pyne 6.9.1 --help` | 151 ms |
+> | `pyne 6.4.6 --help` | 112 ms |
+> | `run_strategy.py --help` | 48 ms |
+> | PineForge `dlopen` + load of the 53,929-bar CSV | 26 ms |
+>
+> Subtract these from any end-to-end number to separate startup from execution.
 
 ---
 
 ## Known limitations
 
-1. **PyneComp daily quota — 167 corpus strategies and the whole set-A compiler-drift check
-   were not run.** The PyneSys cloud compiler allows 300 compiles/day (120/hour); it was
-   exhausted at 2026-09-06T11:02Z. 299 of 466 queued compiles succeeded **with zero compiler
-   errors**: set C 154/154, set B 145/312, set A 0/100. The brief's compiler-drift check
+Read these before quoting any number above.
+
+1. **PyneComp daily quota — 167 corpus strategies and the whole set-A compiler-drift check were
+   not run.** The PyneSys cloud compiler allows 300 compiles/day (120/hour); it was exhausted at
+   2026-09-06T11:02Z. 299 of 466 queued compiles succeeded **with zero compiler errors**:
+   set C 154/154, set B 145/312, set A 0/100. The compiler-drift check the brief asked for
    (recompile all 100 set-A strategies with today's PyneComp 6.0.66 and diff against the
    committed 6.0.31 output) therefore **has not been done**; set A's PyneCore columns use the
-   committed 6.0.31 sources. Every blocked compile is a `not_run` row.
-2. **PyneCore's 6.4.6 column on sets B and C is contaminated by compiler/runtime skew** — see
-   the note under set B. Use set A for the version comparison.
-3. **Neither engine was given auxiliary feeds for `request.security`.** Both got the chart feed
-   only. That is symmetric, but it means the security bucket measures *what each engine can
-   derive from one feed*, not what each could do with a full data plane.
+   committed 6.0.31 sources. Every blocked compile is a `not_run` row, never a compile failure.
+2. **Two harness bugs were found and fixed mid-benchmark; a third is disclosed but not fixed.**
+   (a) Both PyneCore versions were run concurrently on the same strategy directory, racing over
+   PyneCore's AST cache and manufacturing ~40 import errors on set B — fixed by running one
+   version per stage and re-measuring ([`rerunB.sh`](rerunB.sh)). (b) `pyne run --security` was
+   never passed, turning every daily/weekly `request.security` script into an error — fixed by
+   driving the flag from each script's own `--list-data` ([`secrun.sh`](secrun.sh),
+   `bench.py::cmd_pc_sec`). (c) Peak RSS was read from `getrusage(RUSAGE_CHILDREN)` inside one
+   long-lived process, which is a running maximum over every child and reported an identical
+   55 MB for both engines; now measured per run with `/usr/bin/time -f %M`. Any RSS figure not
+   carrying that provenance should be ignored.
+3. **Neither engine was given auxiliary feeds beyond the chart feed.** That is symmetric, but it
+   means the `request.security` bucket measures *what each engine can derive from one feed plus
+   what its CLI lets you declare*, not what either could do with a full data plane.
 4. **Set C is not reproducible from public inputs** by design — third-party scripts. Only
    aggregates are published, and the sample is 200 of 3,881 probes.
 5. **Set C under-measures both engines against the parity campaign's own closed test** — one
    feed per lane instead of the campaign's chart + daily aux (+ lower-timeframe) feeds, and
    lane-level facts instead of the per-probe case conf. The handicap is symmetric, so the
-   head-to-head holds, but neither column is either engine's best achievable score. See the
-   note under [set C](#set-c--closed-campaign-sample-200-script-lane-probes-15-lanes-165223-tv-trades).
+   head-to-head holds, but neither column is either engine's best achievable score.
 6. **PineForge is the home team.** The corpus (set B) is the campaign's regression suite and
-   PineForge is tuned against it; a 311/311 result there is a statement about regression
-   coverage, not about generalisation. Set C is the set to argue from.
+   PineForge is tuned against it; 311/311 there is a statement about regression coverage, not
+   about generalisation. Set C is the set to argue from.
 7. **The engine's main branch moved during the run.** Everything was built and measured at
-   engine `76518c6b`, which was `origin/main` at 10:13Z; main advanced to `86049406` later the
-   same day. The benchmark keeps the sha it measured.
-8. **No PyneCore "fast mode" was benchmarked** — PyneCore ships no documented JIT/numba/compiled
-   execution mode; if one exists it was not found in its docs and is not measured here.
+   engine `76518c6b`, `origin/main` at 10:13Z; main advanced to `86049406` later the same day.
+   The benchmark keeps the sha it measured.
+8. **No PyneCore "fast mode" exists to benchmark.** Verified rather than assumed: the installed
+   6.9.1 package contains no occurrence of `numba`, `njit`, `@jit`, `cython`, `mypyc`, `nuitka`,
+   `pypy`, `compile_mode` or `fast_mode`, and the venv has no such dependency.
+9. **The 600-second per-strategy ceiling binds PyneCore and never binds PineForge.** 15 of
+   PyneCore 6.9.1's failures are timeouts. They are reported as rows, not dropped; a longer
+   ceiling would convert some into (mostly low-tier) grades.
 
----
 
 ## Reproducing the public half
 

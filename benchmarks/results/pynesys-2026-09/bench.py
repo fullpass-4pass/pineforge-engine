@@ -280,6 +280,107 @@ def cmd_pc(work, ver, script="strategy_pyne.py", tag=None, rs=False):
         except Exception as e: rec.update(status="normalize_error", error=str(e)[:300])
     wjson(work/f"{tag}.json", rec); return rec
 
+# ---------------- PyneCore run WITH the security data it asks for ----------------
+# pyne run has a documented Security Options group:
+#   --security 'TIMEFRAME=data_name' | 'SYMBOL:TIMEFRAME=data_name'
+#   --list-data   print what the script's request.security calls need, and exit
+# PyneCore resamples a coarser same-symbol timeframe from the chart data, but it will only do so
+# when the caller NAMES the base file for that timeframe. Not passing it is a harness omission,
+# not an engine limitation, so this variant asks each script what it wants and supplies it.
+SEC_SECTIONS = ("Chart / main data", "Same symbol, other timeframe", "Other symbol")
+SEC_REQ = re.compile(r"(?P<sym>[A-Z0-9_.]+:[^\s]+)\s*@\s*(?P<tf>\S+)")
+# where pyne says the requirement "cannot be listed statically", supply the standard set of
+# same-symbol resamples (all coarser than the chart) — an unused --security is accepted, so
+# over-supplying is safe and is the closest a caller can get to what the script may ask for.
+SEC_FALLBACK = ["60", "240", "D", "W", "M"]
+TF_MINUTES = {"1": 1, "3": 3, "5": 5, "15": 15, "30": 30, "60": 60, "120": 120, "240": 240,
+              "D": 1440, "1D": 1440, "W": 10080, "1W": 10080, "M": 43200, "1M": 43200}
+
+def pc_list_data(work, ver, script="strategy_pyne.py"):
+    """[{symbol, tf, kind}] for one script.
+
+    kind: served (the chart data answers it) | needs (name the base file with --security) |
+    lower (finer than the chart: real data we do not have) | other_symbol (a different
+    instrument: real data we do not have) | dynamic (pyne cannot list it statically).
+    """
+    work = Path(work).resolve(); lane = rjson(work/"probe.json")["lane"]
+    laneinfo = rjson(lanes_dir(ver)/lane/"lane.json")
+    if laneinfo is None or not (work/script).exists(): return None, None
+    venv = VENVS[ver]; wd = PYNE_WD / f"workdir{ver}"
+    r = timed([str(venv/"bin/pyne"), "-w", str(wd), "run", str(work/script), laneinfo["ohlcv"], "--list-data"],
+              cwd=str(work), env={**os.environ, "PYTHONHASHSEED": "0", "COLUMNS": "400", "TERM": "dumb"}, timeout=300)
+    txt = " ".join(((r["stdout"] or "") + "\n" + (r["stderr"] or "")).split())
+    chart_sym, chart_tf = LANES[lane][0], LANES[lane][1]
+    reqs = []
+    if "cannot be listed statically" in txt:
+        reqs.append(dict(symbol=chart_sym, tf="*", kind="dynamic"))
+    # split the flat text into the sections pyne prints, so a bare "-> SYM @ TF" under
+    # "Chart / main data" is not mistaken for an unmet requirement
+    marks = sorted(((txt.index(h), h) for h in SEC_SECTIONS if h in txt))
+    regions = []
+    for i, (pos, head) in enumerate(marks):
+        stop = marks[i+1][0] if i + 1 < len(marks) else len(txt)
+        regions.append((head, txt[pos:stop]))
+    for head, region in regions:
+        for chunk in region.split("->")[1:]:
+            m = SEC_REQ.search(chunk)
+            if not m: continue
+            sym, tf = m.group("sym"), m.group("tf").rstrip(",.")
+            if head.startswith("Chart"): kind = "served"
+            elif "served from the chart data" in chunk: kind = "served"
+            elif "lower timeframe" in chunk: kind = "lower"
+            elif sym != chart_sym: kind = "other_symbol"
+            elif TF_MINUTES.get(tf, 0) and TF_MINUTES.get(chart_tf, 0) and TF_MINUTES[tf] < TF_MINUTES[chart_tf]: kind = "lower"
+            elif tf == chart_tf: kind = "served"
+            else: kind = "needs"
+            reqs.append(dict(symbol=sym, tf=tf, kind=kind))
+    return reqs, r
+
+def sec_args_for(reqs, ohlcv, chart_tf):
+    """--security args: every 'needs' timeframe, plus the coarser standard set when the script's
+    requirements could not be listed statically. Returns (args, unsupplied)."""
+    tfs = [q["tf"] for q in reqs if q.get("kind") == "needs"]
+    if any(q.get("kind") == "dynamic" for q in reqs):
+        base = TF_MINUTES.get(chart_tf, 0)
+        tfs += [t for t in SEC_FALLBACK if TF_MINUTES.get(t, 0) > base]
+    args = []
+    for tf in dict.fromkeys(tfs): args += ["--security", f"{tf}={ohlcv}"]
+    return args, [q for q in reqs if q.get("kind") in ("lower", "other_symbol")]
+
+def cmd_pc_sec(work, ver, script="strategy_pyne.py"):
+    work = Path(work).resolve(); tag = f"pc{ver}_sec"; lane = rjson(work/"probe.json")["lane"]
+    laneinfo = rjson(lanes_dir(ver)/lane/"lane.json")
+    if laneinfo is None:
+        rec = dict(step=tag, status="no_lane_data"); wjson(work/f"{tag}.json", rec); return rec
+    if not (work/script).exists():
+        rec = dict(step=tag, status="no_compile"); wjson(work/f"{tag}.json", rec); return rec
+    # PyneCore caches its AST-transformed script in the work dir; a cache written by the other
+    # version breaks this one (set_bool_na / pine_loop ImportError). Clear it before BOTH the
+    # --list-data probe and the run, and never let the two versions run this dir concurrently.
+    shutil.rmtree(work / "__pycache__", ignore_errors=True)
+    reqs, lr = pc_list_data(work, ver, script)
+    if reqs is None:
+        rec = dict(step=tag, status="no_compile"); wjson(work/f"{tag}.json", rec); return rec
+    sec_args, unsupplied = sec_args_for(reqs, laneinfo["ohlcv"], LANES[lane][1])
+    venv = VENVS[ver]; wd = PYNE_WD / f"workdir{ver}"; (wd/"scripts").mkdir(parents=True, exist_ok=True)
+    raw = work / f"{tag}_raw.csv"; stats = work / f"{tag}_stats.csv"
+    for f in (raw, stats): f.unlink(missing_ok=True)
+    shutil.rmtree(work / "__pycache__", ignore_errors=True)
+    r = timed([str(venv/"bin/pyne"), "-w", str(wd), "run", str(work/script), laneinfo["ohlcv"], *sec_args,
+               "--trade", str(raw), "--strat", str(stats)], cwd=str(work), env={**os.environ, "PYTHONHASHSEED": "0"})
+    rec = dict(step=tag, pynecore=ver, securityRequests=reqs, securityArgs=sec_args,
+               unsuppliedRequests=unsupplied, listDataWallS=(lr or {}).get("wallS"),
+               **{k: r[k] for k in ("rc", "wallS", "maxRssKb", "timeout", "userS", "sysS")})
+    if r["timeout"]: rec.update(status="timeout")
+    elif r["rc"] != 0: rec.update(status="run_error", error=err_class(r["stderr"] or r["stdout"]), stderr=r["stderr"][-2500:])
+    elif not raw.exists():
+        rec.update(status="ok", trades=0, note="no trade csv written (no closed trades)")
+        (work/f"{tag}_trades.csv").write_text("Trade #,Type,Date and time,Price,Qty,Net PnL,Net PnL %,MFE,MAE,Cumulative PnL\n")
+    else:
+        try: n = normalize_pyne(raw, work/f"{tag}_trades.csv"); rec.update(status="ok", trades=n, outSha256=sha256(work/f"{tag}_trades.csv"))
+        except Exception as e: rec.update(status="normalize_error", error=str(e)[:300])
+    wjson(work/f"{tag}.json", rec); return rec
+
 # ---------------- grade (canonical grader: engine scripts/verify_corpus.py::analyze_strategy) ----------------
 sys.path.insert(0, str(ENGINE / "scripts"))
 def load_vc():
@@ -302,7 +403,7 @@ def cmd_grade(work):
     meta_clean.setdefault("tv_trades_csv_tz", "utc_plus_8")
     res = dict(slug=probe["slug"], lane=probe["lane"], set=probe["set"], grader="verify_corpus.analyze_strategy@" + ENGINE_HEAD, engines={})
     scratch_root = Path("/dev/shm/pf-grade") / probe["set"] / probe["lane"] / probe["slug"]
-    for tag in ("pf", "pf_raw", "pf_rs", "pc646", "pc691", "pc691_re", "pc646_rs", "pc691_rs"):
+    for tag in ("pf", "pf_raw", "pf_rs", "pc646", "pc691", "pc691_re", "pc646_rs", "pc691_rs", "pc691_sec", "pc646_sec"):
         st = rjson(work/f"{tag}.json")
         if st is None: continue
         e = dict(status=st.get("status"), wallS=st.get("wallS"), error=st.get("error"))
@@ -324,6 +425,20 @@ def cmd_grade(work):
     res.setdefault("profile", vc.resolve_profile(work, meta_clean) if hasattr(vc, "resolve_profile") else "n/a")
     res["tvTradesTotal"] = sum(1 for _ in open(work/"tv_trades.csv")) // 2
     wjson(work/"grade.json", res); return res
+
+if __name__ == "__main__":
+    a = sys.argv[1:]
+    if a[0] == "lanes": cmd_lanes(*(a[1:2]))
+    elif a[0] == "prepare": cmd_prepare(a[1])
+    elif a[0] == "lanes-rs": cmd_lanes_rs(*(a[1:2]))
+    elif a[0] == "build": print(json.dumps(cmd_build(a[1], *(a[2:3]))))
+    elif a[0] == "pf": print(json.dumps(cmd_pf(a[1], raw="--raw" in a, rs="--rs" in a)))
+    elif a[0] == "pc": print(json.dumps(cmd_pc(a[1], a[2], rs="--rs" in a)))
+    elif a[0] == "pc-sec": print(json.dumps(cmd_pc_sec(a[1], a[2])))
+    elif a[0] == "list-data": print(json.dumps(pc_list_data(a[1], a[2])[0]))
+    elif a[0] == "grade": print(json.dumps(cmd_grade(a[1])))
+    elif a[0] == "fixperiod": cmd_fixperiod(*(a[1:2]))
+    else: print(__doc__)
 
 # ---------------- fix .ohlcv header periods (PyneCore infers 900s for daily bars stamped at 09:15 IST) ----------------
 def cmd_fixperiod(ver="691"):
@@ -350,15 +465,3 @@ shutil.move(str(tmp), str(p)); print("rewritten", per, "->", tf, len(candles))
 '''
         r = timed([str(venv / "bin/python"), "-c", code], timeout=1800)
         print(lane, r["stdout"].strip()[-120:], r["stderr"].strip()[-200:] if r["rc"] else "")
-
-if __name__ == "__main__":
-    a = sys.argv[1:]
-    if a[0] == "lanes": cmd_lanes(*(a[1:2]))
-    elif a[0] == "prepare": cmd_prepare(a[1])
-    elif a[0] == "lanes-rs": cmd_lanes_rs(*(a[1:2]))
-    elif a[0] == "build": print(json.dumps(cmd_build(a[1], *(a[2:3]))))
-    elif a[0] == "pf": print(json.dumps(cmd_pf(a[1], raw="--raw" in a, rs="--rs" in a)))
-    elif a[0] == "pc": print(json.dumps(cmd_pc(a[1], a[2], rs="--rs" in a)))
-    elif a[0] == "grade": print(json.dumps(cmd_grade(a[1])))
-    elif a[0] == "fixperiod": cmd_fixperiod(*(a[1:2]))
-    else: print(__doc__)

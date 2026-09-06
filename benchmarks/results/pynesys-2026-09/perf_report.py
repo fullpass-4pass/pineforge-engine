@@ -15,6 +15,7 @@ def tbl(ds, keys):
 # startup
 st = rows("startup")
 if st:
+    st = list({r["case"]: r for r in st}.values())  # cmd_startup appends; keep the last run of each case
     md.append("## Process startup (median of runs, seconds)\n\n" + tbl([dict(case=r["case"], median_s=r["median"], min_s=r["min"], runs=r["runs"]) for r in st], ["case", "median_s", "min_s", "runs"]) + "\n")
     out += [dict(table="startup", set="", key=r["case"], engine="", metric="median_s", value=r["median"]) for r in st]
 # e2e
@@ -27,7 +28,7 @@ for S in sorted({r["set"] for r in e2e}):
     for eng in ("pf", "pc691"):
         ok = [r for r in rs if r["engine"] == eng and r.get("status") == "ok"]; st_ = collections.Counter(r.get("status") for r in rs if r["engine"] == eng)
         med = [r["median"] for r in ok]; p95 = [r["p95"] for r in ok]
-        ds.append(dict(engine=eng, strategies=len(ok), failures=sum(v for k, v in st_.items() if k != "ok"), median_of_medians_s=pct(med, 0.5), min_median_s=min(med) if med else None, max_median_s=max(med) if med else None, median_p95_s=pct(p95, 0.5), peakRss_median_MB=pct([r["maxRssKb"]/1024 for r in ok], 0.5), peakRss_max_MB=max(r["maxRssKb"] for r in ok)/1024 if ok else None, cold_first_run_median_s=pct([r["coldWallS"] for r in ok if r.get("coldWallS")], 0.5)))
+        ds.append(dict(engine=eng, strategies=len(ok), failures=sum(v for k, v in st_.items() if k != "ok"), median_of_medians_s=pct(med, 0.5), min_median_s=min(med) if med else None, max_median_s=max(med) if med else None, median_p95_s=pct(p95, 0.5), peakRss_median_MB=pct([r["maxRssKb"]/1024 for r in ok if r.get("maxRssKb")], 0.5), peakRss_max_MB=(max([r["maxRssKb"] for r in ok if r.get("maxRssKb")], default=None) or 0)/1024 or None, cold_first_run_median_s=pct([r["coldWallS"] for r in ok if r.get("coldWallS")], 0.5)))
         out += [dict(table="e2e", set=S, key=r["slug"], engine=eng, metric="median_s", value=r["median"], p95=r["p95"], rss_kb=r["maxRssKb"], lane=r["lane"], bars=r.get("feedBars"), status=r.get("status")) for r in rs if r["engine"] == eng]
     sp = [by[s]["pc691"]["median"]/by[s]["pf"]["median"] for s in by if by[s].get("pf", {}).get("status") == "ok" and by[s].get("pc691", {}).get("status") == "ok"]
     md.append(f"## End-to-end wall time per strategy — set {S} ({len(by)} strategies; process start + load + run + write)\n\n" + tbl(ds, list(ds[0].keys())) + f"\nSpeedup PyneCore 6.9.1 / PineForge (per-strategy median ratio): geomean {gmean(sp):.1f}×, min {min(sp):.1f}×, median {pct(sp,0.5):.1f}×, max {max(sp):.1f}× over {len(sp)} strategies.\n" if sp else "\n")

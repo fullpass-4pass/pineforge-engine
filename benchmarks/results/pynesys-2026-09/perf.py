@@ -19,8 +19,23 @@ def idle():
 def require_idle():
     load, busy = idle()
     if busy or load > 1.5: print(f"NOT IDLE: load {load:.2f}, procs {busy}"); sys.exit(4)
+_RSS_N = [0]
 def t(cmd, cwd=None, env=None, timeout=900):
-    return bench.timed(PIN + cmd, cwd=cwd, env=env, timeout=timeout)
+    """Run pinned, and take peak RSS from /usr/bin/time -f %M (this process's own
+    getrusage(RUSAGE_CHILDREN) is a running maximum over EVERY child perf.py has reaped, so it
+    reports the same number for both engines and must not be used here)."""
+    _RSS_N[0] += 1
+    rssf = f"/dev/shm/pf_rss_{os.getpid()}_{_RSS_N[0]}"
+    try: os.unlink(rssf)
+    except OSError: pass
+    r = bench.timed(PIN + ["/usr/bin/time", "-f", "%M", "-o", rssf] + cmd, cwd=cwd, env=env, timeout=timeout)
+    try:
+        v = open(rssf).read().strip().splitlines()
+        r["maxRssKb"] = int(v[-1]) if v and v[-1].isdigit() else None
+        os.unlink(rssf)
+    except OSError:
+        r["maxRssKb"] = None
+    return r
 def workdirs(S): return sorted(p for p in (B / "work" / S).glob("*/*") if p.is_dir())
 def lane_of(w): return bench.rjson(w / "probe.json")["lane"]
 
@@ -58,7 +73,7 @@ def cmd_e2e(S, runs):
             else: cold = None
             ok = all(r["rc"] == 0 and not r["timeout"] for r in rs)
             ws = [r["wallS"] for r in rs]
-            log("e2e", dict(set=S, lane=pr["lane"], slug=pr["slug"], engine=engine, status="ok" if ok else ("timeout" if rs[-1]["timeout"] else "run_error"), runs=len(ws), wallS=ws, median=statistics.median(ws), p95=sorted(ws)[min(len(ws)-1, int(math.ceil(0.95*len(ws))-1))], maxRssKb=max(r["maxRssKb"] for r in rs), userS=[r["userS"] for r in rs], coldWallS=cold, feedBars=feedbars, error=None if ok else bench.err_class(rs[-1]["stderr"])))
+            log("e2e", dict(set=S, lane=pr["lane"], slug=pr["slug"], engine=engine, status="ok" if ok else ("timeout" if rs[-1]["timeout"] else "run_error"), runs=len(ws), wallS=ws, median=statistics.median(ws), p95=sorted(ws)[min(len(ws)-1, int(math.ceil(0.95*len(ws))-1))], maxRssKb=(max([r["maxRssKb"] for r in rs if r["maxRssKb"]], default=None)), userS=[r["userS"] for r in rs], coldWallS=cold, feedBars=feedbars, error=None if ok else bench.err_class(rs[-1]["stderr"])))
             print(S, pr["slug"], engine, "median", statistics.median(ws), "ok" if ok else "FAIL", flush=True)
 
 def cmd_inproc(S, iters):
