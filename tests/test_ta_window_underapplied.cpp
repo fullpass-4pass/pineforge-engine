@@ -1,9 +1,10 @@
 // test_ta_window_underapplied -- round 9 (family W, jayentriken stochRSI on
 // six lanes): TradingView's sliding-window sum re-sums the window whenever the
 // carried Kahan compensation is UNDER-applied to the incoming source
-// (|fl(x - c) - x| < |c|: fully swallowed, the round-7 case, or rounded toward
-// x), and ta.stdev is sqrt(Sxx / n - m * m) over the same sliding sums
-// (window_sum.hpp, ta.hpp StdDev). Pinned 2026-09-05 on full-precision
+// (round 9: |fl(x - c) - x| < |c|; round 10 pinned the quantity TradingView
+// tests as x + |c| -- test_ta_window_round10 -- which decides identically on
+// every bar below), and ta.stdev is sqrt(Sxx / n - m * m) over the same
+// sliding sums (window_sum.hpp, ta.hpp StdDev). Pinned 2026-09-05 on full-precision
 // NYSE:F@15 oracles exported by pineforge-workflow (famw-f15-kdhi-*,
 // famw-f15-sd-*: every value is TradingView's exact double, tiny residues
 // scaled by 2^60 on export).

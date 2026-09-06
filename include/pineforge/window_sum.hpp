@@ -12,11 +12,13 @@ namespace pineforge {
 //   * the ring stores the COMPENSATED addend y = x - c each source entered
 //     with, and subtracts that y (through the same Kahan step) when the
 //     source leaves the window `length` bars later -- sub before add;
-//   * on the bar whose incoming source UNDER-applies the carried compensation
-//     (c != 0 and, with y0 = fl(x - c), |y0 - x| < |c|: fully swallowed or
-//     rounded toward x -- round-9 family-W pin generalising the round-7
-//     swallow case), the sum is re-summed newest-first over the window's
-//     sources, c is reset and the bar's ring addend is its raw source.
+//   * on the bar whose incoming source UNDER-applies the MAGNITUDE of the
+//     carried compensation when it is ADDED (c != 0 and, with z = fl(x + |c|),
+//     |z - x| < |c|: fully swallowed or rounded toward x -- the round-10
+//     family-W pin; round 9's x - c form and round 7's swallow case are the
+//     cases where x - c and x + |c| round alike), the sum is re-summed
+//     newest-first over the window's sources, c is reset and the bar's ring
+//     addend is its raw source.
 //
 // Both users divide S by `length` themselves (ta.sma) or emit S (math.sum).
 class KahanWindowSum {

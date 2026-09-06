@@ -52,11 +52,22 @@ namespace pineforge {
 //     Bit-exact 7,018/7,018 on math.sum(stoch, 3) (round-7 trigger 6,849) and
 //     every k vs d sign / ta.crossover event on the lane (round 7: 24 signs,
 //     12 events wrong). The re-summed bar stores its raw source as its ring
-//     addend (c is 0 after the re-sum). Known open pin: on residue-only
-//     inputs (|x| ~ 1e-15 comparable to |c|) TradingView's decision is a
-//     SIGNED comparison (it flips under negation of the series) that this
-//     magnitude form reproduces on 6,991/7,016 math.sum(k, 3) bars; no k vs d
-//     decision on the lane depends on those bits.
+//     addend (c is 0 after the re-sum);
+//   * round 10 (family W, stage 2: onuriano macd-stoch-rsi on NYSE:F@15, whose
+//     d = sma(k, 3) sits on residue-only plateaus |k| ~ 1e-15 ~ |c|) closed
+//     that pin: the quantity TradingView tests is src + |c|, the compensation's
+//     MAGNITUDE added to the source -- fire iff |fl(x + |c|) - x| < |c|. On
+//     ordinary sources (|c| << |x|) x - c and x + |c| round alike, so the
+//     round-9 form was exact there; on residue-only sources, on sources within
+//     |c| of a power of two, and on negative sources the two forms differ and
+//     TradingView follows x + |c| (its decision flips under negation of the
+//     series because x + |c| is not odd in x). Pinned on 21,509 labelled
+//     decisions: the two NYSE:F@15 stochRSI oracles (jayentriken ta.stoch and
+//     onuriano literal stoch: math.sum(stoch, 3) 7,018/7,018 and math.sum(k, 3)
+//     7,016/7,016 each, bit-exact), the stdev sums 7,029/7,029 x2, and 1,003
+//     literal-replay decisions (pineforge-workflow r9-famW-5, lab tv w5-scan*:
+//     dense +-40 ulp neighbourhoods, sign mirrors, binade straddles, window
+//     lengths 3 and 5).
 //
 // The stochRSI consequence (round-7 family D, jayentriken): k = sma(stoch, 3)
 // and d = sma(k, 3) sit on ALGEBRAIC ties whenever stoch plateaus; TradingView
@@ -69,7 +80,7 @@ namespace pineforge {
 //   c_pre = c
 //   if t >= n: y = -y[t-n] - c; T = S + y; c = (T - S) - y; S = T
 //   y = x - c; T = S + y; c = (T - S) - y; S = T; store y
-//   if c_pre != 0 and |fl(x - c_pre) - x| < |c_pre|:
+//   if c_pre != 0 and |fl(x + |c_pre|) - x| < |c_pre|:
 //       S = (x + x[1]) + ... + x[n-1]; c = 0; store x instead of y
 //   sma = S / n
 
@@ -99,14 +110,19 @@ void KahanWindowSum::enter(double src, double comp_before) {
     addends_.push_front(y);
     values_.push_front(src);
     if (comp_before != 0.0) {
-        // Round-9 pin (family W): the re-sum fires whenever the carried
-        // compensation is UNDER-applied to the incoming source -- the
-        // compensated addend fl(src - c) landed closer to src than the exact
-        // src - c would have (fully swallowed, the round-7 case, or rounded
-        // toward src: c = 1.25 ulp(src) applied as 1 ulp). An exact
-        // subtraction, or one that rounds away from src, continues.
-        const double y0 = src - comp_before;
-        if (std::fabs(y0 - src) < std::fabs(comp_before)) {
+        // Round-10 pin (family W, stage 2): the re-sum fires whenever the
+        // MAGNITUDE of the carried compensation, ADDED to the incoming source,
+        // is under-applied -- fl(src + |c|) landed closer to src than the exact
+        // src + |c| would have (fully swallowed, the round-7 case; rounded
+        // toward src, the round-9 case; or, on residue-only sources, the
+        // rounding of src + |c| that the src - c form does not see). An exact
+        // add, or one that rounds away from src, continues. Note the sign:
+        // TradingView tests |c| added to src, whatever the sign of c, while the
+        // arithmetic itself subtracts c -- the two agree except when src - c
+        // and src + |c| round differently (residue-only sources, sources within
+        // |c| of a power of two, negative sources).
+        const double z = src + std::fabs(comp_before);
+        if (std::fabs(z - src) < std::fabs(comp_before)) {
             double total = 0.0;
             for (double v : values_) {   // newest first
                 total += v;
