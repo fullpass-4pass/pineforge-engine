@@ -18,6 +18,20 @@ better; the two places where this benchmark is *incomplete* are stated in
 - **Closed-set aggregates only:** [`accuracy_closed_aggregates.csv`](accuracy_closed_aggregates.csv)
 - **Feature buckets:** [`buckets.csv`](buckets.csv) · **Lane facts:** [`lanes.csv`](lanes.csv)
 - **Rerun the public half:** [`../../run_pynesys_bench.sh`](../../run_pynesys_bench.sh)
+- **The drivers the numbers came from**, shipped so every table is auditable:
+  [`bench.py`](bench.py) (prepare / build / run / grade),
+  [`report.py`](report.py) (accuracy tables), [`buckets.py`](buckets.py) (feature parsing),
+  [`determinism.py`](determinism.py), [`perf.py`](perf.py) + [`perf_report.py`](perf_report.py),
+  [`pc_inproc.py`](pc_inproc.py) (PyneCore in-process timer), [`pf_tool.cpp`](pf_tool.cpp)
+  (PineForge in-process timer), and the stage scripts [`run_set.sh`](run_set.sh),
+  [`perf1.sh`](perf1.sh), [`perfgate.sh`](perfgate.sh).
+
+  These are the files that ran, with three deliberate edits made afterwards, all recorded here:
+  `report.py` and `perf_report.py` now read `PF_BENCH_ROOT` instead of a hard-coded
+  `~/pf/bench` (so the reproducer can drive them), `report.py` keeps four decimals of
+  `matchedPct` instead of two (see the note on set B), and `bench.py`'s CLI dispatch moved
+  below the last function definition — as measured it sat above `cmd_fixperiod`, so the
+  `fixperiod` subcommand would have raised `NameError`. No measurement path was changed.
 
 ---
 

@@ -325,18 +325,6 @@ def cmd_grade(work):
     res["tvTradesTotal"] = sum(1 for _ in open(work/"tv_trades.csv")) // 2
     wjson(work/"grade.json", res); return res
 
-if __name__ == "__main__":
-    a = sys.argv[1:]
-    if a[0] == "lanes": cmd_lanes(*(a[1:2]))
-    elif a[0] == "prepare": cmd_prepare(a[1])
-    elif a[0] == "lanes-rs": cmd_lanes_rs(*(a[1:2]))
-    elif a[0] == "build": print(json.dumps(cmd_build(a[1], *(a[2:3]))))
-    elif a[0] == "pf": print(json.dumps(cmd_pf(a[1], raw="--raw" in a, rs="--rs" in a)))
-    elif a[0] == "pc": print(json.dumps(cmd_pc(a[1], a[2], rs="--rs" in a)))
-    elif a[0] == "grade": print(json.dumps(cmd_grade(a[1])))
-    elif a[0] == "fixperiod": cmd_fixperiod(*(a[1:2]))
-    else: print(__doc__)
-
 # ---------------- fix .ohlcv header periods (PyneCore infers 900s for daily bars stamped at 09:15 IST) ----------------
 def cmd_fixperiod(ver="691"):
     import importlib.util
@@ -362,3 +350,15 @@ shutil.move(str(tmp), str(p)); print("rewritten", per, "->", tf, len(candles))
 '''
         r = timed([str(venv / "bin/python"), "-c", code], timeout=1800)
         print(lane, r["stdout"].strip()[-120:], r["stderr"].strip()[-200:] if r["rc"] else "")
+
+if __name__ == "__main__":
+    a = sys.argv[1:]
+    if a[0] == "lanes": cmd_lanes(*(a[1:2]))
+    elif a[0] == "prepare": cmd_prepare(a[1])
+    elif a[0] == "lanes-rs": cmd_lanes_rs(*(a[1:2]))
+    elif a[0] == "build": print(json.dumps(cmd_build(a[1], *(a[2:3]))))
+    elif a[0] == "pf": print(json.dumps(cmd_pf(a[1], raw="--raw" in a, rs="--rs" in a)))
+    elif a[0] == "pc": print(json.dumps(cmd_pc(a[1], a[2], rs="--rs" in a)))
+    elif a[0] == "grade": print(json.dumps(cmd_grade(a[1])))
+    elif a[0] == "fixperiod": cmd_fixperiod(*(a[1:2]))
+    else: print(__doc__)

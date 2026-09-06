@@ -113,6 +113,13 @@ DRV="${BENCH_DIR}/results/pynesys-2026-09/bench.py"
 log "converting lane feeds for PyneCore (both versions)"
 python3 "${DRV}" lanes 691
 python3 "${DRV}" lanes 646
+# the range-start variant (feed truncated to TradingView's deep-backtest range start) —
+# set A has none by construction, so this only matters when SETS includes B
+if [[ " ${SETS} " == *" B "* ]]; then
+  log "converting range-start lane feeds"
+  python3 "${DRV}" lanes-rs 691
+  python3 "${DRV}" lanes-rs 646
+fi
 
 for S in ${SETS}; do
   log "set ${S}: prepare"
@@ -131,6 +138,11 @@ for S in ${SETS}; do
   run_stage "PineForge raw" "pf @ --raw"
   run_stage "PyneCore ${PC_CURRENT}" "pc @ 691"
   run_stage "PyneCore ${PC_LOCKED}"  "pc @ 646"
+  if [[ "${S}" == "B" ]]; then
+    run_stage "PineForge range-start"          "pf @ --rs"
+    run_stage "PyneCore ${PC_CURRENT} range-start" "pc @ 691 --rs"
+    run_stage "PyneCore ${PC_LOCKED} range-start"  "pc @ 646 --rs"
+  fi
   run_stage grade           "grade @"
 done
 
