@@ -1,4 +1,5 @@
 set(TEST_SOURCES
+    test_live_abort
     test_placement_rejection_bracket_ownership
     test_explicit_market_price_admission
     test_integer_short_margin_state

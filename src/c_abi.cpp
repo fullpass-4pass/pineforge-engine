@@ -10,7 +10,9 @@
  *   - The runtime-library-side `extern "C"` symbols (the closed-trade
  *     incarnation accessor, setters, strategy_get_last_error,
  *     the auxiliary-security-feed setter, the strategy_stream_* lifecycle,
- *     pf_version_get/pf_version_string, pf_abi_version — the authoritative list is EXPECTED_RUNTIME in
+ *     the live-runtime surface (strategy_request_abort,
+ *     strategy_last_run_status), pf_version_get/pf_version_string,
+ *     pf_abi_version — the authoritative list is EXPECTED_RUNTIME in
  *     scripts/check_c_abi_runtime.py, enforced by CI). The other
  *     `extern "C"` symbols listed in pineforge.h (strategy_create,
  *     run_backtest, etc.) are emitted per-compiled-strategy by the
@@ -200,6 +202,23 @@ PF_API const char* strategy_get_last_error(pf_strategy_t s) {
 PF_API void strategy_set_trade_start_time(pf_strategy_t s, int64_t timestamp_ms) {
     if (!s) return;
     static_cast<pineforge::BacktestEngine*>(s)->set_trade_start_time(timestamp_ms);
+}
+
+/* Cooperative abort of the run in progress on ``s`` (live runtime: a settle
+ * supersedes an in-flight probe). Atomic; consumed by the running loop at its
+ * next bar. Cleared at every run() entry so a request made while idle is a
+ * no-op. The aborted run reports strategy_last_run_status() == 1 and leaves
+ * the handle reusable. */
+PF_API void strategy_request_abort(pf_strategy_t s) {
+    if (!s) return;
+    static_cast<pineforge::BacktestEngine*>(s)->request_abort();
+}
+
+/* 0 when the most recent run() completed, 1 when it was aborted
+ * (NOT_COMPLETED). Errors are reported by strategy_get_last_error. */
+PF_API int strategy_last_run_status(pf_strategy_t s) {
+    if (!s) return 0;
+    return static_cast<const pineforge::BacktestEngine*>(s)->last_run_status();
 }
 
 PF_API int strategy_stream_begin(pf_strategy_t s,

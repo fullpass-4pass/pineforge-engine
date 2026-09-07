@@ -807,6 +807,7 @@ void BacktestEngine::reset_run_state() {
 void BacktestEngine::run(const Bar* bars, int n) {
     last_error_.clear();
     last_run_status_ = 0;
+    abort_requested_.store(false, std::memory_order_relaxed);
     if (n > 0 && bars != nullptr) {
         last_bar_time_ = bars[n - 1].timestamp;
         last_bar_index_ = n - 1;
@@ -848,6 +849,7 @@ void BacktestEngine::run(const Bar* bars, int n) {
     }
 
     for (int i = 0; i < n; i++) {
+        check_abort();
         current_bar_ = bars[i];
         bar_index_ = i;
         is_first_tick_ = true;
@@ -868,6 +870,8 @@ void BacktestEngine::run(const Bar* bars, int n) {
     // (record_range_end_close_trades, engine_orders.cpp). Report-only:
     // the live position is untouched.
     record_range_end_close_trades();
+    } catch (const AbortRequested&) {
+        last_run_status_ = 1;
     } catch (const std::exception& e) {
         last_error_ = e.what();
     } catch (...) {
@@ -1307,6 +1311,7 @@ void BacktestEngine::run(const Bar* input_bars, int n_input,
                           MagnifierDistribution magnifier_dist) {
     last_error_.clear();
     last_run_status_ = 0;
+    abort_requested_.store(false, std::memory_order_relaxed);
     if (n_input > 0 && input_bars != nullptr) {
         last_bar_time_ = input_bars[n_input - 1].timestamp;
     } else {
@@ -1447,6 +1452,8 @@ void BacktestEngine::run(const Bar* input_bars, int n_input,
 #ifdef PINEFORGE_HAS_AUX_SECURITY_FEED_V1
     clear_aux_security_chart_ranges();
 #endif
+    } catch (const AbortRequested&) {
+        last_run_status_ = 1;
     } catch (const std::exception& e) {
         clear_historical_security_lookahead_projections();
 #ifdef PINEFORGE_HAS_AUX_SECURITY_FEED_V1
@@ -1733,6 +1740,7 @@ void BacktestEngine::set_session_bar_state(bool in_session,
 // (with the process_orders_on_close TV variant when configured).
 void BacktestEngine::run_simple_bar_loop(const Bar* input_bars, int n_input) {
     for (int i = 0; i < n_input; ++i) {
+        check_abort();
         current_bar_ = input_bars[i];
         bar_index_ = i;
         is_first_tick_ = true;
@@ -1821,6 +1829,7 @@ void BacktestEngine::run_aggregation_bar_loop(const Bar* input_bars, int n_input
     int emitted_script_bars = 0;
 
     for (int i = 0; i < n_input; ++i) {
+        check_abort();
         // The next input bar's timestamp for the security evaluators fed
         // below (directly, by run_magnified_bar's sub-bar walk, or by the
         // boundary re-feed): a calendar bucket completes on the period's
@@ -2012,6 +2021,7 @@ void BacktestEngine::run(const Bar* input_bars, int n_input,
                           MagnifierDistribution magnifier_dist) {
     last_error_.clear();
     last_run_status_ = 0;
+    abort_requested_.store(false, std::memory_order_relaxed);
     try {
     // Store syminfo and inputs
     syminfo_ = syminfo;
@@ -2049,6 +2059,8 @@ void BacktestEngine::run(const Bar* input_bars, int n_input,
 
     // Delegate to the TF-aware run
     run(input_bars, n_input, input_tf, script_tf, bar_magnifier, magnifier_samples, magnifier_dist);
+    } catch (const AbortRequested&) {
+        last_run_status_ = 1;
     } catch (const std::exception& e) {
         last_error_ = e.what();
     } catch (...) {

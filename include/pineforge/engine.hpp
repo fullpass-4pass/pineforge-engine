@@ -1,4 +1,5 @@
 #pragma once
+#include <atomic>
 #include <vector>
 #include <string>
 #include <cstddef>
@@ -3477,6 +3478,40 @@ protected:
     // byte-identical when untouched (tests/test_live_flags_off_identity.cpp).
     int last_run_status_ = 0;               // 0 completed, 1 NOT_COMPLETED (abort)
 
+    // Cooperative abort (spec §3.5): set from any thread via request_abort();
+    // consumed by the run in progress at the top of each bar-loop iteration
+    // via check_abort(), which unwinds the run with AbortRequested. Cleared
+    // at every run() entry, so a request made while idle is a no-op.
+    //
+    // AbortFlag wraps std::atomic<bool> in a copy/move-constructible shell:
+    // std::atomic itself has its copy/move members deleted, and some tests
+    // (e.g. tests/test_pooc_global_full_exit.cpp's ``run_case``) return a
+    // BacktestEngine subclass by value, which needs the class to stay
+    // implicitly copyable. Copying/moving never carries an in-flight abort
+    // request across — there is no "run in progress" on a copy — so the
+    // copy always starts cleared.
+    struct AbortFlag {
+        std::atomic<bool> value{false};
+        AbortFlag() = default;
+        AbortFlag(const AbortFlag&) noexcept {}
+        AbortFlag(AbortFlag&&) noexcept {}
+        AbortFlag& operator=(const AbortFlag&) noexcept {
+            value.store(false, std::memory_order_relaxed);
+            return *this;
+        }
+        AbortFlag& operator=(AbortFlag&&) noexcept {
+            value.store(false, std::memory_order_relaxed);
+            return *this;
+        }
+        bool load(std::memory_order order) const { return value.load(order); }
+        void store(bool v, std::memory_order order) { value.store(v, order); }
+    };
+    AbortFlag abort_requested_;
+    struct AbortRequested {};               // thrown inside the bar loops only
+    void check_abort() {
+        if (abort_requested_.load(std::memory_order_relaxed)) throw AbortRequested{};
+    }
+
     std::vector<TraceEntryC> trace_buffer_;
     std::vector<std::string> trace_names_;
     std::unordered_map<std::string, int32_t> trace_name_index_;
@@ -4603,6 +4638,12 @@ public:
 
     // --- Live-runtime status API (ABI v4) ---
     int last_run_status() const { return last_run_status_; }
+
+    // Request cooperative abort of the run in progress on this handle (a
+    // live runtime supersedes an in-flight probe run). Safe to call from any
+    // thread; consumed by the running loop at its next bar. A request made
+    // while idle is cleared at the next run() entry and is a no-op.
+    void request_abort() { abort_requested_.store(true, std::memory_order_relaxed); }
 
     // Push a typed per-bar value into the trace buffer. Cheap when
     // disabled — a single bool branch and return. When enabled, name

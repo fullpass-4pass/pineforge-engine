@@ -1227,6 +1227,11 @@ class Strategy:
             L.strategy_set_trace_enabled.argtypes = [ctypes.c_void_p, ctypes.c_int]
         if hasattr(L, "strategy_set_trade_start_time"):
             L.strategy_set_trade_start_time.argtypes = [ctypes.c_void_p, ctypes.c_int64]
+        if hasattr(L, "strategy_request_abort"):
+            L.strategy_request_abort.argtypes = [ctypes.c_void_p]
+            L.strategy_request_abort.restype = None
+            L.strategy_last_run_status.argtypes = [ctypes.c_void_p]
+            L.strategy_last_run_status.restype = ctypes.c_int
         # ``strategy_set_chart_timezone`` lets the harness tell the engine
         # which IANA wall-clock zone Pine's ``hour`` / ``minute`` /
         # ``dayofweek`` (and the 1-arg function overloads) should produce.
