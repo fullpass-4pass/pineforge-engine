@@ -143,6 +143,14 @@ for S in ${SETS}; do
     run_stage "PyneCore ${PC_CURRENT} range-start" "pc @ 691 --rs"
     run_stage "PyneCore ${PC_LOCKED} range-start"  "pc @ 646 --rs"
   fi
+  # The headline is each engine's BEST supported configuration (README, revision 3), so the
+  # reproducer runs PyneCore's remaining public rungs too: --security driven by each script's own
+  # --list-data, and pc-best (--security plus the probe's --from/--to window). The finer-feed
+  # rungs (pf-finer / pc-finer) are NOT here: they need the parity campaign's 1-minute lane feeds,
+  # which are not public. Without them both engines' ladders lose the same rung, so the ladder
+  # this script reproduces stays symmetric — it is simply shorter than the published one.
+  run_stage "PyneCore ${PC_CURRENT} --security" "pc-sec @ 691"
+  run_stage "PyneCore ${PC_CURRENT} best"       "pc-best @ 691"
   run_stage grade           "grade @"
 done
 

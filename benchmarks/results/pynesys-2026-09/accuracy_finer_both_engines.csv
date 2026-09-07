@@ -1,0 +1,137 @@
+variant,inputs,n,excellent,strong,moderate,weak,minimal,run_error,timeout,no_finer_feed,not_run
+pf,"PineForge, chart feed only",511,451,29,8,3,7,13,0,0,0
+pf_finer,PineForge + campaign 1m auxiliary security feed,511,410,24,6,3,3,65,0,0,0
+pf_finer_rs,"PineForge + campaign 1m auxiliary feed, range-start bound",511,444,43,5,5,8,6,0,0,0
+pc691,"PyneCore 6.9.1, chart feed only",511,297,111,21,17,13,39,13,0,0
+pc691_sec,"PyneCore 6.9.1, --security from the chart feed",511,298,113,22,26,16,21,15,0,0
+pc691_finer,PyneCore 6.9.1 + campaign 1m feed via --security,511,4,0,2,2,2,0,5,0,496
+pc691_finer_rs,"PyneCore 6.9.1 + campaign 1m feed via --security, range-start feed",511,5,3,0,1,1,0,5,0,496
+pc691_best,"PyneCore 6.9.1, --security + the probe's --from/--to window",511,335,99,16,28,9,3,21,0,0
+pf @ B/eth-corpus,"PineForge, chart feed only",311,311,0,0,0,0,0,0,0,0
+pf_finer @ B/eth-corpus,PineForge + campaign 1m auxiliary security feed,311,305,0,0,0,0,6,0,0,0
+pf_finer_rs @ B/eth-corpus,"PineForge + campaign 1m auxiliary feed, range-start bound",311,276,24,0,1,4,6,0,0,0
+pc691 @ B/eth-corpus,"PyneCore 6.9.1, chart feed only",311,230,51,0,7,3,10,10,0,0
+pc691_sec @ B/eth-corpus,"PyneCore 6.9.1, --security from the chart feed",311,230,51,0,12,3,2,13,0,0
+pc691_finer @ B/eth-corpus,PyneCore 6.9.1 + campaign 1m feed via --security,311,2,0,0,0,0,0,0,0,309
+pc691_finer_rs @ B/eth-corpus,"PyneCore 6.9.1 + campaign 1m feed via --security, range-start feed",311,1,1,0,0,0,0,0,0,309
+pc691_best @ B/eth-corpus,"PyneCore 6.9.1, --security + the probe's --from/--to window",311,231,51,0,12,3,0,14,0,0
+pf @ C/aapl,"PineForge, chart feed only",18,14,2,0,1,1,0,0,0,0
+pf_finer @ C/aapl,PineForge + campaign 1m auxiliary security feed,18,14,2,0,1,1,0,0,0,0
+pf_finer_rs @ C/aapl,"PineForge + campaign 1m auxiliary feed, range-start bound",18,12,3,1,2,0,0,0,0,0
+pc691 @ C/aapl,"PyneCore 6.9.1, chart feed only",18,6,7,0,3,0,2,0,0,0
+pc691_sec @ C/aapl,"PyneCore 6.9.1, --security from the chart feed",18,6,7,0,4,0,1,0,0,0
+pc691_finer @ C/aapl,PyneCore 6.9.1 + campaign 1m feed via --security,18,0,0,0,0,0,0,0,0,18
+pc691_finer_rs @ C/aapl,"PyneCore 6.9.1 + campaign 1m feed via --security, range-start feed",18,0,0,0,0,0,0,0,0,18
+pc691_best @ C/aapl,"PyneCore 6.9.1, --security + the probe's --from/--to window",18,9,4,0,5,0,0,0,0,0
+pf @ C/btcusdt,"PineForge, chart feed only",18,13,3,0,0,0,2,0,0,0
+pf_finer @ C/btcusdt,PineForge + campaign 1m auxiliary security feed,18,15,3,0,0,0,0,0,0,0
+pf_finer_rs @ C/btcusdt,"PineForge + campaign 1m auxiliary feed, range-start bound",18,17,1,0,0,0,0,0,0,0
+pc691 @ C/btcusdt,"PyneCore 6.9.1, chart feed only",18,6,7,0,0,2,3,0,0,0
+pc691_sec @ C/btcusdt,"PyneCore 6.9.1, --security from the chart feed",18,6,7,0,1,2,2,0,0,0
+pc691_finer @ C/btcusdt,PyneCore 6.9.1 + campaign 1m feed via --security,18,0,0,0,0,0,0,2,0,16
+pc691_finer_rs @ C/btcusdt,"PyneCore 6.9.1 + campaign 1m feed via --security, range-start feed",18,0,0,0,0,0,0,2,0,16
+pc691_best @ C/btcusdt,"PyneCore 6.9.1, --security + the probe's --from/--to window",18,11,3,0,2,0,0,2,0,0
+pf @ C/btcusdt-1d,"PineForge, chart feed only",13,5,2,4,0,0,2,0,0,0
+pf_finer @ C/btcusdt-1d,PineForge + campaign 1m auxiliary security feed,13,7,2,4,0,0,0,0,0,0
+pf_finer_rs @ C/btcusdt-1d,"PineForge + campaign 1m auxiliary feed, range-start bound",13,11,0,2,0,0,0,0,0,0
+pc691 @ C/btcusdt-1d,"PyneCore 6.9.1, chart feed only",13,0,2,8,1,0,2,0,0,0
+pc691_sec @ C/btcusdt-1d,"PyneCore 6.9.1, --security from the chart feed",13,0,2,8,1,0,2,0,0,0
+pc691_finer @ C/btcusdt-1d,PyneCore 6.9.1 + campaign 1m feed via --security,13,1,0,1,0,0,0,0,0,11
+pc691_finer_rs @ C/btcusdt-1d,"PyneCore 6.9.1 + campaign 1m feed via --security, range-start feed",13,2,0,0,0,0,0,0,0,11
+pc691_best @ C/btcusdt-1d,"PyneCore 6.9.1, --security + the probe's --from/--to window",13,7,0,5,1,0,0,0,0,0
+pf @ C/es1,"PineForge, chart feed only",9,7,1,0,0,1,0,0,0,0
+pf_finer @ C/es1,PineForge + campaign 1m auxiliary security feed,9,0,0,0,0,0,9,0,0,0
+pf_finer_rs @ C/es1,"PineForge + campaign 1m auxiliary feed, range-start bound",9,8,0,0,0,1,0,0,0,0
+pc691 @ C/es1,"PyneCore 6.9.1, chart feed only",9,6,2,1,0,0,0,0,0,0
+pc691_sec @ C/es1,"PyneCore 6.9.1, --security from the chart feed",9,6,2,1,0,0,0,0,0,0
+pc691_finer @ C/es1,PyneCore 6.9.1 + campaign 1m feed via --security,9,0,0,0,0,0,0,0,0,9
+pc691_finer_rs @ C/es1,"PyneCore 6.9.1 + campaign 1m feed via --security, range-start feed",9,0,0,0,0,0,0,0,0,9
+pc691_best @ C/es1,"PyneCore 6.9.1, --security + the probe's --from/--to window",9,7,1,0,1,0,0,0,0,0
+pf @ C/es1-1d,"PineForge, chart feed only",8,4,1,0,0,2,1,0,0,0
+pf_finer @ C/es1-1d,PineForge + campaign 1m auxiliary security feed,8,0,0,0,0,0,8,0,0,0
+pf_finer_rs @ C/es1-1d,"PineForge + campaign 1m auxiliary feed, range-start bound",8,6,0,0,0,2,0,0,0,0
+pc691 @ C/es1-1d,"PyneCore 6.9.1, chart feed only",8,0,3,1,0,2,2,0,0,0
+pc691_sec @ C/es1-1d,"PyneCore 6.9.1, --security from the chart feed",8,0,3,2,0,2,1,0,0,0
+pc691_finer @ C/es1-1d,PyneCore 6.9.1 + campaign 1m feed via --security,8,0,0,0,0,1,0,0,0,7
+pc691_finer_rs @ C/es1-1d,"PyneCore 6.9.1 + campaign 1m feed via --security, range-start feed",8,0,0,0,0,1,0,0,0,7
+pc691_best @ C/es1-1d,"PyneCore 6.9.1, --security + the probe's --from/--to window",8,1,3,1,0,3,0,0,0,0
+pf @ C/eth,"PineForge, chart feed only",20,17,2,1,0,0,0,0,0,0
+pf_finer @ C/eth,PineForge + campaign 1m auxiliary security feed,20,17,2,1,0,0,0,0,0,0
+pf_finer_rs @ C/eth,"PineForge + campaign 1m auxiliary feed, range-start bound",20,15,4,1,0,0,0,0,0,0
+pc691 @ C/eth,"PyneCore 6.9.1, chart feed only",20,6,8,2,0,0,2,2,0,0
+pc691_sec @ C/eth,"PyneCore 6.9.1, --security from the chart feed",20,6,9,2,1,0,0,2,0,0
+pc691_finer @ C/eth,PyneCore 6.9.1 + campaign 1m feed via --security,20,0,0,0,0,0,0,0,0,20
+pc691_finer_rs @ C/eth,"PyneCore 6.9.1 + campaign 1m feed via --security, range-start feed",20,0,0,0,0,0,0,0,0,20
+pc691_best @ C/eth,"PyneCore 6.9.1, --security + the probe's --from/--to window",20,9,8,0,1,0,0,2,0,0
+pf @ C/eurusd,"PineForge, chart feed only",19,10,8,0,0,0,1,0,0,0
+pf_finer @ C/eurusd,PineForge + campaign 1m auxiliary security feed,19,11,8,0,0,0,0,0,0,0
+pf_finer_rs @ C/eurusd,"PineForge + campaign 1m auxiliary feed, range-start bound",19,11,8,0,0,0,0,0,0,0
+pc691 @ C/eurusd,"PyneCore 6.9.1, chart feed only",19,6,8,1,0,0,4,0,0,0
+pc691_sec @ C/eurusd,"PyneCore 6.9.1, --security from the chart feed",19,6,8,1,0,0,4,0,0,0
+pc691_finer @ C/eurusd,PyneCore 6.9.1 + campaign 1m feed via --security,19,0,0,0,0,0,0,1,0,18
+pc691_finer_rs @ C/eurusd,"PyneCore 6.9.1 + campaign 1m feed via --security, range-start feed",19,0,0,0,0,0,0,1,0,18
+pc691_best @ C/eurusd,"PyneCore 6.9.1, --security + the probe's --from/--to window",19,6,8,1,0,0,3,1,0,0
+pf @ C/f,"PineForge, chart feed only",17,14,3,0,0,0,0,0,0,0
+pf_finer @ C/f,PineForge + campaign 1m auxiliary security feed,17,0,0,0,0,0,17,0,0,0
+pf_finer_rs @ C/f,"PineForge + campaign 1m auxiliary feed, range-start bound",17,17,0,0,0,0,0,0,0,0
+pc691 @ C/f,"PyneCore 6.9.1, chart feed only",17,8,5,1,2,0,1,0,0,0
+pc691_sec @ C/f,"PyneCore 6.9.1, --security from the chart feed",17,8,5,1,2,1,0,0,0,0
+pc691_finer @ C/f,PyneCore 6.9.1 + campaign 1m feed via --security,17,0,0,0,0,0,0,0,0,17
+pc691_finer_rs @ C/f,"PyneCore 6.9.1 + campaign 1m feed via --security, range-start feed",17,0,0,0,0,0,0,0,0,17
+pc691_best @ C/f,"PyneCore 6.9.1, --security + the probe's --from/--to window",17,10,4,0,2,1,0,0,0,0
+pf @ C/f-1d,"PineForge, chart feed only",13,10,1,0,0,0,2,0,0,0
+pf_finer @ C/f-1d,PineForge + campaign 1m auxiliary security feed,13,12,1,0,0,0,0,0,0,0
+pf_finer_rs @ C/f-1d,"PineForge + campaign 1m auxiliary feed, range-start bound",13,13,0,0,0,0,0,0,0,0
+pc691 @ C/f-1d,"PyneCore 6.9.1, chart feed only",13,3,2,2,2,0,4,0,0,0
+pc691_sec @ C/f-1d,"PyneCore 6.9.1, --security from the chart feed",13,3,3,2,2,1,2,0,0,0
+pc691_finer @ C/f-1d,PyneCore 6.9.1 + campaign 1m feed via --security,13,1,0,0,1,0,0,0,0,11
+pc691_finer_rs @ C/f-1d,"PyneCore 6.9.1 + campaign 1m feed via --security, range-start feed",13,1,0,0,1,0,0,0,0,11
+pc691_best @ C/f-1d,"PyneCore 6.9.1, --security + the probe's --from/--to window",13,5,3,3,2,0,0,0,0,0
+pf @ C/nifty,"PineForge, chart feed only",9,9,0,0,0,0,0,0,0,0
+pf_finer @ C/nifty,PineForge + campaign 1m auxiliary security feed,9,9,0,0,0,0,0,0,0,0
+pf_finer_rs @ C/nifty,"PineForge + campaign 1m auxiliary feed, range-start bound",9,9,0,0,0,0,0,0,0,0
+pc691 @ C/nifty,"PyneCore 6.9.1, chart feed only",9,7,0,2,0,0,0,0,0,0
+pc691_sec @ C/nifty,"PyneCore 6.9.1, --security from the chart feed",9,7,0,2,0,0,0,0,0,0
+pc691_finer @ C/nifty,PyneCore 6.9.1 + campaign 1m feed via --security,9,0,0,0,0,0,0,0,0,9
+pc691_finer_rs @ C/nifty,"PyneCore 6.9.1 + campaign 1m feed via --security, range-start feed",9,0,0,0,0,0,0,0,0,9
+pc691_best @ C/nifty,"PyneCore 6.9.1, --security + the probe's --from/--to window",9,8,0,1,0,0,0,0,0,0
+pf @ C/nifty-1d,"PineForge, chart feed only",8,7,0,0,0,0,1,0,0,0
+pf_finer @ C/nifty-1d,PineForge + campaign 1m auxiliary security feed,8,0,0,0,0,0,8,0,0,0
+pf_finer_rs @ C/nifty-1d,"PineForge + campaign 1m auxiliary feed, range-start bound",8,8,0,0,0,0,0,0,0,0
+pc691 @ C/nifty-1d,"PyneCore 6.9.1, chart feed only",8,1,3,1,0,1,2,0,0,0
+pc691_sec @ C/nifty-1d,"PyneCore 6.9.1, --security from the chart feed",8,1,3,1,1,1,1,0,0,0
+pc691_finer @ C/nifty-1d,PyneCore 6.9.1 + campaign 1m feed via --security,8,0,0,1,0,0,0,0,0,7
+pc691_finer_rs @ C/nifty-1d,"PyneCore 6.9.1 + campaign 1m feed via --security, range-start feed",8,1,0,0,0,0,0,0,0,7
+pc691_best @ C/nifty-1d,"PyneCore 6.9.1, --security + the probe's --from/--to window",8,3,2,2,1,0,0,0,0,0
+pf @ C/nq1,"PineForge, chart feed only",9,7,1,0,1,0,0,0,0,0
+pf_finer @ C/nq1,PineForge + campaign 1m auxiliary security feed,9,0,0,0,0,0,9,0,0,0
+pf_finer_rs @ C/nq1,"PineForge + campaign 1m auxiliary feed, range-start bound",9,8,0,0,1,0,0,0,0,0
+pc691 @ C/nq1,"PyneCore 6.9.1, chart feed only",9,6,1,0,0,0,1,1,0,0
+pc691_sec @ C/nq1,"PyneCore 6.9.1, --security from the chart feed",9,7,1,0,0,1,0,0,0,0
+pc691_finer @ C/nq1,PyneCore 6.9.1 + campaign 1m feed via --security,9,0,0,0,0,0,0,0,0,9
+pc691_finer_rs @ C/nq1,"PyneCore 6.9.1 + campaign 1m feed via --security, range-start feed",9,0,0,0,0,0,0,0,0,9
+pc691_best @ C/nq1,"PyneCore 6.9.1, --security + the probe's --from/--to window",9,8,0,0,0,1,0,0,0,0
+pf @ C/nq1-1d,"PineForge, chart feed only",8,4,0,2,0,1,1,0,0,0
+pf_finer @ C/nq1-1d,PineForge + campaign 1m auxiliary security feed,8,0,0,0,0,0,8,0,0,0
+pf_finer_rs @ C/nq1-1d,"PineForge + campaign 1m auxiliary feed, range-start bound",8,7,0,1,0,0,0,0,0,0
+pc691 @ C/nq1-1d,"PyneCore 6.9.1, chart feed only",8,2,0,0,0,4,2,0,0,0
+pc691_sec @ C/nq1-1d,"PyneCore 6.9.1, --security from the chart feed",8,2,0,0,0,4,2,0,0,0
+pc691_finer @ C/nq1-1d,PyneCore 6.9.1 + campaign 1m feed via --security,8,0,0,0,0,1,0,0,0,7
+pc691_finer_rs @ C/nq1-1d,"PyneCore 6.9.1 + campaign 1m feed via --security, range-start feed",8,0,1,0,0,0,0,0,0,7
+pc691_best @ C/nq1-1d,"PyneCore 6.9.1, --security + the probe's --from/--to window",8,3,2,3,0,0,0,0,0,0
+pf @ C/xauusd,"PineForge, chart feed only",19,12,3,0,1,2,1,0,0,0
+pf_finer @ C/xauusd,PineForge + campaign 1m auxiliary security feed,19,13,3,0,1,2,0,0,0,0
+pf_finer_rs @ C/xauusd,"PineForge + campaign 1m auxiliary feed, range-start bound",19,15,3,0,0,1,0,0,0,0
+pc691 @ C/xauusd,"PyneCore 6.9.1, chart feed only",19,4,10,1,1,1,2,0,0,0
+pc691_sec @ C/xauusd,"PyneCore 6.9.1, --security from the chart feed",19,4,10,1,1,1,2,0,0,0
+pc691_finer @ C/xauusd,PyneCore 6.9.1 + campaign 1m feed via --security,19,0,0,0,0,0,0,1,0,18
+pc691_finer_rs @ C/xauusd,"PyneCore 6.9.1 + campaign 1m feed via --security, range-start feed",19,0,0,0,0,0,0,1,0,18
+pc691_best @ C/xauusd,"PyneCore 6.9.1, --security + the probe's --from/--to window",19,10,6,0,1,1,0,1,0,0
+pf @ C/xauusd-1d,"PineForge, chart feed only",12,7,2,1,0,0,2,0,0,0
+pf_finer @ C/xauusd-1d,PineForge + campaign 1m auxiliary security feed,12,7,3,1,1,0,0,0,0,0
+pf_finer_rs @ C/xauusd-1d,"PineForge + campaign 1m auxiliary feed, range-start bound",12,11,0,0,1,0,0,0,0,0
+pc691 @ C/xauusd-1d,"PyneCore 6.9.1, chart feed only",12,6,2,1,1,0,2,0,0,0
+pc691_sec @ C/xauusd-1d,"PyneCore 6.9.1, --security from the chart feed",12,6,2,1,1,0,2,0,0,0
+pc691_finer @ C/xauusd-1d,PyneCore 6.9.1 + campaign 1m feed via --security,12,0,0,0,1,0,0,1,0,10
+pc691_finer_rs @ C/xauusd-1d,"PyneCore 6.9.1 + campaign 1m feed via --security, range-start feed",12,0,1,0,0,0,0,1,0,10
+pc691_best @ C/xauusd-1d,"PyneCore 6.9.1, --security + the probe's --from/--to window",12,7,4,0,0,0,0,1,0,0

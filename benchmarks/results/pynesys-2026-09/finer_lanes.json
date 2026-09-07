@@ -1,0 +1,130 @@
+{
+ "aapl": {
+  "bytes": 23477350,
+  "file": "09c2dc4060ee922e960d080bb5bbabb23e339288e1264da7e8392d434a9f0308.csv",
+  "laneId": "aapl-15",
+  "sha256": "09c2dc4060ee922e960d080bb5bbabb23e339288e1264da7e8392d434a9f0308",
+  "symbol": "NASDAQ:AAPL",
+  "timeframe": "1"
+ },
+ "btcusdt": {
+  "bytes": 153982613,
+  "file": "787fd2e15bfeddb062cbb7905248ff4be2fe5c695bbe971f9322826f16528b86.csv",
+  "laneId": "btcusdt-15",
+  "sha256": "787fd2e15bfeddb062cbb7905248ff4be2fe5c695bbe971f9322826f16528b86",
+  "symbol": "BINANCE:BTCUSDT",
+  "timeframe": "1"
+ },
+ "btcusdt-1d": {
+  "bytes": 153982613,
+  "file": "787fd2e15bfeddb062cbb7905248ff4be2fe5c695bbe971f9322826f16528b86.csv",
+  "laneId": "btcusdt-1d",
+  "sha256": "787fd2e15bfeddb062cbb7905248ff4be2fe5c695bbe971f9322826f16528b86",
+  "symbol": "BINANCE:BTCUSDT",
+  "timeframe": "1"
+ },
+ "es1": {
+  "bytes": 44439559,
+  "file": "39ba22ce3c669b92576cd3b1c750c9220e4199045db2a6b01eb2144f59ac2781.csv",
+  "laneId": "es1-15",
+  "sha256": "39ba22ce3c669b92576cd3b1c750c9220e4199045db2a6b01eb2144f59ac2781",
+  "symbol": "CME_MINI:ES1!",
+  "timeframe": "1"
+ },
+ "es1-1d": {
+  "bytes": 44439559,
+  "file": "39ba22ce3c669b92576cd3b1c750c9220e4199045db2a6b01eb2144f59ac2781.csv",
+  "laneId": "es1-1d",
+  "sha256": "39ba22ce3c669b92576cd3b1c750c9220e4199045db2a6b01eb2144f59ac2781",
+  "symbol": "CME_MINI:ES1!",
+  "timeframe": "1"
+ },
+ "eth": {
+  "bytes": 176093499,
+  "file": "db8c1332da093008cfbd063e05db0b33fe8f7fd35d78cf058a366519eb9f6cc5.csv",
+  "laneId": "eth-scraped-15",
+  "sha256": "db8c1332da093008cfbd063e05db0b33fe8f7fd35d78cf058a366519eb9f6cc5",
+  "symbol": "BINANCE:ETHUSDT.P",
+  "timeframe": "1"
+ },
+ "eth-corpus": {
+  "bytes": 176093499,
+  "file": "db8c1332da093008cfbd063e05db0b33fe8f7fd35d78cf058a366519eb9f6cc5.csv",
+  "laneId": "eth-corpus-15",
+  "sha256": "db8c1332da093008cfbd063e05db0b33fe8f7fd35d78cf058a366519eb9f6cc5",
+  "symbol": "BINANCE:ETHUSDT.P",
+  "timeframe": "1"
+ },
+ "eurusd": {
+  "bytes": 91462293,
+  "file": "b3d921bb0af969ab5f7e16934914a31b4a7e9fc6b8a2cf514eff571061341a75.csv",
+  "laneId": "eurusd-15",
+  "sha256": "b3d921bb0af969ab5f7e16934914a31b4a7e9fc6b8a2cf514eff571061341a75",
+  "symbol": "OANDA:EURUSD",
+  "timeframe": "1"
+ },
+ "f": {
+  "bytes": 21305589,
+  "file": "50bccb38da9cf08aeaca6c19ff9c3a266f00885fe2894c3e470b98f94e24bcc8.csv",
+  "laneId": "f-15",
+  "sha256": "50bccb38da9cf08aeaca6c19ff9c3a266f00885fe2894c3e470b98f94e24bcc8",
+  "symbol": "NYSE:F",
+  "timeframe": "1"
+ },
+ "f-1d": {
+  "bytes": 21305589,
+  "file": "50bccb38da9cf08aeaca6c19ff9c3a266f00885fe2894c3e470b98f94e24bcc8.csv",
+  "laneId": "f-1d",
+  "sha256": "50bccb38da9cf08aeaca6c19ff9c3a266f00885fe2894c3e470b98f94e24bcc8",
+  "symbol": "NYSE:F",
+  "timeframe": "1"
+ },
+ "nifty": {
+  "bytes": 25719690,
+  "file": "38e8107576e586755aff36f0271af00edababcc6716f527863331a514c943c22.csv",
+  "laneId": "nifty-15",
+  "sha256": "38e8107576e586755aff36f0271af00edababcc6716f527863331a514c943c22",
+  "symbol": "NSE:NIFTY",
+  "timeframe": "1"
+ },
+ "nifty-1d": {
+  "bytes": 25719690,
+  "file": "38e8107576e586755aff36f0271af00edababcc6716f527863331a514c943c22.csv",
+  "laneId": "nifty-1d",
+  "sha256": "38e8107576e586755aff36f0271af00edababcc6716f527863331a514c943c22",
+  "symbol": "NSE:NIFTY",
+  "timeframe": "1"
+ },
+ "nq1": {
+  "bytes": 47728779,
+  "file": "3736801faf9991bb878b42dbb2a18bb249c06833f55019fe5357e56728910ffe.csv",
+  "laneId": "nq1-15",
+  "sha256": "3736801faf9991bb878b42dbb2a18bb249c06833f55019fe5357e56728910ffe",
+  "symbol": "CME_MINI:NQ1!",
+  "timeframe": "1"
+ },
+ "nq1-1d": {
+  "bytes": 47728779,
+  "file": "3736801faf9991bb878b42dbb2a18bb249c06833f55019fe5357e56728910ffe.csv",
+  "laneId": "nq1-1d",
+  "sha256": "3736801faf9991bb878b42dbb2a18bb249c06833f55019fe5357e56728910ffe",
+  "symbol": "CME_MINI:NQ1!",
+  "timeframe": "1"
+ },
+ "xauusd": {
+  "bytes": 92167208,
+  "file": "b2389ad2a29c7ba8896f3af8b1b51b236d8d41114d3a7040ae41752c7ac74c14.csv",
+  "laneId": "xauusd-15",
+  "sha256": "b2389ad2a29c7ba8896f3af8b1b51b236d8d41114d3a7040ae41752c7ac74c14",
+  "symbol": "OANDA:XAUUSD",
+  "timeframe": "1"
+ },
+ "xauusd-1d": {
+  "bytes": 92167208,
+  "file": "b2389ad2a29c7ba8896f3af8b1b51b236d8d41114d3a7040ae41752c7ac74c14.csv",
+  "laneId": "xauusd-1d",
+  "sha256": "b2389ad2a29c7ba8896f3af8b1b51b236d8d41114d3a7040ae41752c7ac74c14",
+  "symbol": "OANDA:XAUUSD",
+  "timeframe": "1"
+ }
+}

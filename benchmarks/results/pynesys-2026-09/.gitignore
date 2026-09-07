@@ -2,3 +2,12 @@
 # rows naming third-party TradingView authors) into this directory; it must never be committed.
 # It was committed once, at 36efaeb, and removed by rewriting this branch - see the README.
 closed_rows.csv
+
+# Revision 3: the campaign-verifier reproduction reads and writes per-probe documents that name
+# closed third-party scripts. None of them belongs in the published tree; they live only on the
+# benchmark machine (~/pf/xc). Blocked by name so a wildcard sync cannot repeat the 36efaeb slip.
+setC_manifest.json
+campaign_tiers.json
+snap_grades.json
+xcheck_*.json
+lane_probes*.json

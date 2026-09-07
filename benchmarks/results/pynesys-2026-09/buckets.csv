@@ -1,325 +1,694 @@
 set,bucketKind,bucket,engine,n,excellent,strong,moderate,weak,minimal,fail,not_run,excellentPct,excellentStrongPct
+A,primary,trail,PineForge - BEST SUPPORTED CONFIGURATION,6,6,0,0,0,0,0,0,100.0,100.0
+A,primary,trail,PyneCore 6.9.1 - BEST SUPPORTED CONFIGURATION,6,6,0,0,0,0,0,0,100.0,100.0
+A,primary,trail,PyneCore 6.4.6 - BEST SUPPORTED CONFIGURATION,6,0,0,6,0,0,0,0,0.0,0.0
+A,primary,trail,PineForge (the campaign's own verifier: verify-engine-local.py ladder),6,0,0,0,0,0,6,0,0.0,0.0
 A,primary,trail,"PineForge (full feed, tape-window)",6,6,0,0,0,0,0,0,100.0,100.0
+A,primary,trail,PineForge (range-start feed),6,6,0,0,0,0,0,0,100.0,100.0
 A,primary,trail,"PineForge (full feed, raw)",6,6,0,0,0,0,0,0,100.0,100.0
 A,primary,trail,"PyneCore 6.9.1 (full feed, --security supplied)",6,6,0,0,0,0,0,0,100.0,100.0
 A,primary,trail,PyneCore 6.9.1 (full feed),6,6,0,0,0,0,0,0,100.0,100.0
+A,primary,trail,PyneCore 6.9.1 (--security + the probe's --from/--to window),6,6,0,0,0,0,0,0,100.0,100.0
 A,primary,trail,PyneCore 6.4.6 (full feed),6,0,0,6,0,0,0,0,0.0,0.0
+A,primary,trail,"PyneCore 6.9.1 (recompiled 6.0.66, full feed)",6,6,0,0,0,0,0,0,100.0,100.0
+A,primary,partial,PineForge - BEST SUPPORTED CONFIGURATION,3,2,1,0,0,0,0,0,66.7,100.0
+A,primary,partial,PyneCore 6.9.1 - BEST SUPPORTED CONFIGURATION,3,2,1,0,0,0,0,0,66.7,100.0
+A,primary,partial,PyneCore 6.4.6 - BEST SUPPORTED CONFIGURATION,3,0,1,2,0,0,0,0,0.0,33.3
+A,primary,partial,PineForge (the campaign's own verifier: verify-engine-local.py ladder),3,0,0,0,0,0,3,0,0.0,0.0
 A,primary,partial,"PineForge (full feed, tape-window)",3,2,1,0,0,0,0,0,66.7,100.0
+A,primary,partial,PineForge (range-start feed),3,2,1,0,0,0,0,0,66.7,100.0
 A,primary,partial,"PineForge (full feed, raw)",3,2,1,0,0,0,0,0,66.7,100.0
 A,primary,partial,"PyneCore 6.9.1 (full feed, --security supplied)",3,2,1,0,0,0,0,0,66.7,100.0
 A,primary,partial,PyneCore 6.9.1 (full feed),3,2,1,0,0,0,0,0,66.7,100.0
+A,primary,partial,PyneCore 6.9.1 (--security + the probe's --from/--to window),3,2,1,0,0,0,0,0,66.7,100.0
 A,primary,partial,PyneCore 6.4.6 (full feed),3,0,1,2,0,0,0,0,0.0,33.3
+A,primary,partial,"PyneCore 6.9.1 (recompiled 6.0.66, full feed)",3,2,1,0,0,0,0,0,66.7,100.0
+A,primary,brackets,PineForge - BEST SUPPORTED CONFIGURATION,13,12,1,0,0,0,0,0,92.3,100.0
+A,primary,brackets,PyneCore 6.9.1 - BEST SUPPORTED CONFIGURATION,13,12,1,0,0,0,0,0,92.3,100.0
+A,primary,brackets,PyneCore 6.4.6 - BEST SUPPORTED CONFIGURATION,13,10,1,2,0,0,0,0,76.9,84.6
+A,primary,brackets,PineForge (the campaign's own verifier: verify-engine-local.py ladder),13,0,0,0,0,0,13,0,0.0,0.0
 A,primary,brackets,"PineForge (full feed, tape-window)",13,12,1,0,0,0,0,0,92.3,100.0
+A,primary,brackets,PineForge (range-start feed),13,12,1,0,0,0,0,0,92.3,100.0
 A,primary,brackets,"PineForge (full feed, raw)",13,12,1,0,0,0,0,0,92.3,100.0
 A,primary,brackets,"PyneCore 6.9.1 (full feed, --security supplied)",13,12,1,0,0,0,0,0,92.3,100.0
 A,primary,brackets,PyneCore 6.9.1 (full feed),13,12,1,0,0,0,0,0,92.3,100.0
+A,primary,brackets,PyneCore 6.9.1 (--security + the probe's --from/--to window),13,12,1,0,0,0,0,0,92.3,100.0
 A,primary,brackets,PyneCore 6.4.6 (full feed),13,10,1,2,0,0,0,0,76.9,84.6
+A,primary,brackets,"PyneCore 6.9.1 (recompiled 6.0.66, full feed)",13,12,1,0,0,0,0,0,92.3,100.0
+A,primary,plain,PineForge - BEST SUPPORTED CONFIGURATION,78,70,8,0,0,0,0,0,89.7,100.0
+A,primary,plain,PyneCore 6.9.1 - BEST SUPPORTED CONFIGURATION,78,62,16,0,0,0,0,0,79.5,100.0
+A,primary,plain,PyneCore 6.4.6 - BEST SUPPORTED CONFIGURATION,78,59,16,0,2,0,1,0,75.6,96.2
+A,primary,plain,PineForge (the campaign's own verifier: verify-engine-local.py ladder),78,0,0,0,0,0,78,0,0.0,0.0
 A,primary,plain,"PineForge (full feed, tape-window)",78,69,9,0,0,0,0,0,88.5,100.0
+A,primary,plain,PineForge (range-start feed),78,69,9,0,0,0,0,0,88.5,100.0
 A,primary,plain,"PineForge (full feed, raw)",78,64,14,0,0,0,0,0,82.1,100.0
 A,primary,plain,"PyneCore 6.9.1 (full feed, --security supplied)",78,61,16,0,1,0,0,0,78.2,98.7
 A,primary,plain,PyneCore 6.9.1 (full feed),78,61,16,0,1,0,0,0,78.2,98.7
+A,primary,plain,PyneCore 6.9.1 (--security + the probe's --from/--to window),78,61,16,0,1,0,0,0,78.2,98.7
 A,primary,plain,PyneCore 6.4.6 (full feed),78,59,16,0,2,0,1,0,75.6,96.2
+A,primary,plain,"PyneCore 6.9.1 (recompiled 6.0.66, full feed)",78,62,16,0,0,0,0,0,79.5,100.0
+A,feature,trail,PineForge - BEST SUPPORTED CONFIGURATION,6,6,0,0,0,0,0,0,100.0,100.0
+A,feature,trail,PyneCore 6.9.1 - BEST SUPPORTED CONFIGURATION,6,6,0,0,0,0,0,0,100.0,100.0
+A,feature,trail,PyneCore 6.4.6 - BEST SUPPORTED CONFIGURATION,6,0,0,6,0,0,0,0,0.0,0.0
+A,feature,trail,PineForge (the campaign's own verifier: verify-engine-local.py ladder),6,0,0,0,0,0,6,0,0.0,0.0
 A,feature,trail,"PineForge (full feed, tape-window)",6,6,0,0,0,0,0,0,100.0,100.0
+A,feature,trail,PineForge (range-start feed),6,6,0,0,0,0,0,0,100.0,100.0
 A,feature,trail,"PineForge (full feed, raw)",6,6,0,0,0,0,0,0,100.0,100.0
 A,feature,trail,"PyneCore 6.9.1 (full feed, --security supplied)",6,6,0,0,0,0,0,0,100.0,100.0
 A,feature,trail,PyneCore 6.9.1 (full feed),6,6,0,0,0,0,0,0,100.0,100.0
+A,feature,trail,PyneCore 6.9.1 (--security + the probe's --from/--to window),6,6,0,0,0,0,0,0,100.0,100.0
 A,feature,trail,PyneCore 6.4.6 (full feed),6,0,0,6,0,0,0,0,0.0,0.0
+A,feature,trail,"PyneCore 6.9.1 (recompiled 6.0.66, full feed)",6,6,0,0,0,0,0,0,100.0,100.0
+A,feature,brackets,PineForge - BEST SUPPORTED CONFIGURATION,22,20,2,0,0,0,0,0,90.9,100.0
+A,feature,brackets,PyneCore 6.9.1 - BEST SUPPORTED CONFIGURATION,22,20,2,0,0,0,0,0,90.9,100.0
+A,feature,brackets,PyneCore 6.4.6 - BEST SUPPORTED CONFIGURATION,22,10,2,10,0,0,0,0,45.5,54.5
+A,feature,brackets,PineForge (the campaign's own verifier: verify-engine-local.py ladder),22,0,0,0,0,0,22,0,0.0,0.0
 A,feature,brackets,"PineForge (full feed, tape-window)",22,20,2,0,0,0,0,0,90.9,100.0
+A,feature,brackets,PineForge (range-start feed),22,20,2,0,0,0,0,0,90.9,100.0
 A,feature,brackets,"PineForge (full feed, raw)",22,20,2,0,0,0,0,0,90.9,100.0
 A,feature,brackets,"PyneCore 6.9.1 (full feed, --security supplied)",22,20,2,0,0,0,0,0,90.9,100.0
 A,feature,brackets,PyneCore 6.9.1 (full feed),22,20,2,0,0,0,0,0,90.9,100.0
+A,feature,brackets,PyneCore 6.9.1 (--security + the probe's --from/--to window),22,20,2,0,0,0,0,0,90.9,100.0
 A,feature,brackets,PyneCore 6.4.6 (full feed),22,10,2,10,0,0,0,0,45.5,54.5
+A,feature,brackets,"PyneCore 6.9.1 (recompiled 6.0.66, full feed)",22,20,2,0,0,0,0,0,90.9,100.0
+A,feature,partial,PineForge - BEST SUPPORTED CONFIGURATION,3,2,1,0,0,0,0,0,66.7,100.0
+A,feature,partial,PyneCore 6.9.1 - BEST SUPPORTED CONFIGURATION,3,2,1,0,0,0,0,0,66.7,100.0
+A,feature,partial,PyneCore 6.4.6 - BEST SUPPORTED CONFIGURATION,3,0,1,2,0,0,0,0,0.0,33.3
+A,feature,partial,PineForge (the campaign's own verifier: verify-engine-local.py ladder),3,0,0,0,0,0,3,0,0.0,0.0
 A,feature,partial,"PineForge (full feed, tape-window)",3,2,1,0,0,0,0,0,66.7,100.0
+A,feature,partial,PineForge (range-start feed),3,2,1,0,0,0,0,0,66.7,100.0
 A,feature,partial,"PineForge (full feed, raw)",3,2,1,0,0,0,0,0,66.7,100.0
 A,feature,partial,"PyneCore 6.9.1 (full feed, --security supplied)",3,2,1,0,0,0,0,0,66.7,100.0
 A,feature,partial,PyneCore 6.9.1 (full feed),3,2,1,0,0,0,0,0,66.7,100.0
+A,feature,partial,PyneCore 6.9.1 (--security + the probe's --from/--to window),3,2,1,0,0,0,0,0,66.7,100.0
 A,feature,partial,PyneCore 6.4.6 (full feed),3,0,1,2,0,0,0,0,0.0,33.3
+A,feature,partial,"PyneCore 6.9.1 (recompiled 6.0.66, full feed)",3,2,1,0,0,0,0,0,66.7,100.0
+A,feature,pyramiding,PineForge - BEST SUPPORTED CONFIGURATION,3,3,0,0,0,0,0,0,100.0,100.0
+A,feature,pyramiding,PyneCore 6.9.1 - BEST SUPPORTED CONFIGURATION,3,3,0,0,0,0,0,0,100.0,100.0
+A,feature,pyramiding,PyneCore 6.4.6 - BEST SUPPORTED CONFIGURATION,3,3,0,0,0,0,0,0,100.0,100.0
+A,feature,pyramiding,PineForge (the campaign's own verifier: verify-engine-local.py ladder),3,0,0,0,0,0,3,0,0.0,0.0
 A,feature,pyramiding,"PineForge (full feed, tape-window)",3,3,0,0,0,0,0,0,100.0,100.0
+A,feature,pyramiding,PineForge (range-start feed),3,3,0,0,0,0,0,0,100.0,100.0
 A,feature,pyramiding,"PineForge (full feed, raw)",3,2,1,0,0,0,0,0,66.7,100.0
 A,feature,pyramiding,"PyneCore 6.9.1 (full feed, --security supplied)",3,3,0,0,0,0,0,0,100.0,100.0
 A,feature,pyramiding,PyneCore 6.9.1 (full feed),3,3,0,0,0,0,0,0,100.0,100.0
+A,feature,pyramiding,PyneCore 6.9.1 (--security + the probe's --from/--to window),3,3,0,0,0,0,0,0,100.0,100.0
 A,feature,pyramiding,PyneCore 6.4.6 (full feed),3,3,0,0,0,0,0,0,100.0,100.0
+A,feature,pyramiding,"PyneCore 6.9.1 (recompiled 6.0.66, full feed)",3,3,0,0,0,0,0,0,100.0,100.0
+A,feature,pooc,PineForge - BEST SUPPORTED CONFIGURATION,1,1,0,0,0,0,0,0,100.0,100.0
+A,feature,pooc,PyneCore 6.9.1 - BEST SUPPORTED CONFIGURATION,1,1,0,0,0,0,0,0,100.0,100.0
+A,feature,pooc,PyneCore 6.4.6 - BEST SUPPORTED CONFIGURATION,1,1,0,0,0,0,0,0,100.0,100.0
+A,feature,pooc,PineForge (the campaign's own verifier: verify-engine-local.py ladder),1,0,0,0,0,0,1,0,0.0,0.0
 A,feature,pooc,"PineForge (full feed, tape-window)",1,1,0,0,0,0,0,0,100.0,100.0
+A,feature,pooc,PineForge (range-start feed),1,1,0,0,0,0,0,0,100.0,100.0
 A,feature,pooc,"PineForge (full feed, raw)",1,1,0,0,0,0,0,0,100.0,100.0
 A,feature,pooc,"PyneCore 6.9.1 (full feed, --security supplied)",1,1,0,0,0,0,0,0,100.0,100.0
 A,feature,pooc,PyneCore 6.9.1 (full feed),1,1,0,0,0,0,0,0,100.0,100.0
+A,feature,pooc,PyneCore 6.9.1 (--security + the probe's --from/--to window),1,1,0,0,0,0,0,0,100.0,100.0
 A,feature,pooc,PyneCore 6.4.6 (full feed),1,1,0,0,0,0,0,0,100.0,100.0
+A,feature,pooc,"PyneCore 6.9.1 (recompiled 6.0.66, full feed)",1,1,0,0,0,0,0,0,100.0,100.0
+A,feature,margin_lt100,PineForge - BEST SUPPORTED CONFIGURATION,1,0,1,0,0,0,0,0,0.0,100.0
+A,feature,margin_lt100,PyneCore 6.9.1 - BEST SUPPORTED CONFIGURATION,1,0,1,0,0,0,0,0,0.0,100.0
+A,feature,margin_lt100,PyneCore 6.4.6 - BEST SUPPORTED CONFIGURATION,1,0,1,0,0,0,0,0,0.0,100.0
+A,feature,margin_lt100,PineForge (the campaign's own verifier: verify-engine-local.py ladder),1,0,0,0,0,0,1,0,0.0,0.0
 A,feature,margin_lt100,"PineForge (full feed, tape-window)",1,0,1,0,0,0,0,0,0.0,100.0
+A,feature,margin_lt100,PineForge (range-start feed),1,0,1,0,0,0,0,0,0.0,100.0
 A,feature,margin_lt100,"PineForge (full feed, raw)",1,0,1,0,0,0,0,0,0.0,100.0
 A,feature,margin_lt100,"PyneCore 6.9.1 (full feed, --security supplied)",1,0,1,0,0,0,0,0,0.0,100.0
 A,feature,margin_lt100,PyneCore 6.9.1 (full feed),1,0,1,0,0,0,0,0,0.0,100.0
+A,feature,margin_lt100,PyneCore 6.9.1 (--security + the probe's --from/--to window),1,0,1,0,0,0,0,0,0.0,100.0
 A,feature,margin_lt100,PyneCore 6.4.6 (full feed),1,0,1,0,0,0,0,0,0.0,100.0
+A,feature,margin_lt100,"PyneCore 6.9.1 (recompiled 6.0.66, full feed)",1,0,1,0,0,0,0,0,0.0,100.0
+A,feature,magnifier,PineForge - BEST SUPPORTED CONFIGURATION,5,5,0,0,0,0,0,0,100.0,100.0
+A,feature,magnifier,PyneCore 6.9.1 - BEST SUPPORTED CONFIGURATION,5,5,0,0,0,0,0,0,100.0,100.0
+A,feature,magnifier,PyneCore 6.4.6 - BEST SUPPORTED CONFIGURATION,5,5,0,0,0,0,0,0,100.0,100.0
+A,feature,magnifier,PineForge (the campaign's own verifier: verify-engine-local.py ladder),5,0,0,0,0,0,5,0,0.0,0.0
 A,feature,magnifier,"PineForge (full feed, tape-window)",5,5,0,0,0,0,0,0,100.0,100.0
+A,feature,magnifier,PineForge (range-start feed),5,5,0,0,0,0,0,0,100.0,100.0
 A,feature,magnifier,"PineForge (full feed, raw)",5,5,0,0,0,0,0,0,100.0,100.0
 A,feature,magnifier,"PyneCore 6.9.1 (full feed, --security supplied)",5,5,0,0,0,0,0,0,100.0,100.0
 A,feature,magnifier,PyneCore 6.9.1 (full feed),5,5,0,0,0,0,0,0,100.0,100.0
+A,feature,magnifier,PyneCore 6.9.1 (--security + the probe's --from/--to window),5,5,0,0,0,0,0,0,100.0,100.0
 A,feature,magnifier,PyneCore 6.4.6 (full feed),5,5,0,0,0,0,0,0,100.0,100.0
+A,feature,magnifier,"PyneCore 6.9.1 (recompiled 6.0.66, full feed)",5,5,0,0,0,0,0,0,100.0,100.0
+A,feature,var_state,PineForge - BEST SUPPORTED CONFIGURATION,22,17,5,0,0,0,0,0,77.3,100.0
+A,feature,var_state,PyneCore 6.9.1 - BEST SUPPORTED CONFIGURATION,22,17,5,0,0,0,0,0,77.3,100.0
+A,feature,var_state,PyneCore 6.4.6 - BEST SUPPORTED CONFIGURATION,22,16,5,0,0,0,1,0,72.7,95.5
+A,feature,var_state,PineForge (the campaign's own verifier: verify-engine-local.py ladder),22,0,0,0,0,0,22,0,0.0,0.0
 A,feature,var_state,"PineForge (full feed, tape-window)",22,16,6,0,0,0,0,0,72.7,100.0
+A,feature,var_state,PineForge (range-start feed),22,16,6,0,0,0,0,0,72.7,100.0
 A,feature,var_state,"PineForge (full feed, raw)",22,17,5,0,0,0,0,0,77.3,100.0
 A,feature,var_state,"PyneCore 6.9.1 (full feed, --security supplied)",22,17,5,0,0,0,0,0,77.3,100.0
 A,feature,var_state,PyneCore 6.9.1 (full feed),22,17,5,0,0,0,0,0,77.3,100.0
+A,feature,var_state,PyneCore 6.9.1 (--security + the probe's --from/--to window),22,17,5,0,0,0,0,0,77.3,100.0
 A,feature,var_state,PyneCore 6.4.6 (full feed),22,16,5,0,0,0,1,0,72.7,95.5
+A,feature,var_state,"PyneCore 6.9.1 (recompiled 6.0.66, full feed)",22,17,5,0,0,0,0,0,77.3,100.0
+A,feature,arrays,PineForge - BEST SUPPORTED CONFIGURATION,7,6,1,0,0,0,0,0,85.7,100.0
+A,feature,arrays,PyneCore 6.9.1 - BEST SUPPORTED CONFIGURATION,7,4,3,0,0,0,0,0,57.1,100.0
+A,feature,arrays,PyneCore 6.4.6 - BEST SUPPORTED CONFIGURATION,7,4,3,0,0,0,0,0,57.1,100.0
+A,feature,arrays,PineForge (the campaign's own verifier: verify-engine-local.py ladder),7,0,0,0,0,0,7,0,0.0,0.0
 A,feature,arrays,"PineForge (full feed, tape-window)",7,6,1,0,0,0,0,0,85.7,100.0
+A,feature,arrays,PineForge (range-start feed),7,6,1,0,0,0,0,0,85.7,100.0
 A,feature,arrays,"PineForge (full feed, raw)",7,6,1,0,0,0,0,0,85.7,100.0
 A,feature,arrays,"PyneCore 6.9.1 (full feed, --security supplied)",7,4,3,0,0,0,0,0,57.1,100.0
 A,feature,arrays,PyneCore 6.9.1 (full feed),7,4,3,0,0,0,0,0,57.1,100.0
+A,feature,arrays,PyneCore 6.9.1 (--security + the probe's --from/--to window),7,4,3,0,0,0,0,0,57.1,100.0
 A,feature,arrays,PyneCore 6.4.6 (full feed),7,4,3,0,0,0,0,0,57.1,100.0
+A,feature,arrays,"PyneCore 6.9.1 (recompiled 6.0.66, full feed)",7,4,3,0,0,0,0,0,57.1,100.0
+B,primary,trail,PineForge - BEST SUPPORTED CONFIGURATION,7,7,0,0,0,0,0,0,100.0,100.0
+B,primary,trail,PyneCore 6.9.1 - BEST SUPPORTED CONFIGURATION,7,7,0,0,0,0,0,0,100.0,100.0
+B,primary,trail,PyneCore 6.4.6 - BEST SUPPORTED CONFIGURATION,7,0,0,5,0,0,2,0,0.0,0.0
+B,primary,trail,PineForge (the campaign's own verifier: verify-engine-local.py ladder),7,7,0,0,0,0,0,0,100.0,100.0
 B,primary,trail,"PineForge (full feed, tape-window)",7,7,0,0,0,0,0,0,100.0,100.0
 B,primary,trail,PineForge (range-start feed),7,7,0,0,0,0,0,0,100.0,100.0
 B,primary,trail,"PineForge (full feed, raw)",7,7,0,0,0,0,0,0,100.0,100.0
+B,primary,trail,PineForge (+ campaign 1m auxiliary feed),7,7,0,0,0,0,0,0,100.0,100.0
+B,primary,trail,"PineForge (+ campaign 1m auxiliary feed, range-start bound)",7,7,0,0,0,0,0,0,100.0,100.0
 B,primary,trail,"PyneCore 6.9.1 (full feed, --security supplied)",7,7,0,0,0,0,0,0,100.0,100.0
 B,primary,trail,PyneCore 6.9.1 (full feed),7,7,0,0,0,0,0,0,100.0,100.0
 B,primary,trail,PyneCore 6.9.1 (range-start feed),7,7,0,0,0,0,0,0,100.0,100.0
+B,primary,trail,PyneCore 6.9.1 (--security + the probe's --from/--to window),7,7,0,0,0,0,0,0,100.0,100.0
 B,primary,trail,PyneCore 6.4.6 (full feed),7,0,0,5,0,0,2,0,0.0,0.0
 B,primary,trail,PyneCore 6.4.6 (range-start feed),7,0,0,5,0,0,2,0,0.0,0.0
+B,primary,partial,PineForge - BEST SUPPORTED CONFIGURATION,3,3,0,0,0,0,0,0,100.0,100.0
+B,primary,partial,PyneCore 6.9.1 - BEST SUPPORTED CONFIGURATION,3,3,0,0,0,0,0,0,100.0,100.0
+B,primary,partial,PyneCore 6.4.6 - BEST SUPPORTED CONFIGURATION,3,1,0,1,1,0,0,0,33.3,33.3
+B,primary,partial,PineForge (the campaign's own verifier: verify-engine-local.py ladder),3,3,0,0,0,0,0,0,100.0,100.0
 B,primary,partial,"PineForge (full feed, tape-window)",3,3,0,0,0,0,0,0,100.0,100.0
 B,primary,partial,PineForge (range-start feed),3,3,0,0,0,0,0,0,100.0,100.0
 B,primary,partial,"PineForge (full feed, raw)",3,3,0,0,0,0,0,0,100.0,100.0
-B,primary,partial,"PyneCore 6.9.1 (full feed, --security supplied)",3,2,0,0,0,0,0,1,66.7,66.7
-B,primary,partial,PyneCore 6.9.1 (full feed),3,2,0,0,0,0,0,1,66.7,66.7
-B,primary,partial,PyneCore 6.9.1 (range-start feed),3,2,0,0,0,0,0,1,66.7,66.7
-B,primary,partial,PyneCore 6.4.6 (full feed),3,0,0,1,1,0,0,1,0.0,0.0
-B,primary,partial,PyneCore 6.4.6 (range-start feed),3,0,0,1,1,0,0,1,0.0,0.0
+B,primary,partial,PineForge (+ campaign 1m auxiliary feed),3,3,0,0,0,0,0,0,100.0,100.0
+B,primary,partial,"PineForge (+ campaign 1m auxiliary feed, range-start bound)",3,3,0,0,0,0,0,0,100.0,100.0
+B,primary,partial,"PyneCore 6.9.1 (full feed, --security supplied)",3,3,0,0,0,0,0,0,100.0,100.0
+B,primary,partial,PyneCore 6.9.1 (full feed),3,3,0,0,0,0,0,0,100.0,100.0
+B,primary,partial,PyneCore 6.9.1 (range-start feed),3,3,0,0,0,0,0,0,100.0,100.0
+B,primary,partial,PyneCore 6.9.1 (--security + the probe's --from/--to window),3,3,0,0,0,0,0,0,100.0,100.0
+B,primary,partial,PyneCore 6.4.6 (full feed),3,1,0,1,1,0,0,0,33.3,33.3
+B,primary,partial,PyneCore 6.4.6 (range-start feed),3,1,0,1,1,0,0,0,33.3,33.3
+B,primary,brackets,PineForge - BEST SUPPORTED CONFIGURATION,52,52,0,0,0,0,0,0,100.0,100.0
+B,primary,brackets,PyneCore 6.9.1 - BEST SUPPORTED CONFIGURATION,52,47,3,0,2,0,0,0,90.4,96.2
+B,primary,brackets,PyneCore 6.4.6 - BEST SUPPORTED CONFIGURATION,52,38,4,1,2,1,6,0,73.1,80.8
+B,primary,brackets,PineForge (the campaign's own verifier: verify-engine-local.py ladder),52,52,0,0,0,0,0,0,100.0,100.0
 B,primary,brackets,"PineForge (full feed, tape-window)",52,52,0,0,0,0,0,0,100.0,100.0
 B,primary,brackets,PineForge (range-start feed),52,47,2,0,0,3,0,0,90.4,94.2
 B,primary,brackets,"PineForge (full feed, raw)",52,29,19,0,1,3,0,0,55.8,92.3
-B,primary,brackets,"PyneCore 6.9.1 (full feed, --security supplied)",52,18,13,0,0,0,3,18,34.6,59.6
-B,primary,brackets,PyneCore 6.9.1 (full feed),52,18,13,0,0,0,3,18,34.6,59.6
-B,primary,brackets,PyneCore 6.9.1 (range-start feed),52,32,2,0,0,0,0,18,61.5,65.4
-B,primary,brackets,PyneCore 6.4.6 (full feed),52,16,12,1,1,0,4,18,30.8,53.8
-B,primary,brackets,PyneCore 6.4.6 (range-start feed),52,25,3,1,1,0,4,18,48.1,53.8
+B,primary,brackets,PineForge (+ campaign 1m auxiliary feed),52,49,0,0,0,0,3,0,94.2,94.2
+B,primary,brackets,"PineForge (+ campaign 1m auxiliary feed, range-start bound)",52,44,2,0,0,3,3,0,84.6,88.5
+B,primary,brackets,"PyneCore 6.9.1 (full feed, --security supplied)",52,27,19,0,3,0,3,0,51.9,88.5
+B,primary,brackets,PyneCore 6.9.1 (full feed),52,27,19,0,3,0,3,0,51.9,88.5
+B,primary,brackets,PyneCore 6.9.1 (range-start feed),52,47,3,0,2,0,0,0,90.4,96.2
+B,primary,brackets,PyneCore 6.9.1 (--security + the probe's --from/--to window),52,27,19,0,3,0,3,0,51.9,88.5
+B,primary,brackets,PyneCore 6.4.6 (full feed),52,23,18,1,3,1,6,0,44.2,78.8
+B,primary,brackets,PyneCore 6.4.6 (range-start feed),52,38,4,1,2,1,6,0,73.1,80.8
+B,primary,security,PineForge - BEST SUPPORTED CONFIGURATION,18,18,0,0,0,0,0,0,100.0,100.0
+B,primary,security,PyneCore 6.9.1 - BEST SUPPORTED CONFIGURATION,18,8,2,0,5,0,3,0,44.4,55.6
+B,primary,security,PyneCore 6.4.6 - BEST SUPPORTED CONFIGURATION,18,0,0,0,0,0,18,0,0.0,0.0
+B,primary,security,PineForge (the campaign's own verifier: verify-engine-local.py ladder),18,18,0,0,0,0,0,0,100.0,100.0
 B,primary,security,"PineForge (full feed, tape-window)",18,18,0,0,0,0,0,0,100.0,100.0
 B,primary,security,PineForge (range-start feed),18,17,1,0,0,0,0,0,94.4,100.0
 B,primary,security,"PineForge (full feed, raw)",18,15,2,1,0,0,0,0,83.3,94.4
-B,primary,security,"PyneCore 6.9.1 (full feed, --security supplied)",18,0,0,0,5,0,12,1,0.0,0.0
-B,primary,security,PyneCore 6.9.1 (full feed),18,0,0,0,0,0,17,1,0.0,0.0
-B,primary,security,PyneCore 6.9.1 (range-start feed),18,5,2,0,0,0,10,1,27.8,38.9
-B,primary,security,PyneCore 6.4.6 (full feed),18,0,0,0,0,0,17,1,0.0,0.0
-B,primary,security,PyneCore 6.4.6 (range-start feed),18,0,0,0,0,0,17,1,0.0,0.0
+B,primary,security,PineForge (+ campaign 1m auxiliary feed),18,16,0,0,0,0,2,0,88.9,88.9
+B,primary,security,"PineForge (+ campaign 1m auxiliary feed, range-start bound)",18,15,1,0,0,0,2,0,83.3,88.9
+B,primary,security,"PyneCore 6.9.1 (full feed, --security supplied)",18,1,0,0,5,0,12,0,5.6,5.6
+B,primary,security,PyneCore 6.9.1 (full feed),18,1,0,0,0,0,17,0,5.6,5.6
+B,primary,security,PyneCore 6.9.1 (range-start feed),18,6,2,0,0,0,10,0,33.3,44.4
+B,primary,security,PyneCore 6.9.1 (+ campaign 1m feed via --security),18,2,0,0,0,0,0,16,11.1,11.1
+B,primary,security,"PyneCore 6.9.1 (+ campaign 1m feed via --security, range-start feed)",18,1,1,0,0,0,0,16,5.6,11.1
+B,primary,security,PyneCore 6.9.1 (--security + the probe's --from/--to window),18,2,0,0,5,0,11,0,11.1,11.1
+B,primary,security,PyneCore 6.4.6 (full feed),18,0,0,0,0,0,18,0,0.0,0.0
+B,primary,security,PyneCore 6.4.6 (range-start feed),18,0,0,0,0,0,18,0,0.0,0.0
+B,primary,plain,PineForge - BEST SUPPORTED CONFIGURATION,231,230,1,0,0,0,0,0,99.6,100.0
+B,primary,plain,PyneCore 6.9.1 - BEST SUPPORTED CONFIGURATION,231,207,19,0,4,1,0,0,89.6,97.8
+B,primary,plain,PyneCore 6.4.6 - BEST SUPPORTED CONFIGURATION,231,194,21,1,8,0,7,0,84.0,93.1
+B,primary,plain,PineForge (the campaign's own verifier: verify-engine-local.py ladder),231,230,1,0,0,0,0,0,99.6,100.0
 B,primary,plain,"PineForge (full feed, tape-window)",231,231,0,0,0,0,0,0,100.0,100.0
 B,primary,plain,PineForge (range-start feed),231,208,21,0,1,1,0,0,90.0,99.1
 B,primary,plain,"PineForge (full feed, raw)",231,213,13,1,1,3,0,0,92.2,97.8
-B,primary,plain,"PyneCore 6.9.1 (full feed, --security supplied)",231,63,18,0,2,1,0,147,27.3,35.1
-B,primary,plain,PyneCore 6.9.1 (full feed),231,63,18,0,2,1,0,147,27.3,35.1
-B,primary,plain,PyneCore 6.9.1 (range-start feed),231,71,11,0,2,0,0,147,30.7,35.5
-B,primary,plain,PyneCore 6.4.6 (full feed),231,60,17,0,3,2,2,147,26.0,33.3
-B,primary,plain,PyneCore 6.4.6 (range-start feed),231,67,11,0,4,0,2,147,29.0,33.8
+B,primary,plain,PineForge (+ campaign 1m auxiliary feed),231,230,0,0,0,0,1,0,99.6,99.6
+B,primary,plain,"PineForge (+ campaign 1m auxiliary feed, range-start bound)",231,207,21,0,1,1,1,0,89.6,98.7
+B,primary,plain,"PyneCore 6.9.1 (full feed, --security supplied)",231,192,32,0,4,3,0,0,83.1,97.0
+B,primary,plain,PyneCore 6.9.1 (full feed),231,192,32,0,4,3,0,0,83.1,97.0
+B,primary,plain,PyneCore 6.9.1 (range-start feed),231,200,26,0,4,1,0,0,86.6,97.8
+B,primary,plain,PyneCore 6.9.1 (--security + the probe's --from/--to window),231,192,32,0,4,3,0,0,83.1,97.0
+B,primary,plain,PyneCore 6.4.6 (full feed),231,181,32,1,7,3,7,0,78.4,92.2
+B,primary,plain,PyneCore 6.4.6 (range-start feed),231,187,28,1,8,0,7,0,81.0,93.1
+B,feature,trail,PineForge - BEST SUPPORTED CONFIGURATION,7,7,0,0,0,0,0,0,100.0,100.0
+B,feature,trail,PyneCore 6.9.1 - BEST SUPPORTED CONFIGURATION,7,7,0,0,0,0,0,0,100.0,100.0
+B,feature,trail,PyneCore 6.4.6 - BEST SUPPORTED CONFIGURATION,7,0,0,5,0,0,2,0,0.0,0.0
+B,feature,trail,PineForge (the campaign's own verifier: verify-engine-local.py ladder),7,7,0,0,0,0,0,0,100.0,100.0
 B,feature,trail,"PineForge (full feed, tape-window)",7,7,0,0,0,0,0,0,100.0,100.0
 B,feature,trail,PineForge (range-start feed),7,7,0,0,0,0,0,0,100.0,100.0
 B,feature,trail,"PineForge (full feed, raw)",7,7,0,0,0,0,0,0,100.0,100.0
+B,feature,trail,PineForge (+ campaign 1m auxiliary feed),7,7,0,0,0,0,0,0,100.0,100.0
+B,feature,trail,"PineForge (+ campaign 1m auxiliary feed, range-start bound)",7,7,0,0,0,0,0,0,100.0,100.0
 B,feature,trail,"PyneCore 6.9.1 (full feed, --security supplied)",7,7,0,0,0,0,0,0,100.0,100.0
 B,feature,trail,PyneCore 6.9.1 (full feed),7,7,0,0,0,0,0,0,100.0,100.0
 B,feature,trail,PyneCore 6.9.1 (range-start feed),7,7,0,0,0,0,0,0,100.0,100.0
+B,feature,trail,PyneCore 6.9.1 (--security + the probe's --from/--to window),7,7,0,0,0,0,0,0,100.0,100.0
 B,feature,trail,PyneCore 6.4.6 (full feed),7,0,0,5,0,0,2,0,0.0,0.0
 B,feature,trail,PyneCore 6.4.6 (range-start feed),7,0,0,5,0,0,2,0,0.0,0.0
+B,feature,brackets,PineForge - BEST SUPPORTED CONFIGURATION,59,59,0,0,0,0,0,0,100.0,100.0
+B,feature,brackets,PyneCore 6.9.1 - BEST SUPPORTED CONFIGURATION,59,54,3,0,2,0,0,0,91.5,96.6
+B,feature,brackets,PyneCore 6.4.6 - BEST SUPPORTED CONFIGURATION,59,38,4,7,3,1,6,0,64.4,71.2
+B,feature,brackets,PineForge (the campaign's own verifier: verify-engine-local.py ladder),59,59,0,0,0,0,0,0,100.0,100.0
 B,feature,brackets,"PineForge (full feed, tape-window)",59,59,0,0,0,0,0,0,100.0,100.0
 B,feature,brackets,PineForge (range-start feed),59,54,2,0,0,3,0,0,91.5,94.9
 B,feature,brackets,"PineForge (full feed, raw)",59,36,19,0,1,3,0,0,61.0,93.2
-B,feature,brackets,"PyneCore 6.9.1 (full feed, --security supplied)",59,25,13,0,0,0,3,18,42.4,64.4
-B,feature,brackets,PyneCore 6.9.1 (full feed),59,25,13,0,0,0,3,18,42.4,64.4
-B,feature,brackets,PyneCore 6.9.1 (range-start feed),59,39,2,0,0,0,0,18,66.1,69.5
-B,feature,brackets,PyneCore 6.4.6 (full feed),59,16,12,7,2,0,4,18,27.1,47.5
-B,feature,brackets,PyneCore 6.4.6 (range-start feed),59,25,3,7,2,0,4,18,42.4,47.5
+B,feature,brackets,PineForge (+ campaign 1m auxiliary feed),59,56,0,0,0,0,3,0,94.9,94.9
+B,feature,brackets,"PineForge (+ campaign 1m auxiliary feed, range-start bound)",59,51,2,0,0,3,3,0,86.4,89.8
+B,feature,brackets,"PyneCore 6.9.1 (full feed, --security supplied)",59,34,19,0,3,0,3,0,57.6,89.8
+B,feature,brackets,PyneCore 6.9.1 (full feed),59,34,19,0,3,0,3,0,57.6,89.8
+B,feature,brackets,PyneCore 6.9.1 (range-start feed),59,54,3,0,2,0,0,0,91.5,96.6
+B,feature,brackets,PyneCore 6.9.1 (--security + the probe's --from/--to window),59,34,19,0,3,0,3,0,57.6,89.8
+B,feature,brackets,PyneCore 6.4.6 (full feed),59,23,18,7,4,1,6,0,39.0,69.5
+B,feature,brackets,PyneCore 6.4.6 (range-start feed),59,38,4,7,3,1,6,0,64.4,71.2
+B,feature,partial,PineForge - BEST SUPPORTED CONFIGURATION,3,3,0,0,0,0,0,0,100.0,100.0
+B,feature,partial,PyneCore 6.9.1 - BEST SUPPORTED CONFIGURATION,3,3,0,0,0,0,0,0,100.0,100.0
+B,feature,partial,PyneCore 6.4.6 - BEST SUPPORTED CONFIGURATION,3,1,0,1,1,0,0,0,33.3,33.3
+B,feature,partial,PineForge (the campaign's own verifier: verify-engine-local.py ladder),3,3,0,0,0,0,0,0,100.0,100.0
 B,feature,partial,"PineForge (full feed, tape-window)",3,3,0,0,0,0,0,0,100.0,100.0
 B,feature,partial,PineForge (range-start feed),3,3,0,0,0,0,0,0,100.0,100.0
 B,feature,partial,"PineForge (full feed, raw)",3,3,0,0,0,0,0,0,100.0,100.0
-B,feature,partial,"PyneCore 6.9.1 (full feed, --security supplied)",3,2,0,0,0,0,0,1,66.7,66.7
-B,feature,partial,PyneCore 6.9.1 (full feed),3,2,0,0,0,0,0,1,66.7,66.7
-B,feature,partial,PyneCore 6.9.1 (range-start feed),3,2,0,0,0,0,0,1,66.7,66.7
-B,feature,partial,PyneCore 6.4.6 (full feed),3,0,0,1,1,0,0,1,0.0,0.0
-B,feature,partial,PyneCore 6.4.6 (range-start feed),3,0,0,1,1,0,0,1,0.0,0.0
+B,feature,partial,PineForge (+ campaign 1m auxiliary feed),3,3,0,0,0,0,0,0,100.0,100.0
+B,feature,partial,"PineForge (+ campaign 1m auxiliary feed, range-start bound)",3,3,0,0,0,0,0,0,100.0,100.0
+B,feature,partial,"PyneCore 6.9.1 (full feed, --security supplied)",3,3,0,0,0,0,0,0,100.0,100.0
+B,feature,partial,PyneCore 6.9.1 (full feed),3,3,0,0,0,0,0,0,100.0,100.0
+B,feature,partial,PyneCore 6.9.1 (range-start feed),3,3,0,0,0,0,0,0,100.0,100.0
+B,feature,partial,PyneCore 6.9.1 (--security + the probe's --from/--to window),3,3,0,0,0,0,0,0,100.0,100.0
+B,feature,partial,PyneCore 6.4.6 (full feed),3,1,0,1,1,0,0,0,33.3,33.3
+B,feature,partial,PyneCore 6.4.6 (range-start feed),3,1,0,1,1,0,0,0,33.3,33.3
+B,feature,pyramiding,PineForge - BEST SUPPORTED CONFIGURATION,10,10,0,0,0,0,0,0,100.0,100.0
+B,feature,pyramiding,PyneCore 6.9.1 - BEST SUPPORTED CONFIGURATION,10,9,0,0,0,1,0,0,90.0,90.0
+B,feature,pyramiding,PyneCore 6.4.6 - BEST SUPPORTED CONFIGURATION,10,8,0,1,0,0,1,0,80.0,80.0
+B,feature,pyramiding,PineForge (the campaign's own verifier: verify-engine-local.py ladder),10,10,0,0,0,0,0,0,100.0,100.0
 B,feature,pyramiding,"PineForge (full feed, tape-window)",10,10,0,0,0,0,0,0,100.0,100.0
 B,feature,pyramiding,PineForge (range-start feed),10,9,0,0,0,1,0,0,90.0,90.0
 B,feature,pyramiding,"PineForge (full feed, raw)",10,7,2,0,0,1,0,0,70.0,90.0
-B,feature,pyramiding,"PyneCore 6.9.1 (full feed, --security supplied)",10,2,0,0,0,0,0,8,20.0,20.0
-B,feature,pyramiding,PyneCore 6.9.1 (full feed),10,2,0,0,0,0,0,8,20.0,20.0
-B,feature,pyramiding,PyneCore 6.9.1 (range-start feed),10,2,0,0,0,0,0,8,20.0,20.0
-B,feature,pyramiding,PyneCore 6.4.6 (full feed),10,2,0,0,0,0,0,8,20.0,20.0
-B,feature,pyramiding,PyneCore 6.4.6 (range-start feed),10,2,0,0,0,0,0,8,20.0,20.0
+B,feature,pyramiding,PineForge (+ campaign 1m auxiliary feed),10,10,0,0,0,0,0,0,100.0,100.0
+B,feature,pyramiding,"PineForge (+ campaign 1m auxiliary feed, range-start bound)",10,9,0,0,0,1,0,0,90.0,90.0
+B,feature,pyramiding,"PyneCore 6.9.1 (full feed, --security supplied)",10,8,1,0,0,1,0,0,80.0,90.0
+B,feature,pyramiding,PyneCore 6.9.1 (full feed),10,8,1,0,0,1,0,0,80.0,90.0
+B,feature,pyramiding,PyneCore 6.9.1 (range-start feed),10,8,1,0,0,1,0,0,80.0,90.0
+B,feature,pyramiding,PyneCore 6.9.1 (--security + the probe's --from/--to window),10,8,1,0,0,1,0,0,80.0,90.0
+B,feature,pyramiding,PyneCore 6.4.6 (full feed),10,7,1,1,0,0,1,0,70.0,80.0
+B,feature,pyramiding,PyneCore 6.4.6 (range-start feed),10,7,1,1,0,0,1,0,70.0,80.0
+B,feature,calc_on_fills,PineForge - BEST SUPPORTED CONFIGURATION,1,1,0,0,0,0,0,0,100.0,100.0
+B,feature,calc_on_fills,PyneCore 6.9.1 - BEST SUPPORTED CONFIGURATION,1,0,1,0,0,0,0,0,0.0,100.0
+B,feature,calc_on_fills,PyneCore 6.4.6 - BEST SUPPORTED CONFIGURATION,1,0,1,0,0,0,0,0,0.0,100.0
+B,feature,calc_on_fills,PineForge (the campaign's own verifier: verify-engine-local.py ladder),1,1,0,0,0,0,0,0,100.0,100.0
 B,feature,calc_on_fills,"PineForge (full feed, tape-window)",1,1,0,0,0,0,0,0,100.0,100.0
 B,feature,calc_on_fills,PineForge (range-start feed),1,1,0,0,0,0,0,0,100.0,100.0
 B,feature,calc_on_fills,"PineForge (full feed, raw)",1,1,0,0,0,0,0,0,100.0,100.0
+B,feature,calc_on_fills,PineForge (+ campaign 1m auxiliary feed),1,1,0,0,0,0,0,0,100.0,100.0
+B,feature,calc_on_fills,"PineForge (+ campaign 1m auxiliary feed, range-start bound)",1,1,0,0,0,0,0,0,100.0,100.0
 B,feature,calc_on_fills,"PyneCore 6.9.1 (full feed, --security supplied)",1,0,1,0,0,0,0,0,0.0,100.0
 B,feature,calc_on_fills,PyneCore 6.9.1 (full feed),1,0,1,0,0,0,0,0,0.0,100.0
 B,feature,calc_on_fills,PyneCore 6.9.1 (range-start feed),1,0,1,0,0,0,0,0,0.0,100.0
+B,feature,calc_on_fills,PyneCore 6.9.1 (--security + the probe's --from/--to window),1,0,1,0,0,0,0,0,0.0,100.0
 B,feature,calc_on_fills,PyneCore 6.4.6 (full feed),1,0,1,0,0,0,0,0,0.0,100.0
 B,feature,calc_on_fills,PyneCore 6.4.6 (range-start feed),1,0,1,0,0,0,0,0,0.0,100.0
+B,feature,pooc,PineForge - BEST SUPPORTED CONFIGURATION,4,4,0,0,0,0,0,0,100.0,100.0
+B,feature,pooc,PyneCore 6.9.1 - BEST SUPPORTED CONFIGURATION,4,3,1,0,0,0,0,0,75.0,100.0
+B,feature,pooc,PyneCore 6.4.6 - BEST SUPPORTED CONFIGURATION,4,3,1,0,0,0,0,0,75.0,100.0
+B,feature,pooc,PineForge (the campaign's own verifier: verify-engine-local.py ladder),4,4,0,0,0,0,0,0,100.0,100.0
 B,feature,pooc,"PineForge (full feed, tape-window)",4,4,0,0,0,0,0,0,100.0,100.0
 B,feature,pooc,PineForge (range-start feed),4,4,0,0,0,0,0,0,100.0,100.0
 B,feature,pooc,"PineForge (full feed, raw)",4,4,0,0,0,0,0,0,100.0,100.0
-B,feature,pooc,"PyneCore 6.9.1 (full feed, --security supplied)",4,1,1,0,0,0,0,2,25.0,50.0
-B,feature,pooc,PyneCore 6.9.1 (full feed),4,1,1,0,0,0,0,2,25.0,50.0
-B,feature,pooc,PyneCore 6.9.1 (range-start feed),4,1,1,0,0,0,0,2,25.0,50.0
-B,feature,pooc,PyneCore 6.4.6 (full feed),4,1,1,0,0,0,0,2,25.0,50.0
-B,feature,pooc,PyneCore 6.4.6 (range-start feed),4,1,1,0,0,0,0,2,25.0,50.0
+B,feature,pooc,PineForge (+ campaign 1m auxiliary feed),4,4,0,0,0,0,0,0,100.0,100.0
+B,feature,pooc,"PineForge (+ campaign 1m auxiliary feed, range-start bound)",4,4,0,0,0,0,0,0,100.0,100.0
+B,feature,pooc,"PyneCore 6.9.1 (full feed, --security supplied)",4,3,1,0,0,0,0,0,75.0,100.0
+B,feature,pooc,PyneCore 6.9.1 (full feed),4,3,1,0,0,0,0,0,75.0,100.0
+B,feature,pooc,PyneCore 6.9.1 (range-start feed),4,3,1,0,0,0,0,0,75.0,100.0
+B,feature,pooc,PyneCore 6.9.1 (--security + the probe's --from/--to window),4,3,1,0,0,0,0,0,75.0,100.0
+B,feature,pooc,PyneCore 6.4.6 (full feed),4,3,1,0,0,0,0,0,75.0,100.0
+B,feature,pooc,PyneCore 6.4.6 (range-start feed),4,3,1,0,0,0,0,0,75.0,100.0
+B,feature,margin_lt100,PineForge - BEST SUPPORTED CONFIGURATION,1,0,1,0,0,0,0,0,0.0,100.0
+B,feature,margin_lt100,PyneCore 6.9.1 - BEST SUPPORTED CONFIGURATION,1,0,1,0,0,0,0,0,0.0,100.0
+B,feature,margin_lt100,PyneCore 6.4.6 - BEST SUPPORTED CONFIGURATION,1,0,1,0,0,0,0,0,0.0,100.0
+B,feature,margin_lt100,PineForge (the campaign's own verifier: verify-engine-local.py ladder),1,0,1,0,0,0,0,0,0.0,100.0
 B,feature,margin_lt100,"PineForge (full feed, tape-window)",1,1,0,0,0,0,0,0,100.0,100.0
 B,feature,margin_lt100,PineForge (range-start feed),1,1,0,0,0,0,0,0,100.0,100.0
 B,feature,margin_lt100,"PineForge (full feed, raw)",1,0,0,1,0,0,0,0,0.0,0.0
+B,feature,margin_lt100,PineForge (+ campaign 1m auxiliary feed),1,1,0,0,0,0,0,0,100.0,100.0
+B,feature,margin_lt100,"PineForge (+ campaign 1m auxiliary feed, range-start bound)",1,1,0,0,0,0,0,0,100.0,100.0
+B,feature,margin_lt100,"PyneCore 6.9.1 (full feed, --security supplied)",1,0,1,0,0,0,0,0,0.0,100.0
+B,feature,margin_lt100,PyneCore 6.9.1 (full feed),1,0,1,0,0,0,0,0,0.0,100.0
+B,feature,margin_lt100,PyneCore 6.9.1 (range-start feed),1,0,1,0,0,0,0,0,0.0,100.0
+B,feature,margin_lt100,PyneCore 6.9.1 (--security + the probe's --from/--to window),1,0,1,0,0,0,0,0,0.0,100.0
+B,feature,margin_lt100,PyneCore 6.4.6 (full feed),1,0,1,0,0,0,0,0,0.0,100.0
+B,feature,margin_lt100,PyneCore 6.4.6 (range-start feed),1,0,1,0,0,0,0,0,0.0,100.0
+B,feature,security,PineForge - BEST SUPPORTED CONFIGURATION,22,22,0,0,0,0,0,0,100.0,100.0
+B,feature,security,PyneCore 6.9.1 - BEST SUPPORTED CONFIGURATION,22,12,2,0,5,0,3,0,54.5,63.6
+B,feature,security,PyneCore 6.4.6 - BEST SUPPORTED CONFIGURATION,22,0,0,0,0,0,22,0,0.0,0.0
+B,feature,security,PineForge (the campaign's own verifier: verify-engine-local.py ladder),22,22,0,0,0,0,0,0,100.0,100.0
 B,feature,security,"PineForge (full feed, tape-window)",22,22,0,0,0,0,0,0,100.0,100.0
 B,feature,security,PineForge (range-start feed),22,21,1,0,0,0,0,0,95.5,100.0
 B,feature,security,"PineForge (full feed, raw)",22,18,3,1,0,0,0,0,81.8,95.5
-B,feature,security,"PyneCore 6.9.1 (full feed, --security supplied)",22,1,0,0,5,0,15,1,4.5,4.5
-B,feature,security,PyneCore 6.9.1 (full feed),22,1,0,0,0,0,20,1,4.5,4.5
-B,feature,security,PyneCore 6.9.1 (range-start feed),22,9,2,0,0,0,10,1,40.9,50.0
-B,feature,security,PyneCore 6.4.6 (full feed),22,0,0,0,0,0,21,1,0.0,0.0
-B,feature,security,PyneCore 6.4.6 (range-start feed),22,0,0,0,0,0,21,1,0.0,0.0
+B,feature,security,PineForge (+ campaign 1m auxiliary feed),22,20,0,0,0,0,2,0,90.9,90.9
+B,feature,security,"PineForge (+ campaign 1m auxiliary feed, range-start bound)",22,19,1,0,0,0,2,0,86.4,90.9
+B,feature,security,"PyneCore 6.9.1 (full feed, --security supplied)",22,2,0,0,5,0,15,0,9.1,9.1
+B,feature,security,PyneCore 6.9.1 (full feed),22,2,0,0,0,0,20,0,9.1,9.1
+B,feature,security,PyneCore 6.9.1 (range-start feed),22,10,2,0,0,0,10,0,45.5,54.5
+B,feature,security,PyneCore 6.9.1 (+ campaign 1m feed via --security),22,2,0,0,0,0,0,20,9.1,9.1
+B,feature,security,"PyneCore 6.9.1 (+ campaign 1m feed via --security, range-start feed)",22,1,1,0,0,0,0,20,4.5,9.1
+B,feature,security,PyneCore 6.9.1 (--security + the probe's --from/--to window),22,3,0,0,5,0,14,0,13.6,13.6
+B,feature,security,PyneCore 6.4.6 (full feed),22,0,0,0,0,0,22,0,0.0,0.0
+B,feature,security,PyneCore 6.4.6 (range-start feed),22,0,0,0,0,0,22,0,0.0,0.0
+B,feature,magnifier,PineForge - BEST SUPPORTED CONFIGURATION,5,5,0,0,0,0,0,0,100.0,100.0
+B,feature,magnifier,PyneCore 6.9.1 - BEST SUPPORTED CONFIGURATION,5,5,0,0,0,0,0,0,100.0,100.0
+B,feature,magnifier,PyneCore 6.4.6 - BEST SUPPORTED CONFIGURATION,5,5,0,0,0,0,0,0,100.0,100.0
+B,feature,magnifier,PineForge (the campaign's own verifier: verify-engine-local.py ladder),5,5,0,0,0,0,0,0,100.0,100.0
 B,feature,magnifier,"PineForge (full feed, tape-window)",5,5,0,0,0,0,0,0,100.0,100.0
 B,feature,magnifier,PineForge (range-start feed),5,5,0,0,0,0,0,0,100.0,100.0
 B,feature,magnifier,"PineForge (full feed, raw)",5,5,0,0,0,0,0,0,100.0,100.0
-B,feature,magnifier,"PyneCore 6.9.1 (full feed, --security supplied)",5,4,0,0,0,0,0,1,80.0,80.0
-B,feature,magnifier,PyneCore 6.9.1 (full feed),5,4,0,0,0,0,0,1,80.0,80.0
-B,feature,magnifier,PyneCore 6.9.1 (range-start feed),5,4,0,0,0,0,0,1,80.0,80.0
-B,feature,magnifier,PyneCore 6.4.6 (full feed),5,4,0,0,0,0,0,1,80.0,80.0
-B,feature,magnifier,PyneCore 6.4.6 (range-start feed),5,4,0,0,0,0,0,1,80.0,80.0
+B,feature,magnifier,PineForge (+ campaign 1m auxiliary feed),5,1,0,0,0,0,4,0,20.0,20.0
+B,feature,magnifier,"PineForge (+ campaign 1m auxiliary feed, range-start bound)",5,1,0,0,0,0,4,0,20.0,20.0
+B,feature,magnifier,"PyneCore 6.9.1 (full feed, --security supplied)",5,5,0,0,0,0,0,0,100.0,100.0
+B,feature,magnifier,PyneCore 6.9.1 (full feed),5,5,0,0,0,0,0,0,100.0,100.0
+B,feature,magnifier,PyneCore 6.9.1 (range-start feed),5,5,0,0,0,0,0,0,100.0,100.0
+B,feature,magnifier,PyneCore 6.9.1 (--security + the probe's --from/--to window),5,5,0,0,0,0,0,0,100.0,100.0
+B,feature,magnifier,PyneCore 6.4.6 (full feed),5,5,0,0,0,0,0,0,100.0,100.0
+B,feature,magnifier,PyneCore 6.4.6 (range-start feed),5,5,0,0,0,0,0,0,100.0,100.0
+B,feature,var_state,PineForge - BEST SUPPORTED CONFIGURATION,82,82,0,0,0,0,0,0,100.0,100.0
+B,feature,var_state,PyneCore 6.9.1 - BEST SUPPORTED CONFIGURATION,82,74,6,0,2,0,0,0,90.2,97.6
+B,feature,var_state,PyneCore 6.4.6 - BEST SUPPORTED CONFIGURATION,82,63,6,0,0,1,12,0,76.8,84.1
+B,feature,var_state,PineForge (the campaign's own verifier: verify-engine-local.py ladder),82,82,0,0,0,0,0,0,100.0,100.0
 B,feature,var_state,"PineForge (full feed, tape-window)",82,82,0,0,0,0,0,0,100.0,100.0
 B,feature,var_state,PineForge (range-start feed),82,71,8,0,0,3,0,0,86.6,96.3
 B,feature,var_state,"PineForge (full feed, raw)",82,71,7,0,1,3,0,0,86.6,95.1
-B,feature,var_state,"PyneCore 6.9.1 (full feed, --security supplied)",82,33,7,0,1,0,3,38,40.2,48.8
-B,feature,var_state,PyneCore 6.9.1 (full feed),82,33,7,0,0,0,4,38,40.2,48.8
-B,feature,var_state,PyneCore 6.9.1 (range-start feed),82,39,4,0,0,0,1,38,47.6,52.4
-B,feature,var_state,PyneCore 6.4.6 (full feed),82,30,8,0,0,0,6,38,36.6,46.3
-B,feature,var_state,PyneCore 6.4.6 (range-start feed),82,33,5,0,0,0,6,38,40.2,46.3
+B,feature,var_state,PineForge (+ campaign 1m auxiliary feed),82,81,0,0,0,0,1,0,98.8,98.8
+B,feature,var_state,"PineForge (+ campaign 1m auxiliary feed, range-start bound)",82,70,8,0,0,3,1,0,85.4,95.1
+B,feature,var_state,"PyneCore 6.9.1 (full feed, --security supplied)",82,64,12,0,3,0,3,0,78.0,92.7
+B,feature,var_state,PyneCore 6.9.1 (full feed),82,64,12,0,2,0,4,0,78.0,92.7
+B,feature,var_state,PyneCore 6.9.1 (range-start feed),82,74,6,0,1,0,1,0,90.2,97.6
+B,feature,var_state,PyneCore 6.9.1 (--security + the probe's --from/--to window),82,64,12,0,3,0,3,0,78.0,92.7
+B,feature,var_state,PyneCore 6.4.6 (full feed),82,56,12,0,1,1,12,0,68.3,82.9
+B,feature,var_state,PyneCore 6.4.6 (range-start feed),82,63,6,0,0,1,12,0,76.8,84.1
+B,feature,arrays,PineForge - BEST SUPPORTED CONFIGURATION,22,22,0,0,0,0,0,0,100.0,100.0
+B,feature,arrays,PyneCore 6.9.1 - BEST SUPPORTED CONFIGURATION,22,19,2,0,1,0,0,0,86.4,95.5
+B,feature,arrays,PyneCore 6.4.6 - BEST SUPPORTED CONFIGURATION,22,17,2,0,0,0,3,0,77.3,86.4
+B,feature,arrays,PineForge (the campaign's own verifier: verify-engine-local.py ladder),22,22,0,0,0,0,0,0,100.0,100.0
 B,feature,arrays,"PineForge (full feed, tape-window)",22,22,0,0,0,0,0,0,100.0,100.0
 B,feature,arrays,PineForge (range-start feed),22,18,4,0,0,0,0,0,81.8,100.0
 B,feature,arrays,"PineForge (full feed, raw)",22,17,5,0,0,0,0,0,77.3,100.0
-B,feature,arrays,"PyneCore 6.9.1 (full feed, --security supplied)",22,7,9,0,1,0,2,3,31.8,72.7
-B,feature,arrays,PyneCore 6.9.1 (full feed),22,7,9,0,0,0,3,3,31.8,72.7
-B,feature,arrays,PyneCore 6.9.1 (range-start feed),22,14,2,0,0,0,3,3,63.6,72.7
-B,feature,arrays,PyneCore 6.4.6 (full feed),22,7,9,0,0,0,3,3,31.8,72.7
-B,feature,arrays,PyneCore 6.4.6 (range-start feed),22,14,2,0,0,0,3,3,63.6,72.7
+B,feature,arrays,PineForge (+ campaign 1m auxiliary feed),22,20,0,0,0,0,2,0,90.9,90.9
+B,feature,arrays,"PineForge (+ campaign 1m auxiliary feed, range-start bound)",22,16,4,0,0,0,2,0,72.7,90.9
+B,feature,arrays,"PyneCore 6.9.1 (full feed, --security supplied)",22,9,10,0,1,0,2,0,40.9,86.4
+B,feature,arrays,PyneCore 6.9.1 (full feed),22,9,10,0,0,0,3,0,40.9,86.4
+B,feature,arrays,PyneCore 6.9.1 (range-start feed),22,16,3,0,0,0,3,0,72.7,86.4
+B,feature,arrays,PyneCore 6.9.1 (+ campaign 1m feed via --security),22,2,0,0,0,0,0,20,9.1,9.1
+B,feature,arrays,"PyneCore 6.9.1 (+ campaign 1m feed via --security, range-start feed)",22,1,1,0,0,0,0,20,4.5,9.1
+B,feature,arrays,PyneCore 6.9.1 (--security + the probe's --from/--to window),22,11,10,0,1,0,0,0,50.0,95.5
+B,feature,arrays,PyneCore 6.4.6 (full feed),22,9,10,0,0,0,3,0,40.9,86.4
+B,feature,arrays,PyneCore 6.4.6 (range-start feed),22,16,3,0,0,0,3,0,72.7,86.4
+B,feature,udt,PineForge - BEST SUPPORTED CONFIGURATION,29,29,0,0,0,0,0,0,100.0,100.0
+B,feature,udt,PyneCore 6.9.1 - BEST SUPPORTED CONFIGURATION,29,28,1,0,0,0,0,0,96.6,100.0
+B,feature,udt,PyneCore 6.4.6 - BEST SUPPORTED CONFIGURATION,29,23,0,0,0,0,6,0,79.3,79.3
+B,feature,udt,PineForge (the campaign's own verifier: verify-engine-local.py ladder),29,29,0,0,0,0,0,0,100.0,100.0
 B,feature,udt,"PineForge (full feed, tape-window)",29,29,0,0,0,0,0,0,100.0,100.0
 B,feature,udt,PineForge (range-start feed),29,24,2,0,0,3,0,0,82.8,89.7
 B,feature,udt,"PineForge (full feed, raw)",29,24,2,0,0,3,0,0,82.8,89.7
-B,feature,udt,"PyneCore 6.9.1 (full feed, --security supplied)",29,1,0,0,0,0,0,28,3.4,3.4
-B,feature,udt,PyneCore 6.9.1 (full feed),29,1,0,0,0,0,0,28,3.4,3.4
-B,feature,udt,PyneCore 6.9.1 (range-start feed),29,1,0,0,0,0,0,28,3.4,3.4
-B,feature,udt,PyneCore 6.4.6 (full feed),29,1,0,0,0,0,0,28,3.4,3.4
-B,feature,udt,PyneCore 6.4.6 (range-start feed),29,1,0,0,0,0,0,28,3.4,3.4
+B,feature,udt,PineForge (+ campaign 1m auxiliary feed),29,29,0,0,0,0,0,0,100.0,100.0
+B,feature,udt,"PineForge (+ campaign 1m auxiliary feed, range-start bound)",29,24,2,0,0,3,0,0,82.8,89.7
+B,feature,udt,"PyneCore 6.9.1 (full feed, --security supplied)",29,26,3,0,0,0,0,0,89.7,100.0
+B,feature,udt,PyneCore 6.9.1 (full feed),29,26,3,0,0,0,0,0,89.7,100.0
+B,feature,udt,PyneCore 6.9.1 (range-start feed),29,28,1,0,0,0,0,0,96.6,100.0
+B,feature,udt,PyneCore 6.9.1 (--security + the probe's --from/--to window),29,26,3,0,0,0,0,0,89.7,100.0
+B,feature,udt,PyneCore 6.4.6 (full feed),29,21,2,0,0,0,6,0,72.4,79.3
+B,feature,udt,PyneCore 6.4.6 (range-start feed),29,23,0,0,0,0,6,0,79.3,79.3
+C,primary,trail,PineForge - BEST SUPPORTED CONFIGURATION,10,9,1,0,0,0,0,0,90.0,100.0
+C,primary,trail,PyneCore 6.9.1 - BEST SUPPORTED CONFIGURATION,10,3,1,1,5,0,0,0,30.0,40.0
+C,primary,trail,PyneCore 6.4.6 - BEST SUPPORTED CONFIGURATION,10,1,0,3,1,0,5,0,10.0,10.0
+C,primary,trail,PineForge (the campaign's own verifier: verify-engine-local.py ladder),10,9,1,0,0,0,0,0,90.0,100.0
 C,primary,trail,"PineForge (full feed, tape-window)",10,9,1,0,0,0,0,0,90.0,100.0
 C,primary,trail,PineForge (range-start feed),10,9,1,0,0,0,0,0,90.0,100.0
 C,primary,trail,"PineForge (full feed, raw)",10,6,1,3,0,0,0,0,60.0,70.0
+C,primary,trail,PineForge (+ campaign 1m auxiliary feed),10,7,1,0,0,0,2,0,70.0,80.0
+C,primary,trail,"PineForge (+ campaign 1m auxiliary feed, range-start bound)",10,9,1,0,0,0,0,0,90.0,100.0
 C,primary,trail,"PyneCore 6.9.1 (full feed, --security supplied)",10,3,1,1,5,0,0,0,30.0,40.0
 C,primary,trail,PyneCore 6.9.1 (full feed),10,3,1,1,4,0,1,0,30.0,40.0
 C,primary,trail,PyneCore 6.9.1 (range-start feed),10,3,1,1,4,0,1,0,30.0,40.0
+C,primary,trail,PyneCore 6.9.1 (--security + the probe's --from/--to window),10,2,2,1,5,0,0,0,20.0,40.0
+C,primary,trail,PyneCore 6.9.1 (+ the campaign's native TradingView daily feed under SYMBOL:D/1D),10,0,1,0,2,0,0,7,0.0,10.0
 C,primary,trail,PyneCore 6.4.6 (full feed),10,1,0,2,1,1,5,0,10.0,10.0
 C,primary,trail,PyneCore 6.4.6 (range-start feed),10,1,0,3,1,0,5,0,10.0,10.0
+C,primary,partial,PineForge - BEST SUPPORTED CONFIGURATION,14,14,0,0,0,0,0,0,100.0,100.0
+C,primary,partial,PyneCore 6.9.1 - BEST SUPPORTED CONFIGURATION,14,4,3,3,4,0,0,0,28.6,50.0
+C,primary,partial,PyneCore 6.4.6 - BEST SUPPORTED CONFIGURATION,14,4,2,0,0,1,7,0,28.6,42.9
+C,primary,partial,PineForge (the campaign's own verifier: verify-engine-local.py ladder),14,14,0,0,0,0,0,0,100.0,100.0
 C,primary,partial,"PineForge (full feed, tape-window)",14,8,4,1,0,0,1,0,57.1,85.7
 C,primary,partial,PineForge (range-start feed),14,9,2,2,0,0,1,0,64.3,78.6
 C,primary,partial,"PineForge (full feed, raw)",14,5,5,2,0,1,1,0,35.7,71.4
+C,primary,partial,PineForge (+ campaign 1m auxiliary feed),14,3,5,1,0,0,5,0,21.4,57.1
+C,primary,partial,"PineForge (+ campaign 1m auxiliary feed, range-start bound)",14,10,2,2,0,0,0,0,71.4,85.7
 C,primary,partial,"PyneCore 6.9.1 (full feed, --security supplied)",14,4,1,3,2,2,2,0,28.6,35.7
 C,primary,partial,PyneCore 6.9.1 (full feed),14,4,1,2,0,1,6,0,28.6,35.7
 C,primary,partial,PyneCore 6.9.1 (range-start feed),14,4,2,1,1,0,6,0,28.6,42.9
+C,primary,partial,PyneCore 6.9.1 (+ campaign 1m feed via --security),14,0,0,0,1,0,0,13,0.0,0.0
+C,primary,partial,"PyneCore 6.9.1 (+ campaign 1m feed via --security, range-start feed)",14,0,1,0,0,0,0,13,0.0,7.1
+C,primary,partial,PyneCore 6.9.1 (--security + the probe's --from/--to window),14,4,2,3,5,0,0,0,28.6,42.9
+C,primary,partial,PyneCore 6.9.1 (+ the campaign's native TradingView daily feed under SYMBOL:D/1D),14,3,0,1,0,0,0,10,21.4,21.4
 C,primary,partial,PyneCore 6.4.6 (full feed),14,4,0,1,0,2,7,0,28.6,28.6
 C,primary,partial,PyneCore 6.4.6 (range-start feed),14,4,2,0,0,1,7,0,28.6,42.9
+C,primary,brackets,PineForge - BEST SUPPORTED CONFIGURATION,57,57,0,0,0,0,0,0,100.0,100.0
+C,primary,brackets,PyneCore 6.9.1 - BEST SUPPORTED CONFIGURATION,57,37,13,2,2,2,1,0,64.9,87.7
+C,primary,brackets,PyneCore 6.4.6 - BEST SUPPORTED CONFIGURATION,57,16,12,8,2,5,14,0,28.1,49.1
+C,primary,brackets,PineForge (the campaign's own verifier: verify-engine-local.py ladder),57,57,0,0,0,0,0,0,100.0,100.0
 C,primary,brackets,"PineForge (full feed, tape-window)",57,38,11,2,2,2,2,0,66.7,86.0
-C,primary,brackets,PineForge (range-start feed),57,46,5,0,2,2,2,0,80.7,89.5
+C,primary,brackets,PineForge (range-start feed),57,45,6,0,2,2,2,0,78.9,89.5
 C,primary,brackets,"PineForge (full feed, raw)",57,29,20,3,2,1,2,0,50.9,86.0
+C,primary,brackets,PineForge (+ campaign 1m auxiliary feed),57,29,10,2,1,1,14,0,50.9,68.4
+C,primary,brackets,"PineForge (+ campaign 1m auxiliary feed, range-start bound)",57,47,6,0,2,2,0,0,82.5,93.0
 C,primary,brackets,"PyneCore 6.9.1 (full feed, --security supplied)",57,21,24,4,2,2,4,0,36.8,78.9
 C,primary,brackets,PyneCore 6.9.1 (full feed),57,21,24,4,1,1,6,0,36.8,78.9
 C,primary,brackets,PyneCore 6.9.1 (range-start feed),57,35,12,2,2,1,5,0,61.4,82.5
+C,primary,brackets,PyneCore 6.9.1 (+ campaign 1m feed via --security),57,1,0,0,0,1,0,55,1.8,1.8
+C,primary,brackets,"PyneCore 6.9.1 (+ campaign 1m feed via --security, range-start feed)",57,1,1,0,0,0,0,55,1.8,3.5
+C,primary,brackets,PyneCore 6.9.1 (--security + the probe's --from/--to window),57,34,15,2,2,2,2,0,59.6,86.0
+C,primary,brackets,PyneCore 6.9.1 (+ the campaign's native TradingView daily feed under SYMBOL:D/1D),57,11,3,1,2,1,0,39,19.3,24.6
 C,primary,brackets,PyneCore 6.4.6 (full feed),57,9,16,10,2,6,14,0,15.8,43.9
 C,primary,brackets,PyneCore 6.4.6 (range-start feed),57,16,11,9,2,5,14,0,28.1,47.4
+C,primary,security,PineForge - BEST SUPPORTED CONFIGURATION,24,24,0,0,0,0,0,0,100.0,100.0
+C,primary,security,PyneCore 6.9.1 - BEST SUPPORTED CONFIGURATION,24,10,2,0,3,2,7,0,41.7,50.0
+C,primary,security,PyneCore 6.4.6 - BEST SUPPORTED CONFIGURATION,24,0,0,0,0,0,24,0,0.0,0.0
+C,primary,security,PineForge (the campaign's own verifier: verify-engine-local.py ladder),24,24,0,0,0,0,0,0,100.0,100.0
 C,primary,security,"PineForge (full feed, tape-window)",24,9,2,1,0,2,10,0,37.5,45.8
 C,primary,security,PineForge (range-start feed),24,13,1,0,0,0,10,0,54.2,58.3
 C,primary,security,"PineForge (full feed, raw)",24,6,3,3,0,2,10,0,25.0,37.5
+C,primary,security,PineForge (+ campaign 1m auxiliary feed),24,13,1,0,1,2,7,0,54.2,58.3
+C,primary,security,"PineForge (+ campaign 1m auxiliary feed, range-start bound)",24,22,1,0,1,0,0,0,91.7,95.8
 C,primary,security,"PyneCore 6.9.1 (full feed, --security supplied)",24,3,2,1,2,1,15,0,12.5,20.8
 C,primary,security,PyneCore 6.9.1 (full feed),24,2,0,1,2,0,19,0,8.3,8.3
 C,primary,security,PyneCore 6.9.1 (range-start feed),24,5,0,0,2,0,17,0,20.8,20.8
+C,primary,security,PyneCore 6.9.1 (+ campaign 1m feed via --security),24,1,0,2,1,1,5,14,4.2,4.2
+C,primary,security,"PyneCore 6.9.1 (+ campaign 1m feed via --security, range-start feed)",24,3,0,0,1,1,5,14,12.5,12.5
+C,primary,security,PyneCore 6.9.1 (--security + the probe's --from/--to window),24,9,2,0,3,2,8,0,37.5,45.8
+C,primary,security,PyneCore 6.9.1 (+ the campaign's native TradingView daily feed under SYMBOL:D/1D),24,4,0,0,2,1,0,17,16.7,16.7
 C,primary,security,PyneCore 6.4.6 (full feed),24,0,0,0,0,0,24,0,0.0,0.0
 C,primary,security,PyneCore 6.4.6 (range-start feed),24,0,0,0,0,0,24,0,0.0,0.0
+C,primary,plain,PineForge - BEST SUPPORTED CONFIGURATION,95,94,1,0,0,0,0,0,98.9,100.0
+C,primary,plain,PyneCore 6.9.1 - BEST SUPPORTED CONFIGURATION,95,60,23,9,1,2,0,0,63.2,87.4
+C,primary,plain,PyneCore 6.4.6 - BEST SUPPORTED CONFIGURATION,95,39,32,13,2,5,4,0,41.1,74.7
+C,primary,plain,PineForge (the campaign's own verifier: verify-engine-local.py ladder),95,94,1,0,0,0,0,0,98.9,100.0
 C,primary,plain,"PineForge (full feed, tape-window)",95,76,11,4,1,3,0,0,80.0,91.6
 C,primary,plain,PineForge (range-start feed),95,80,9,3,1,2,0,0,84.2,93.7
 C,primary,plain,"PineForge (full feed, raw)",95,47,30,9,1,8,0,0,49.5,81.1
+C,primary,plain,PineForge (+ campaign 1m auxiliary feed),95,53,7,3,1,0,31,0,55.8,63.2
+C,primary,plain,"PineForge (+ campaign 1m auxiliary feed, range-start bound)",95,80,9,3,1,2,0,0,84.2,93.7
 C,primary,plain,"PyneCore 6.9.1 (full feed, --security supplied)",95,37,34,13,3,8,0,0,38.9,74.7
 C,primary,plain,PyneCore 6.9.1 (full feed),95,37,34,13,3,8,0,0,38.9,74.7
 C,primary,plain,PyneCore 6.9.1 (range-start feed),95,60,23,9,1,2,0,0,63.2,87.4
+C,primary,plain,PyneCore 6.9.1 (--security + the probe's --from/--to window),95,55,27,10,1,2,0,0,57.9,86.3
+C,primary,plain,PyneCore 6.9.1 (+ the campaign's native TradingView daily feed under SYMBOL:D/1D),95,24,5,0,1,0,0,65,25.3,30.5
 C,primary,plain,PyneCore 6.4.6 (full feed),95,29,33,14,5,10,4,0,30.5,65.3
 C,primary,plain,PyneCore 6.4.6 (range-start feed),95,39,32,13,2,5,4,0,41.1,74.7
+C,feature,trail,PineForge - BEST SUPPORTED CONFIGURATION,10,9,1,0,0,0,0,0,90.0,100.0
+C,feature,trail,PyneCore 6.9.1 - BEST SUPPORTED CONFIGURATION,10,3,1,1,5,0,0,0,30.0,40.0
+C,feature,trail,PyneCore 6.4.6 - BEST SUPPORTED CONFIGURATION,10,1,0,3,1,0,5,0,10.0,10.0
+C,feature,trail,PineForge (the campaign's own verifier: verify-engine-local.py ladder),10,9,1,0,0,0,0,0,90.0,100.0
 C,feature,trail,"PineForge (full feed, tape-window)",10,9,1,0,0,0,0,0,90.0,100.0
 C,feature,trail,PineForge (range-start feed),10,9,1,0,0,0,0,0,90.0,100.0
 C,feature,trail,"PineForge (full feed, raw)",10,6,1,3,0,0,0,0,60.0,70.0
+C,feature,trail,PineForge (+ campaign 1m auxiliary feed),10,7,1,0,0,0,2,0,70.0,80.0
+C,feature,trail,"PineForge (+ campaign 1m auxiliary feed, range-start bound)",10,9,1,0,0,0,0,0,90.0,100.0
 C,feature,trail,"PyneCore 6.9.1 (full feed, --security supplied)",10,3,1,1,5,0,0,0,30.0,40.0
 C,feature,trail,PyneCore 6.9.1 (full feed),10,3,1,1,4,0,1,0,30.0,40.0
 C,feature,trail,PyneCore 6.9.1 (range-start feed),10,3,1,1,4,0,1,0,30.0,40.0
+C,feature,trail,PyneCore 6.9.1 (--security + the probe's --from/--to window),10,2,2,1,5,0,0,0,20.0,40.0
+C,feature,trail,PyneCore 6.9.1 (+ the campaign's native TradingView daily feed under SYMBOL:D/1D),10,0,1,0,2,0,0,7,0.0,10.0
 C,feature,trail,PyneCore 6.4.6 (full feed),10,1,0,2,1,1,5,0,10.0,10.0
 C,feature,trail,PyneCore 6.4.6 (range-start feed),10,1,0,3,1,0,5,0,10.0,10.0
+C,feature,brackets,PineForge - BEST SUPPORTED CONFIGURATION,74,73,1,0,0,0,0,0,98.6,100.0
+C,feature,brackets,PyneCore 6.9.1 - BEST SUPPORTED CONFIGURATION,74,44,17,5,5,2,1,0,59.5,82.4
+C,feature,brackets,PyneCore 6.4.6 - BEST SUPPORTED CONFIGURATION,74,21,14,11,3,6,19,0,28.4,47.3
+C,feature,brackets,PineForge (the campaign's own verifier: verify-engine-local.py ladder),74,73,1,0,0,0,0,0,98.6,100.0
 C,feature,brackets,"PineForge (full feed, tape-window)",74,49,15,3,2,2,3,0,66.2,86.5
-C,feature,brackets,PineForge (range-start feed),74,57,8,2,2,2,3,0,77.0,87.8
+C,feature,brackets,PineForge (range-start feed),74,56,9,2,2,2,3,0,75.7,87.8
 C,feature,brackets,"PineForge (full feed, raw)",74,39,23,5,2,2,3,0,52.7,83.8
+C,feature,brackets,PineForge (+ campaign 1m auxiliary feed),74,36,15,3,1,1,18,0,48.6,68.9
+C,feature,brackets,"PineForge (+ campaign 1m auxiliary feed, range-start bound)",74,59,9,2,2,2,0,0,79.7,91.9
 C,feature,brackets,"PyneCore 6.9.1 (full feed, --security supplied)",74,28,26,7,4,3,6,0,37.8,73.0
 C,feature,brackets,PyneCore 6.9.1 (full feed),74,28,26,7,1,2,10,0,37.8,73.0
 C,feature,brackets,PyneCore 6.9.1 (range-start feed),74,42,15,4,3,1,9,0,56.8,77.0
+C,feature,brackets,PyneCore 6.9.1 (+ campaign 1m feed via --security),74,1,0,0,1,1,0,71,1.4,1.4
+C,feature,brackets,"PyneCore 6.9.1 (+ campaign 1m feed via --security, range-start feed)",74,1,2,0,0,0,0,71,1.4,4.1
+C,feature,brackets,PyneCore 6.9.1 (--security + the probe's --from/--to window),74,40,19,5,6,2,2,0,54.1,79.7
+C,feature,brackets,PyneCore 6.9.1 (+ the campaign's native TradingView daily feed under SYMBOL:D/1D),74,14,4,2,2,1,0,51,18.9,24.3
 C,feature,brackets,PyneCore 6.4.6 (full feed),74,14,16,13,3,9,19,0,18.9,40.5
 C,feature,brackets,PyneCore 6.4.6 (range-start feed),74,21,13,12,3,6,19,0,28.4,45.9
+C,feature,partial,PineForge - BEST SUPPORTED CONFIGURATION,15,15,0,0,0,0,0,0,100.0,100.0
+C,feature,partial,PyneCore 6.9.1 - BEST SUPPORTED CONFIGURATION,15,5,3,3,4,0,0,0,33.3,53.3
+C,feature,partial,PyneCore 6.4.6 - BEST SUPPORTED CONFIGURATION,15,4,2,0,1,1,7,0,26.7,40.0
+C,feature,partial,PineForge (the campaign's own verifier: verify-engine-local.py ladder),15,15,0,0,0,0,0,0,100.0,100.0
 C,feature,partial,"PineForge (full feed, tape-window)",15,9,4,1,0,0,1,0,60.0,86.7
 C,feature,partial,PineForge (range-start feed),15,10,2,2,0,0,1,0,66.7,80.0
 C,feature,partial,"PineForge (full feed, raw)",15,6,5,2,0,1,1,0,40.0,73.3
+C,feature,partial,PineForge (+ campaign 1m auxiliary feed),15,4,5,1,0,0,5,0,26.7,60.0
+C,feature,partial,"PineForge (+ campaign 1m auxiliary feed, range-start bound)",15,11,2,2,0,0,0,0,73.3,86.7
 C,feature,partial,"PyneCore 6.9.1 (full feed, --security supplied)",15,5,1,3,2,2,2,0,33.3,40.0
 C,feature,partial,PyneCore 6.9.1 (full feed),15,5,1,2,0,1,6,0,33.3,40.0
 C,feature,partial,PyneCore 6.9.1 (range-start feed),15,5,2,1,1,0,6,0,33.3,46.7
+C,feature,partial,PyneCore 6.9.1 (+ campaign 1m feed via --security),15,0,0,0,1,0,0,14,0.0,0.0
+C,feature,partial,"PyneCore 6.9.1 (+ campaign 1m feed via --security, range-start feed)",15,0,1,0,0,0,0,14,0.0,6.7
+C,feature,partial,PyneCore 6.9.1 (--security + the probe's --from/--to window),15,5,2,3,5,0,0,0,33.3,46.7
+C,feature,partial,PyneCore 6.9.1 (+ the campaign's native TradingView daily feed under SYMBOL:D/1D),15,3,0,1,0,0,0,11,20.0,20.0
 C,feature,partial,PyneCore 6.4.6 (full feed),15,4,0,1,1,2,7,0,26.7,26.7
 C,feature,partial,PyneCore 6.4.6 (range-start feed),15,4,2,0,1,1,7,0,26.7,40.0
+C,feature,pyramiding,PineForge - BEST SUPPORTED CONFIGURATION,10,10,0,0,0,0,0,0,100.0,100.0
+C,feature,pyramiding,PyneCore 6.9.1 - BEST SUPPORTED CONFIGURATION,10,3,1,0,1,1,4,0,30.0,40.0
+C,feature,pyramiding,PyneCore 6.4.6 - BEST SUPPORTED CONFIGURATION,10,1,0,1,0,1,7,0,10.0,10.0
+C,feature,pyramiding,PineForge (the campaign's own verifier: verify-engine-local.py ladder),10,10,0,0,0,0,0,0,100.0,100.0
 C,feature,pyramiding,"PineForge (full feed, tape-window)",10,2,0,0,1,1,6,0,20.0,20.0
 C,feature,pyramiding,PineForge (range-start feed),10,4,0,0,0,0,6,0,40.0,40.0
 C,feature,pyramiding,"PineForge (full feed, raw)",10,3,0,0,0,1,6,0,30.0,30.0
+C,feature,pyramiding,PineForge (+ campaign 1m auxiliary feed),10,8,0,0,1,1,0,0,80.0,80.0
+C,feature,pyramiding,"PineForge (+ campaign 1m auxiliary feed, range-start bound)",10,9,0,0,1,0,0,0,90.0,90.0
 C,feature,pyramiding,"PyneCore 6.9.1 (full feed, --security supplied)",10,2,1,0,0,1,6,0,20.0,30.0
 C,feature,pyramiding,PyneCore 6.9.1 (full feed),10,2,1,0,0,1,6,0,20.0,30.0
 C,feature,pyramiding,PyneCore 6.9.1 (range-start feed),10,2,1,0,0,1,6,0,20.0,30.0
+C,feature,pyramiding,PyneCore 6.9.1 (+ campaign 1m feed via --security),10,1,0,0,1,0,4,4,10.0,10.0
+C,feature,pyramiding,"PyneCore 6.9.1 (+ campaign 1m feed via --security, range-start feed)",10,1,0,0,1,0,4,4,10.0,10.0
+C,feature,pyramiding,PyneCore 6.9.1 (--security + the probe's --from/--to window),10,3,1,0,1,1,4,0,30.0,40.0
+C,feature,pyramiding,PyneCore 6.9.1 (+ the campaign's native TradingView daily feed under SYMBOL:D/1D),10,1,0,0,0,0,0,9,10.0,10.0
 C,feature,pyramiding,PyneCore 6.4.6 (full feed),10,1,0,1,0,1,7,0,10.0,10.0
 C,feature,pyramiding,PyneCore 6.4.6 (range-start feed),10,1,0,1,0,1,7,0,10.0,10.0
+C,feature,calc_on_fills,PineForge - BEST SUPPORTED CONFIGURATION,5,4,1,0,0,0,0,0,80.0,100.0
+C,feature,calc_on_fills,PyneCore 6.9.1 - BEST SUPPORTED CONFIGURATION,5,1,4,0,0,0,0,0,20.0,100.0
+C,feature,calc_on_fills,PyneCore 6.4.6 - BEST SUPPORTED CONFIGURATION,5,0,1,0,0,4,0,0,0.0,20.0
+C,feature,calc_on_fills,PineForge (the campaign's own verifier: verify-engine-local.py ladder),5,4,1,0,0,0,0,0,80.0,100.0
 C,feature,calc_on_fills,"PineForge (full feed, tape-window)",5,2,1,0,0,2,0,0,40.0,60.0
 C,feature,calc_on_fills,PineForge (range-start feed),5,2,1,0,0,2,0,0,40.0,60.0
 C,feature,calc_on_fills,"PineForge (full feed, raw)",5,3,2,0,0,0,0,0,60.0,100.0
+C,feature,calc_on_fills,PineForge (+ campaign 1m auxiliary feed),5,2,1,0,0,1,1,0,40.0,60.0
+C,feature,calc_on_fills,"PineForge (+ campaign 1m auxiliary feed, range-start bound)",5,2,1,0,0,2,0,0,40.0,60.0
 C,feature,calc_on_fills,"PyneCore 6.9.1 (full feed, --security supplied)",5,1,4,0,0,0,0,0,20.0,100.0
 C,feature,calc_on_fills,PyneCore 6.9.1 (full feed),5,1,4,0,0,0,0,0,20.0,100.0
 C,feature,calc_on_fills,PyneCore 6.9.1 (range-start feed),5,1,3,0,1,0,0,0,20.0,80.0
+C,feature,calc_on_fills,PyneCore 6.9.1 (--security + the probe's --from/--to window),5,1,3,0,1,0,0,0,20.0,80.0
+C,feature,calc_on_fills,PyneCore 6.9.1 (+ the campaign's native TradingView daily feed under SYMBOL:D/1D),5,0,0,0,1,0,0,4,0.0,0.0
 C,feature,calc_on_fills,PyneCore 6.4.6 (full feed),5,0,1,0,0,4,0,0,0.0,20.0
 C,feature,calc_on_fills,PyneCore 6.4.6 (range-start feed),5,0,0,1,0,4,0,0,0.0,0.0
+C,feature,pooc,PineForge - BEST SUPPORTED CONFIGURATION,31,30,1,0,0,0,0,0,96.8,100.0
+C,feature,pooc,PyneCore 6.9.1 - BEST SUPPORTED CONFIGURATION,31,9,6,2,9,0,5,0,29.0,48.4
+C,feature,pooc,PyneCore 6.4.6 - BEST SUPPORTED CONFIGURATION,31,3,5,0,1,2,20,0,9.7,25.8
+C,feature,pooc,PineForge (the campaign's own verifier: verify-engine-local.py ladder),31,30,1,0,0,0,0,0,96.8,100.0
 C,feature,pooc,"PineForge (full feed, tape-window)",31,18,5,0,0,1,7,0,58.1,74.2
-C,feature,pooc,PineForge (range-start feed),31,20,3,1,0,0,7,0,64.5,74.2
+C,feature,pooc,PineForge (range-start feed),31,19,4,1,0,0,7,0,61.3,74.2
 C,feature,pooc,"PineForge (full feed, raw)",31,5,15,3,0,1,7,0,16.1,64.5
+C,feature,pooc,PineForge (+ campaign 1m auxiliary feed),31,19,6,0,0,1,5,0,61.3,80.6
+C,feature,pooc,"PineForge (+ campaign 1m auxiliary feed, range-start bound)",31,25,4,1,1,0,0,0,80.6,93.5
 C,feature,pooc,"PyneCore 6.9.1 (full feed, --security supplied)",31,4,8,1,6,2,10,0,12.9,38.7
 C,feature,pooc,PyneCore 6.9.1 (full feed),31,4,8,0,5,1,13,0,12.9,38.7
 C,feature,pooc,PyneCore 6.9.1 (range-start feed),31,8,5,0,6,0,12,0,25.8,41.9
+C,feature,pooc,PyneCore 6.9.1 (+ campaign 1m feed via --security),31,1,0,0,2,0,4,24,3.2,3.2
+C,feature,pooc,"PyneCore 6.9.1 (+ campaign 1m feed via --security, range-start feed)",31,1,1,0,1,0,4,24,3.2,6.5
+C,feature,pooc,PyneCore 6.9.1 (--security + the probe's --from/--to window),31,9,6,1,9,0,6,0,29.0,48.4
+C,feature,pooc,PyneCore 6.9.1 (+ the campaign's native TradingView daily feed under SYMBOL:D/1D),31,4,1,1,2,0,0,23,12.9,16.1
 C,feature,pooc,PyneCore 6.4.6 (full feed),31,1,5,0,2,3,20,0,3.2,19.4
 C,feature,pooc,PyneCore 6.4.6 (range-start feed),31,3,4,1,1,2,20,0,9.7,22.6
+C,feature,margin_lt100,PineForge - BEST SUPPORTED CONFIGURATION,5,5,0,0,0,0,0,0,100.0,100.0
+C,feature,margin_lt100,PyneCore 6.9.1 - BEST SUPPORTED CONFIGURATION,5,3,0,0,0,2,0,0,60.0,60.0
+C,feature,margin_lt100,PyneCore 6.4.6 - BEST SUPPORTED CONFIGURATION,5,0,1,0,1,1,2,0,0.0,20.0
+C,feature,margin_lt100,PineForge (the campaign's own verifier: verify-engine-local.py ladder),5,5,0,0,0,0,0,0,100.0,100.0
 C,feature,margin_lt100,"PineForge (full feed, tape-window)",5,3,0,0,2,0,0,0,60.0,60.0
 C,feature,margin_lt100,PineForge (range-start feed),5,4,0,0,1,0,0,0,80.0,80.0
 C,feature,margin_lt100,"PineForge (full feed, raw)",5,3,0,0,1,1,0,0,60.0,60.0
+C,feature,margin_lt100,PineForge (+ campaign 1m auxiliary feed),5,2,0,0,1,0,2,0,40.0,40.0
+C,feature,margin_lt100,"PineForge (+ campaign 1m auxiliary feed, range-start bound)",5,4,0,0,1,0,0,0,80.0,80.0
 C,feature,margin_lt100,"PyneCore 6.9.1 (full feed, --security supplied)",5,3,0,0,0,2,0,0,60.0,60.0
 C,feature,margin_lt100,PyneCore 6.9.1 (full feed),5,3,0,0,0,1,1,0,60.0,60.0
 C,feature,margin_lt100,PyneCore 6.9.1 (range-start feed),5,3,0,0,0,1,1,0,60.0,60.0
+C,feature,margin_lt100,PyneCore 6.9.1 (--security + the probe's --from/--to window),5,3,0,0,0,2,0,0,60.0,60.0
+C,feature,margin_lt100,PyneCore 6.9.1 (+ the campaign's native TradingView daily feed under SYMBOL:D/1D),5,1,0,0,0,1,0,3,20.0,20.0
 C,feature,margin_lt100,PyneCore 6.4.6 (full feed),5,0,1,0,1,1,2,0,0.0,20.0
 C,feature,margin_lt100,PyneCore 6.4.6 (range-start feed),5,0,0,1,1,1,2,0,0.0,0.0
+C,feature,security,PineForge - BEST SUPPORTED CONFIGURATION,48,48,0,0,0,0,0,0,100.0,100.0
+C,feature,security,PyneCore 6.9.1 - BEST SUPPORTED CONFIGURATION,48,14,10,3,10,3,8,0,29.2,50.0
+C,feature,security,PyneCore 6.4.6 - BEST SUPPORTED CONFIGURATION,48,3,0,1,0,1,43,0,6.2,6.2
+C,feature,security,PineForge (the campaign's own verifier: verify-engine-local.py ladder),48,48,0,0,0,0,0,0,100.0,100.0
 C,feature,security,"PineForge (full feed, tape-window)",48,21,9,2,1,2,13,0,43.8,62.5
-C,feature,security,PineForge (range-start feed),48,27,5,2,1,0,13,0,56.2,66.7
+C,feature,security,PineForge (range-start feed),48,26,6,2,1,0,13,0,54.2,66.7
 C,feature,security,"PineForge (full feed, raw)",48,12,15,4,1,3,13,0,25.0,56.2
+C,feature,security,PineForge (+ campaign 1m auxiliary feed),48,23,9,1,1,2,12,0,47.9,66.7
+C,feature,security,"PineForge (+ campaign 1m auxiliary feed, range-start bound)",48,38,6,2,2,0,0,0,79.2,91.7
 C,feature,security,"PyneCore 6.9.1 (full feed, --security supplied)",48,4,10,3,6,4,21,0,8.3,29.2
 C,feature,security,PyneCore 6.9.1 (full feed),48,3,8,2,2,1,32,0,6.2,22.9
 C,feature,security,PyneCore 6.9.1 (range-start feed),48,8,6,1,4,0,29,0,16.7,29.2
+C,feature,security,PyneCore 6.9.1 (+ campaign 1m feed via --security),48,2,0,2,2,2,5,35,4.2,4.2
+C,feature,security,"PyneCore 6.9.1 (+ campaign 1m feed via --security, range-start feed)",48,4,2,0,1,1,5,35,8.3,12.5
+C,feature,security,PyneCore 6.9.1 (--security + the probe's --from/--to window),48,13,10,2,10,3,10,0,27.1,47.9
+C,feature,security,PyneCore 6.9.1 (+ the campaign's native TradingView daily feed under SYMBOL:D/1D),48,5,3,2,3,2,0,33,10.4,16.7
 C,feature,security,PyneCore 6.4.6 (full feed),48,1,2,1,0,1,43,0,2.1,6.2
 C,feature,security,PyneCore 6.4.6 (range-start feed),48,3,0,1,0,1,43,0,6.2,6.2
+C,feature,var_state,PineForge - BEST SUPPORTED CONFIGURATION,134,134,0,0,0,0,0,0,100.0,100.0
+C,feature,var_state,PyneCore 6.9.1 - BEST SUPPORTED CONFIGURATION,134,60,34,12,15,5,8,0,44.8,70.1
+C,feature,var_state,PyneCore 6.4.6 - BEST SUPPORTED CONFIGURATION,134,26,31,16,4,9,48,0,19.4,42.5
+C,feature,var_state,PineForge (the campaign's own verifier: verify-engine-local.py ladder),134,134,0,0,0,0,0,0,100.0,100.0
 C,feature,var_state,"PineForge (full feed, tape-window)",134,88,21,5,3,6,11,0,65.7,81.3
-C,feature,var_state,PineForge (range-start feed),134,100,13,4,3,3,11,0,74.6,84.3
+C,feature,var_state,PineForge (range-start feed),134,99,14,4,3,3,11,0,73.9,84.3
 C,feature,var_state,"PineForge (full feed, raw)",134,54,42,15,3,9,11,0,40.3,71.6
+C,feature,var_state,PineForge (+ campaign 1m auxiliary feed),134,72,19,3,3,3,34,0,53.7,67.9
+C,feature,var_state,"PineForge (+ campaign 1m auxiliary feed, range-start bound)",134,109,14,4,4,3,0,0,81.3,91.8
 C,feature,var_state,"PyneCore 6.9.1 (full feed, --security supplied)",134,32,43,16,14,10,19,0,23.9,56.0
 C,feature,var_state,PyneCore 6.9.1 (full feed),134,31,42,15,10,7,29,0,23.1,54.5
 C,feature,var_state,PyneCore 6.9.1 (range-start feed),134,55,31,10,10,2,26,0,41.0,64.2
+C,feature,var_state,PyneCore 6.9.1 (+ campaign 1m feed via --security),134,2,0,0,2,2,5,123,1.5,1.5
+C,feature,var_state,"PyneCore 6.9.1 (+ campaign 1m feed via --security, range-start feed)",134,2,2,0,1,1,5,123,1.5,3.0
+C,feature,var_state,PyneCore 6.9.1 (--security + the probe's --from/--to window),134,54,36,13,16,5,10,0,40.3,67.2
+C,feature,var_state,PyneCore 6.9.1 (+ the campaign's native TradingView daily feed under SYMBOL:D/1D),134,20,6,2,7,2,0,97,14.9,19.4
 C,feature,var_state,PyneCore 6.4.6 (full feed),134,20,28,16,7,15,48,0,14.9,35.8
 C,feature,var_state,PyneCore 6.4.6 (range-start feed),134,26,30,17,4,9,48,0,19.4,41.8
+C,feature,arrays,PineForge - BEST SUPPORTED CONFIGURATION,24,24,0,0,0,0,0,0,100.0,100.0
+C,feature,arrays,PyneCore 6.9.1 - BEST SUPPORTED CONFIGURATION,24,7,6,4,1,2,4,0,29.2,54.2
+C,feature,arrays,PyneCore 6.4.6 - BEST SUPPORTED CONFIGURATION,24,5,1,3,0,1,14,0,20.8,25.0
+C,feature,arrays,PineForge (the campaign's own verifier: verify-engine-local.py ladder),24,24,0,0,0,0,0,0,100.0,100.0
 C,feature,arrays,"PineForge (full feed, tape-window)",24,8,5,0,1,1,9,0,33.3,54.2
 C,feature,arrays,PineForge (range-start feed),24,12,2,1,0,0,9,0,50.0,58.3
 C,feature,arrays,"PineForge (full feed, raw)",24,5,6,0,1,3,9,0,20.8,45.8
+C,feature,arrays,PineForge (+ campaign 1m auxiliary feed),24,12,4,0,1,1,6,0,50.0,66.7
+C,feature,arrays,"PineForge (+ campaign 1m auxiliary feed, range-start bound)",24,21,2,1,0,0,0,0,87.5,95.8
 C,feature,arrays,"PyneCore 6.9.1 (full feed, --security supplied)",24,2,7,1,1,2,11,0,8.3,37.5
 C,feature,arrays,PyneCore 6.9.1 (full feed),24,2,7,1,1,2,11,0,8.3,37.5
 C,feature,arrays,PyneCore 6.9.1 (range-start feed),24,5,4,3,0,1,11,0,20.8,37.5
+C,feature,arrays,PyneCore 6.9.1 (+ campaign 1m feed via --security),24,1,0,0,2,2,4,15,4.2,4.2
+C,feature,arrays,"PyneCore 6.9.1 (+ campaign 1m feed via --security, range-start feed)",24,1,2,0,1,1,4,15,4.2,12.5
+C,feature,arrays,PyneCore 6.9.1 (--security + the probe's --from/--to window),24,7,6,3,2,2,4,0,29.2,54.2
+C,feature,arrays,PyneCore 6.9.1 (+ the campaign's native TradingView daily feed under SYMBOL:D/1D),24,2,3,2,0,0,0,17,8.3,20.8
 C,feature,arrays,PyneCore 6.4.6 (full feed),24,3,3,1,1,2,14,0,12.5,25.0
 C,feature,arrays,PyneCore 6.4.6 (range-start feed),24,5,1,3,0,1,14,0,20.8,25.0
+C,feature,udt,PineForge - BEST SUPPORTED CONFIGURATION,2,2,0,0,0,0,0,0,100.0,100.0
+C,feature,udt,PyneCore 6.9.1 - BEST SUPPORTED CONFIGURATION,2,2,0,0,0,0,0,0,100.0,100.0
+C,feature,udt,PyneCore 6.4.6 - BEST SUPPORTED CONFIGURATION,2,1,0,0,0,0,1,0,50.0,50.0
+C,feature,udt,PineForge (the campaign's own verifier: verify-engine-local.py ladder),2,2,0,0,0,0,0,0,100.0,100.0
 C,feature,udt,"PineForge (full feed, tape-window)",2,2,0,0,0,0,0,0,100.0,100.0
 C,feature,udt,PineForge (range-start feed),2,2,0,0,0,0,0,0,100.0,100.0
 C,feature,udt,"PineForge (full feed, raw)",2,1,1,0,0,0,0,0,50.0,100.0
+C,feature,udt,PineForge (+ campaign 1m auxiliary feed),2,2,0,0,0,0,0,0,100.0,100.0
+C,feature,udt,"PineForge (+ campaign 1m auxiliary feed, range-start bound)",2,2,0,0,0,0,0,0,100.0,100.0
 C,feature,udt,"PyneCore 6.9.1 (full feed, --security supplied)",2,1,1,0,0,0,0,0,50.0,100.0
 C,feature,udt,PyneCore 6.9.1 (full feed),2,1,1,0,0,0,0,0,50.0,100.0
 C,feature,udt,PyneCore 6.9.1 (range-start feed),2,2,0,0,0,0,0,0,100.0,100.0
+C,feature,udt,PyneCore 6.9.1 (--security + the probe's --from/--to window),2,2,0,0,0,0,0,0,100.0,100.0
+C,feature,udt,PyneCore 6.9.1 (+ the campaign's native TradingView daily feed under SYMBOL:D/1D),2,1,0,0,0,0,0,1,50.0,50.0
 C,feature,udt,PyneCore 6.4.6 (full feed),2,1,0,0,0,0,1,0,50.0,50.0
 C,feature,udt,PyneCore 6.4.6 (range-start feed),2,1,0,0,0,0,1,0,50.0,50.0

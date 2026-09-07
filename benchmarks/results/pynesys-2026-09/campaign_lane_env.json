@@ -1,0 +1,297 @@
+{
+ "aapl-15": {
+  "symbol": "NASDAQ:AAPL",
+  "tf": "15",
+  "group": "standard",
+  "env": {
+   "PINEFORGE_VERIFY_MINTICK": "0.01",
+   "PINEFORGE_VERIFY_SESSION": "0930-1600",
+   "PINEFORGE_VERIFY_SYMTYPE": "stock",
+   "PINEFORGE_VERIFY_QTY_STEP": "1",
+   "PINEFORGE_VERIFY_TIMEZONE": "America/New_York",
+   "PINEFORGE_VERIFY_MARGIN_LONG": "100",
+   "PINEFORGE_VERIFY_POINT_VALUE": "1",
+   "PINEFORGE_VERIFY_MARGIN_SHORT": "100"
+  },
+  "chartSha": "ae2b03d3736f057cf4072185d637b7c2edd9350d7a1d83ddf0178cbf292279a0",
+  "finerSha": "09c2dc4060ee922e960d080bb5bbabb23e339288e1264da7e8392d434a9f0308",
+  "dailySha": "3d0731dcee04a39209fd349f024ca14cb244efd9a8dd959f800e6df5bcc45720"
+ },
+ "btcusdt-15": {
+  "symbol": "BINANCE:BTCUSDT",
+  "tf": "15",
+  "group": "standard",
+  "env": {
+   "PINEFORGE_VERIFY_MINTICK": "0.01",
+   "PINEFORGE_VERIFY_SESSION": "24x7",
+   "PINEFORGE_VERIFY_SYMTYPE": "crypto",
+   "PINEFORGE_VERIFY_QTY_STEP": "1e-05",
+   "PINEFORGE_VERIFY_TIMEZONE": "UTC",
+   "PINEFORGE_VERIFY_MARGIN_LONG": "100",
+   "PINEFORGE_VERIFY_POINT_VALUE": "1",
+   "PINEFORGE_VERIFY_MARGIN_SHORT": "100"
+  },
+  "chartSha": "6b54c44ac6de8b7b588b3fcc6ddc29b09e5fe12ce9559d811dca7859217e6270",
+  "finerSha": "787fd2e15bfeddb062cbb7905248ff4be2fe5c695bbe971f9322826f16528b86",
+  "dailySha": null
+ },
+ "btcusdt-1d": {
+  "symbol": "BINANCE:BTCUSDT",
+  "tf": "1D",
+  "group": "standard",
+  "env": {
+   "PINEFORGE_VERIFY_MINTICK": "0.01",
+   "PINEFORGE_VERIFY_SESSION": "24x7",
+   "PINEFORGE_VERIFY_SYMTYPE": "crypto",
+   "PINEFORGE_VERIFY_QTY_STEP": "1e-05",
+   "PINEFORGE_VERIFY_TIMEZONE": "UTC",
+   "PINEFORGE_VERIFY_MARGIN_LONG": "100",
+   "PINEFORGE_VERIFY_POINT_VALUE": "1",
+   "PINEFORGE_VERIFY_MARGIN_SHORT": "100",
+   "PINEFORGE_VERIFY_CHART_RECEIPT_SHA256": "91f9e8230810403a1b0892f5abd92be0229d8207ae76bb2054ebffbf6ace1b99",
+   "PINEFORGE_VERIFY_CHART_RECEIPT_S3_VERSION_ID": "8XB5E0XrLRvheuFxyG7HKcTS4fRDX_Sw"
+  },
+  "chartSha": "14b8e066225c2508eeb2ec3fae501de17144a9cfddffd3a7a961b20d6a3a9523",
+  "finerSha": "787fd2e15bfeddb062cbb7905248ff4be2fe5c695bbe971f9322826f16528b86",
+  "dailySha": null
+ },
+ "es1-15": {
+  "symbol": "CME_MINI:ES1!",
+  "tf": "15",
+  "group": "standard",
+  "env": {
+   "PINEFORGE_VERIFY_MINTICK": "0.25",
+   "PINEFORGE_VERIFY_SESSION": "1700-1600",
+   "PINEFORGE_VERIFY_SYMTYPE": "futures",
+   "PINEFORGE_VERIFY_QTY_STEP": "1",
+   "PINEFORGE_VERIFY_TIMEZONE": "America/Chicago",
+   "PINEFORGE_VERIFY_MARGIN_LONG": "100",
+   "PINEFORGE_VERIFY_POINT_VALUE": "50",
+   "PINEFORGE_VERIFY_MARGIN_SHORT": "100"
+  },
+  "chartSha": "766e8149d7e16be49cd030f0993eeb339199e0fd4a97d7603625e6a3fe583471",
+  "finerSha": "39ba22ce3c669b92576cd3b1c750c9220e4199045db2a6b01eb2144f59ac2781",
+  "dailySha": "8da771d4bb794d41963d79298e99c0caf5d0bfba6eec7dd1892e26e50c8bbd68"
+ },
+ "es1-1d": {
+  "symbol": "CME_MINI:ES1!",
+  "tf": "1D",
+  "group": "standard",
+  "env": {
+   "PINEFORGE_VERIFY_MINTICK": "0.25",
+   "PINEFORGE_VERIFY_SESSION": "1700-1600",
+   "PINEFORGE_VERIFY_SYMTYPE": "futures",
+   "PINEFORGE_VERIFY_QTY_STEP": "1",
+   "PINEFORGE_VERIFY_TIMEZONE": "America/Chicago",
+   "PINEFORGE_VERIFY_MARGIN_LONG": "100",
+   "PINEFORGE_VERIFY_POINT_VALUE": "50",
+   "PINEFORGE_VERIFY_MARGIN_SHORT": "100",
+   "PINEFORGE_VERIFY_CHART_RECEIPT_SHA256": "2450fe5dded18b2847d46ed852fbd3f0e954a23f6192701e5d9fb83e63d1771e",
+   "PINEFORGE_VERIFY_CHART_RECEIPT_S3_VERSION_ID": "BJ1SDoUK5ZqlPWJUCfitPoIrUfCg7EnN"
+  },
+  "chartSha": "8da771d4bb794d41963d79298e99c0caf5d0bfba6eec7dd1892e26e50c8bbd68",
+  "finerSha": "39ba22ce3c669b92576cd3b1c750c9220e4199045db2a6b01eb2144f59ac2781",
+  "dailySha": null
+ },
+ "eth-corpus-15": {
+  "symbol": "BINANCE:ETHUSDT.P",
+  "tf": "15",
+  "group": "validation",
+  "env": {},
+  "chartSha": "27b62431096edf1bfba71b2409f8dc183f69213dec2834560b3241750f8e7026",
+  "finerSha": "db8c1332da093008cfbd063e05db0b33fe8f7fd35d78cf058a366519eb9f6cc5",
+  "dailySha": null,
+  "dataRoot": "~/pf/xc/dataB"
+ },
+ "eth-scraped-15": {
+  "symbol": "BINANCE:ETHUSDT.P",
+  "tf": "15",
+  "group": "standard",
+  "env": {},
+  "chartSha": "27b62431096edf1bfba71b2409f8dc183f69213dec2834560b3241750f8e7026",
+  "finerSha": "db8c1332da093008cfbd063e05db0b33fe8f7fd35d78cf058a366519eb9f6cc5",
+  "dailySha": null
+ },
+ "eurusd-15": {
+  "symbol": "OANDA:EURUSD",
+  "tf": "15",
+  "group": "standard",
+  "env": {
+   "PINEFORGE_VERIFY_MINTICK": "1e-05",
+   "PINEFORGE_VERIFY_SESSION": "1700-1700",
+   "PINEFORGE_VERIFY_SYMTYPE": "forex",
+   "PINEFORGE_VERIFY_QTY_STEP": "0.01",
+   "PINEFORGE_VERIFY_TIMEZONE": "America/New_York",
+   "PINEFORGE_VERIFY_MARGIN_LONG": "100",
+   "PINEFORGE_VERIFY_POINT_VALUE": "1",
+   "PINEFORGE_VERIFY_MARGIN_SHORT": "100"
+  },
+  "chartSha": "f945f31a140aedc64ca24e2ace42b9885a914ce31a2531f74179b703c025a648",
+  "finerSha": "b3d921bb0af969ab5f7e16934914a31b4a7e9fc6b8a2cf514eff571061341a75",
+  "dailySha": null
+ },
+ "f-15": {
+  "symbol": "NYSE:F",
+  "tf": "15",
+  "group": "standard",
+  "env": {
+   "PINEFORGE_VERIFY_MINTICK": "0.01",
+   "PINEFORGE_VERIFY_SESSION": "0930-1600",
+   "PINEFORGE_VERIFY_SYMTYPE": "stock",
+   "PINEFORGE_VERIFY_QTY_STEP": "1",
+   "PINEFORGE_VERIFY_TIMEZONE": "America/New_York",
+   "PINEFORGE_VERIFY_MARGIN_LONG": "100",
+   "PINEFORGE_VERIFY_POINT_VALUE": "1",
+   "PINEFORGE_VERIFY_MARGIN_SHORT": "100"
+  },
+  "chartSha": "80f404ae85ef0b6a0d8056a90997e92fa1236f1ae68b75c1b2d3a6f182558e32",
+  "finerSha": "50bccb38da9cf08aeaca6c19ff9c3a266f00885fe2894c3e470b98f94e24bcc8",
+  "dailySha": "e3dd3a88e85bde802b65c26e1ad35cb17b3dcf66ad56f70e30a2ff711f2297bb"
+ },
+ "f-1d": {
+  "symbol": "NYSE:F",
+  "tf": "1D",
+  "group": "standard",
+  "env": {
+   "PINEFORGE_VERIFY_MINTICK": "0.01",
+   "PINEFORGE_VERIFY_SESSION": "0930-1600",
+   "PINEFORGE_VERIFY_SYMTYPE": "stock",
+   "PINEFORGE_VERIFY_QTY_STEP": "1",
+   "PINEFORGE_VERIFY_TIMEZONE": "America/New_York",
+   "PINEFORGE_VERIFY_MARGIN_LONG": "100",
+   "PINEFORGE_VERIFY_POINT_VALUE": "1",
+   "PINEFORGE_VERIFY_MARGIN_SHORT": "100",
+   "PINEFORGE_VERIFY_CHART_RECEIPT_SHA256": "891579f804a968360f2887dddaefcc0b2eb1d513ab575e57eb008ef388c4f2a4",
+   "PINEFORGE_VERIFY_CHART_RECEIPT_S3_VERSION_ID": "qRd.9I8SUvoVsDXUyZABU0TIishxoLxj"
+  },
+  "chartSha": "e3dd3a88e85bde802b65c26e1ad35cb17b3dcf66ad56f70e30a2ff711f2297bb",
+  "finerSha": "50bccb38da9cf08aeaca6c19ff9c3a266f00885fe2894c3e470b98f94e24bcc8",
+  "dailySha": null
+ },
+ "nifty-15": {
+  "symbol": "NSE:NIFTY",
+  "tf": "15",
+  "group": "standard",
+  "env": {
+   "PINEFORGE_VERIFY_MINTICK": "0.05",
+   "PINEFORGE_VERIFY_SESSION": "0915-1530",
+   "PINEFORGE_VERIFY_SYMTYPE": "index",
+   "PINEFORGE_VERIFY_QTY_STEP": "1",
+   "PINEFORGE_VERIFY_TIMEZONE": "Asia/Kolkata",
+   "PINEFORGE_VERIFY_MARGIN_LONG": "100",
+   "PINEFORGE_VERIFY_POINT_VALUE": "1",
+   "PINEFORGE_VERIFY_MARGIN_SHORT": "100"
+  },
+  "chartSha": "ca2cb44a4e4c3f67e7f11b3052f4456d4a978d34cab2f10afba942cdc0e02e09",
+  "finerSha": "38e8107576e586755aff36f0271af00edababcc6716f527863331a514c943c22",
+  "dailySha": "b57ebb7b4e4b80743420136c06ac00b9b58c61e37e0c01ade3368ef15665aed0"
+ },
+ "nifty-1d": {
+  "symbol": "NSE:NIFTY",
+  "tf": "1D",
+  "group": "standard",
+  "env": {
+   "PINEFORGE_VERIFY_MINTICK": "0.05",
+   "PINEFORGE_VERIFY_SESSION": "0915-1530",
+   "PINEFORGE_VERIFY_SYMTYPE": "index",
+   "PINEFORGE_VERIFY_QTY_STEP": "1",
+   "PINEFORGE_VERIFY_TIMEZONE": "Asia/Kolkata",
+   "PINEFORGE_VERIFY_MARGIN_LONG": "100",
+   "PINEFORGE_VERIFY_POINT_VALUE": "1",
+   "PINEFORGE_VERIFY_MARGIN_SHORT": "100",
+   "PINEFORGE_VERIFY_CHART_RECEIPT_SHA256": "54a80e4cb734b6bb27c6d7ecd4418f5e9b678c51e57e7ee93212797c803e40c3",
+   "PINEFORGE_VERIFY_CHART_RECEIPT_S3_VERSION_ID": "JPSQtI0zCfKWSVSiwwksmdCJMc_rWuwo"
+  },
+  "chartSha": "b57ebb7b4e4b80743420136c06ac00b9b58c61e37e0c01ade3368ef15665aed0",
+  "finerSha": "38e8107576e586755aff36f0271af00edababcc6716f527863331a514c943c22",
+  "dailySha": null
+ },
+ "nq1-15": {
+  "symbol": "CME_MINI:NQ1!",
+  "tf": "15",
+  "group": "standard",
+  "env": {
+   "PINEFORGE_VERIFY_MINTICK": "0.25",
+   "PINEFORGE_VERIFY_SESSION": "1700-1600",
+   "PINEFORGE_VERIFY_SYMTYPE": "futures",
+   "PINEFORGE_VERIFY_QTY_STEP": "1",
+   "PINEFORGE_VERIFY_TIMEZONE": "America/Chicago",
+   "PINEFORGE_VERIFY_MARGIN_LONG": "100",
+   "PINEFORGE_VERIFY_POINT_VALUE": "20",
+   "PINEFORGE_VERIFY_MARGIN_SHORT": "100"
+  },
+  "chartSha": "ed88b5530c0aff402d01e322e359d2390366d41c94255ac5bb2daebe8be03f14",
+  "finerSha": "3736801faf9991bb878b42dbb2a18bb249c06833f55019fe5357e56728910ffe",
+  "dailySha": "ef0a39bf35d8def1fa22795a170cd5bb481f7d28c075211b0c78afc8da70392d"
+ },
+ "nq1-1d": {
+  "symbol": "CME_MINI:NQ1!",
+  "tf": "1D",
+  "group": "standard",
+  "env": {
+   "PINEFORGE_VERIFY_MINTICK": "0.25",
+   "PINEFORGE_VERIFY_SESSION": "1700-1600",
+   "PINEFORGE_VERIFY_SYMTYPE": "futures",
+   "PINEFORGE_VERIFY_QTY_STEP": "1",
+   "PINEFORGE_VERIFY_TIMEZONE": "America/Chicago",
+   "PINEFORGE_VERIFY_MARGIN_LONG": "100",
+   "PINEFORGE_VERIFY_POINT_VALUE": "20",
+   "PINEFORGE_VERIFY_MARGIN_SHORT": "100",
+   "PINEFORGE_VERIFY_CHART_RECEIPT_SHA256": "89ba56d3b133851cf2fd6a6262fac62959611e592e4710e417e54a3d16df64e6",
+   "PINEFORGE_VERIFY_CHART_RECEIPT_S3_VERSION_ID": "BiKNc84mdNBzWlC3RuwYs9Wd0d_C06mi"
+  },
+  "chartSha": "ef0a39bf35d8def1fa22795a170cd5bb481f7d28c075211b0c78afc8da70392d",
+  "finerSha": "3736801faf9991bb878b42dbb2a18bb249c06833f55019fe5357e56728910ffe",
+  "dailySha": null
+ },
+ "xauusd-15": {
+  "symbol": "OANDA:XAUUSD",
+  "tf": "15",
+  "group": "standard",
+  "env": {
+   "PINEFORGE_VERIFY_MINTICK": "0.001",
+   "PINEFORGE_VERIFY_SESSION": "1800-1700",
+   "PINEFORGE_VERIFY_SYMTYPE": "cfd",
+   "PINEFORGE_VERIFY_QTY_STEP": "0.01",
+   "PINEFORGE_VERIFY_TIMEZONE": "America/New_York",
+   "PINEFORGE_VERIFY_MARGIN_LONG": "100",
+   "PINEFORGE_VERIFY_POINT_VALUE": "1",
+   "PINEFORGE_VERIFY_MARGIN_SHORT": "100"
+  },
+  "chartSha": "248086b8b82d6560277cdf7bb877a269f04067b8cdb8c1577a02323772c48579",
+  "finerSha": "b2389ad2a29c7ba8896f3af8b1b51b236d8d41114d3a7040ae41752c7ac74c14",
+  "dailySha": null
+ },
+ "xauusd-1d": {
+  "symbol": "OANDA:XAUUSD",
+  "tf": "1D",
+  "group": "standard",
+  "env": {
+   "PINEFORGE_VERIFY_MINTICK": "0.001",
+   "PINEFORGE_VERIFY_SESSION": "1800-1700",
+   "PINEFORGE_VERIFY_SYMTYPE": "cfd",
+   "PINEFORGE_VERIFY_QTY_STEP": "0.01",
+   "PINEFORGE_VERIFY_TIMEZONE": "America/New_York",
+   "PINEFORGE_VERIFY_MARGIN_LONG": "100",
+   "PINEFORGE_VERIFY_POINT_VALUE": "1",
+   "PINEFORGE_VERIFY_MARGIN_SHORT": "100",
+   "PINEFORGE_VERIFY_CHART_RECEIPT_SHA256": "d9018f4129aabc1687ab002254a25bff011807723e2e234859e734c80fc39c4e",
+   "PINEFORGE_VERIFY_CHART_RECEIPT_S3_VERSION_ID": "cX4y3rxt1En4yZRPpY7a5huBS.gGSa6O"
+  },
+  "chartSha": "79cdcfb671e52b9a316930d8c19044c66531132b5264c00ddc7660c6aa13727f",
+  "finerSha": "b2389ad2a29c7ba8896f3af8b1b51b236d8d41114d3a7040ae41752c7ac74c14",
+  "dailySha": null
+ },
+ "eth-suite": {
+  "symbol": "BINANCE:ETHUSDT.P",
+  "tf": "15",
+  "group": "standard",
+  "chartFile": "~/pf/xc/engine/benchmarks/assets/data/ETHUSDT_15.csv",
+  "finerFile": "~/pf/xc/engine/corpus/data/ohlcv_ETH-USDT-USDT_1m.csv",
+  "chartSha": null,
+  "finerSha": null,
+  "dailySha": null,
+  "dataRoot": "~/pf/xc/dataA",
+  "env": {}
+ }
+}

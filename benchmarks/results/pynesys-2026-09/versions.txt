@@ -1,6 +1,7 @@
 PineForge vs PyneSys/PyneCore benchmark — versions, hardware, provenance
-generated 2026-09-06, revision 2 on 2026-09-07 (campaign scenario
+generated 2026-09-06; revision 2 and revision 3 on 2026-09-07 (campaign scenario
 custom:benchmark/r13-bench-pynesys, stage fix-rerun)
+as of 2026-09-07, revision 3
 
 [hardware / OS]
 machine:    spark2 (all accuracy and performance measurements)
@@ -23,24 +24,56 @@ g++:        13.3.0 (Ubuntu 13.3.0-6ubuntu2~24.04.1), -O2 -std=c++17 -fPIC
 ccache:     4.9.1
 
 [PineForge]
-engine:     76518c6b79cea8410b462a892994deaebd4bdc9a
-            (github.com/pineforge-4pass/pineforge-engine origin/main as of 2026-09-06T10:13Z;
-             main advanced to 86049406d8f675d7ad237f519d1a023ae21f6096 later the same day —
-             the benchmark keeps the sha it was built and measured with)
-codegen:    4de83dd450cb6b7f00a2600ad4428f05ceec4e6d
-            (github.com/pineforge-4pass/pineforge-codegen-oss origin/main, still current)
-runner:     engine scripts/run_strategy.py (Pine -> C++ -> libpineforge.a -> strategy.so)
-grader:     engine scripts/verify_corpus.py::analyze_strategy, called by benchmarks/compare.py
-            (strict profile; production profile for trail_* scripts) — the same grader the
-            parity campaign uses, unmodified
+engine:     bfdbe9618c122fada4c22fd17746625254a06a6a   (tree 8100ca9ee35658399a55928f6b0faf7ddf5c86cd)
+codegen:    3fd97fe28abd7b191cb376d9f5db4e056fcfae4b   (tree fcc6b116bd0f7eab3edfb4912f812c3214bf3350)
+            Revision 3 re-pinned BOTH to the exact commits the parity campaign's ACTIVE BASELINE
+            pins (snapshot 14e129519500e5d5e0fe7d961a9e1766f516224126e721040a78c2ceb7a2831c,
+            candidate sweep cand-round24b-20260907). Both trees were verified clean against the
+            campaign's own case spec `resultIdentity.expectedTrees`, so the benchmark and the
+            campaign are running the same bytes and the benchmark's PineForge numbers can be
+            checked against the campaign's snapshot probe by probe (README "Campaign cross-check").
+            Revisions 1-2 measured at engine 76518c6b79cea8410b462a892994deaebd4bdc9a /
+            codegen 4de83dd450cb6b7f00a2600ad4428f05ceec4e6d. Every ACCURACY number in this
+            revision was re-measured at the pins above. The PERFORMANCE and DETERMINISM stages
+            are being re-run at the same pins (chain7.sh / chain8.sh) and, until that follow-up
+            commit lands, performance.csv / performance.md and the README's Determinism table
+            are still the revision-2 measurements at 76518c6b -- stated in the README rather
+            than deleted. Revision 2's raw records are archived on the benchmark machine as
+            perf/*.jsonl.rev2-76518c6b.
+lab:        3bac0b7bfa78dc66edb2d93b1d94b222f6e40cb8 (pineforge-lab; the verifier's own commit,
+            the same one the campaign's round-24b case spec pins as `labCommit`)
+runner:     engine scripts/run_strategy.py (Pine -> C++ -> libpineforge.a -> strategy.so),
+            driven on sets B and C by pineforge-lab scripts/verify-engine-local.py -- the
+            campaign's own verifier, with the campaign's per-lane PINEFORGE_VERIFY_* environment
+            and its sha-pinned chart / 1-minute / native-daily feeds. Set A is driven by this
+            benchmark's own harness because the campaign verifier refuses set A by name (below).
+grader:     pineforge-lab scripts/verify-engine-local.py driving engine
+            scripts/verify_corpus.py::analyze_strategy (strict profile; production profile for
+            trail_* scripts) -- the campaign's own verifier and ladder, at the commits above.
+            BOTH engines are graded by that one function on the same three files
+            (tv_trades.csv, engine_trades.csv, strategy.pine) in the same scratch-directory
+            protocol verify-engine-local.py::_canonical_candidate_score uses for its own
+            candidates. benchmarks/compare.py is NOT in revision 3's grading path.
+set A note: the campaign verifier refuses all 100 set-A scripts before transpiling, by name:
+              "account-currency: <slug> declares currency.USD but BINANCE:ETHUSDT.P quotes USDT
+               -- a probe's account currency is its symbol's quote currency (no FX series); drop
+               the currency= declaration or tape the probe on a USD-quoted symbol"
+            (the campaign's round-9 no-account-FX decision). Set A therefore has no campaign
+            configuration to adopt and no campaign grade to reproduce; it keeps this benchmark's
+            own five-rung PineForge ladder, graded by the same analyze_strategy.
 
 [PyneSys / PyneCore]
 pynecore:   6.4.6 (the lock in pineforge-engine/benchmarks/uv.lock) and
             6.9.1 (current PyPI at 2026-09-06)
 pynecomp:   v6.0.66 — the cloud Pine->Python compiler that produced every strategy_pyne.py
             re-compiled for this benchmark (banner line in each generated file)
-            NOTE set A keeps its pre-existing sources compiled by PyneComp 6.0.31; the
-            compiler-drift re-compile of set A could NOT be run (see [quota] below)
+            NOTE set A ships pre-existing sources compiled by PyneComp 6.0.31. Revision 3
+            re-compiled all 100 with 6.0.66 and measured them on the SAME 6.9.1 runtime
+            (rung pc691_re, driver drift_A.py), so the compiler version is the only thing that
+            differs: 94 generated bodies byte-identical, 6 differ, 1 tier moves (weak ->
+            excellent). pc691_re joins PyneCore 6.9.1's ladder, which makes the compiler version
+            uniform across all three sets and can only help PyneCore; both columns stay
+            published (drift_setA.csv and the "every rung measured" table).
 runner:     pyne run <script.py> <lane.ohlcv> --trade <csv> --strat <csv>, normalised to the
             TradingView trade-list schema by tools/spark/bench.py::normalize_pyne
 
@@ -50,10 +83,19 @@ assets:     pineforge-benchmarks-assets bb97c51dcdd5192d33991db77fe7b3321016d3b0
 lane feeds: the campaign registry lane_input_templates fixedInputs feed-<lane>-chart
             documents, fetched by content sha with lab evidence get; per-lane sha256,
             bar count and symbol facts in results/lanes.csv
-finer feeds (revision 2, SUPPLEMENTARY, PineForge only — never in a head-to-head table):
+finer feeds (revision 3: staged for BOTH engines and part of both headline ladders;
+            revision 2 staged these for PineForge only, over 9 lanes, as a supplementary):
             the same templates' feeds.finer documents (feed-<lane>-finer-NN chunks,
             concatenated and verified against the declared whole-file sha256), 1-minute
-            bars, 7 distinct feeds / 476 MB over 9 lanes:
+            bars, 9 distinct feeds / 675 MB over 16 of the benchmark's 17 lanes.
+            Per-lane content hashes and byte counts: results/pynesys-2026-09/finer_lanes.json.
+            Added in revision 3, after a check of every lane's template showed feeds.finer
+            present on all of them:
+              aapl-15                  09c2dc4060ee922e960d080bb5bbabb23e339288e1264da7e8392d434a9f0308
+              eth-corpus-15 + eth-scraped-15
+                                       db8c1332da093008cfbd063e05db0b33fe8f7fd35d78cf058a366519eb9f6cc5
+              (es1-15, f-15, nifty-15, nq1-15 share their 1-day lane's feed sha, below)
+            Staged in revision 2:
               btcusdt-15 + btcusdt-1d  787fd2e15bfeddb062cbb7905248ff4be2fe5c695bbe971f9322826f16528b86
               es1-1d                   39ba22ce3c669b92576cd3b1c750c9220e4199045db2a6b01eb2144f59ac2781
               eurusd-15                b3d921bb0af969ab5f7e16934914a31b4a7e9fc6b8a2cf514eff571061341a75
@@ -63,6 +105,40 @@ finer feeds (revision 2, SUPPLEMENTARY, PineForge only — never in a head-to-he
               xauusd-15 + xauusd-1d    b2389ad2a29c7ba8896f3af8b1b51b236d8d41114d3a7040ae41752c7ac74c14
             The chart feeds this benchmark stages were confirmed byte-identical to the
             campaign's templates on all nine of those lanes.
+            Set A's lane (eth-suite) is the engine's own benchmark asset feed, not a campaign
+            lane, and has no campaign 1-minute feed; no set-A probe of either engine needs one.
+daily feeds (NEW in revision 3, staged for BOTH engines): the same templates' feeds.daily
+            documents -- TradingView's OWN 1-day bars of the lane's symbol, which on an intraday
+            chart are the settlement / official close and are NOT derivable from the intraday
+            bars across sessions and holidays. Five lanes pin one, and the campaign hands it to
+            PineForge as PINEFORGE_VERIFY_FEED_1D; revision 3 hands the identical bytes to
+            PyneCore under exact SYMBOL:D and SYMBOL:1D --security keys (bench.py daily-lanes +
+            pc-best --daily, rung pc691_bestd). Per-lane hashes: daily_lanes.json.
+              aapl-15    3d0731dcee04a39209fd349f024ca14cb244efd9a8dd959f800e6df5bcc45720   66290 B
+              es1-15     8da771d4bb794d41963d79298e99c0caf5d0bfba6eec7dd1892e26e50c8bbd68   63640 B
+              f-15       e3dd3a88e85bde802b65c26e1ad35cb17b3dcf66ad56f70e30a2ff711f2297bb   59980 B
+              nifty-15   b57ebb7b4e4b80743420136c06ac00b9b58c61e37e0c01ade3368ef15665aed0   74410 B
+              nq1-15     ef0a39bf35d8def1fa22795a170cd5bb481f7d28c075211b0c78afc8da70392d   67064 B
+            (each is also that symbol's own 1-day lane chart feed, except AAPL, which has no
+            1-day lane; its daily document was fetched by content from the evidence store.)
+            NIFTY's converted .ohlcv needed the documented period fix before it could be offered
+            at all: PyneCore infers 900 s for daily bars stamped 09:15 IST, so it was rewritten
+            at period "1D" and re-read to confirm. Revisions 1-2 gave this feed to NEITHER
+            engine, which was the last remaining input asymmetry against PineForge.
+lane env:   the campaign's own per-lane verifier environment, taken verbatim from the round-24b
+            case specs' input manifests (PINEFORGE_VERIFY_MINTICK / SESSION / SYMTYPE /
+            QTY_STEP / TIMEZONE / MARGIN_LONG / MARGIN_SHORT / POINT_VALUE); the ETH lanes carry
+            none, which is the campaign's own default. Table: campaign_lane_env.json.
+probe bytes: for set C, all 200 strategy.pine, tv_trades.csv and metrics.json documents on the
+            benchmark machine were hash-checked against the campaign's own evidence inputs and
+            matched 200/200/200; the 20 meta.json the campaign ships were fetched by content and
+            sha-verified. For set B, the campaign's metrics.json (40 distinct documents covering
+            all 309 corpus probes it measures) were fetched by content, and the corpus's own
+            inputs.json is used where it ships one (121 of 311).
+PyneCore data conversion for the 1-minute feeds: bench.py finer-lanes, `pyne data convert-from
+            --provider pineforge`, one .ohlcv per lane with a .toml carrying that lane's own
+            symbol facts and period = "1"; every converted file re-read and confirmed at
+            period 1 before use.
 tv tapes:   set A/B = the corpus/assets tv_trades.csv; set C = the campaign registry tape
             pinned by each probe (TradingView deep-backtest export, full precision)
 

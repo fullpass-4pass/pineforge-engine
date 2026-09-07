@@ -1,0 +1,7 @@
+{
+  "aapl": {"file": "3d0731dcee04a39209fd349f024ca14cb244efd9a8dd959f800e6df5bcc45720.csv", "sha256": "3d0731dcee04a39209fd349f024ca14cb244efd9a8dd959f800e6df5bcc45720", "bytes": 66290, "laneId": "aapl-15"},
+  "f": {"file": "e3dd3a88e85bde802b65c26e1ad35cb17b3dcf66ad56f70e30a2ff711f2297bb.csv", "sha256": "e3dd3a88e85bde802b65c26e1ad35cb17b3dcf66ad56f70e30a2ff711f2297bb", "bytes": 59980, "laneId": "f-15"},
+  "nq1": {"file": "ef0a39bf35d8def1fa22795a170cd5bb481f7d28c075211b0c78afc8da70392d.csv", "sha256": "ef0a39bf35d8def1fa22795a170cd5bb481f7d28c075211b0c78afc8da70392d", "bytes": 67064, "laneId": "nq1-15"},
+  "es1": {"file": "8da771d4bb794d41963d79298e99c0caf5d0bfba6eec7dd1892e26e50c8bbd68.csv", "sha256": "8da771d4bb794d41963d79298e99c0caf5d0bfba6eec7dd1892e26e50c8bbd68", "bytes": 63640, "laneId": "es1-15"},
+  "nifty": {"file": "b57ebb7b4e4b80743420136c06ac00b9b58c61e37e0c01ade3368ef15665aed0.csv", "sha256": "b57ebb7b4e4b80743420136c06ac00b9b58c61e37e0c01ade3368ef15665aed0", "bytes": 74410, "laneId": "nifty-15"}
+}

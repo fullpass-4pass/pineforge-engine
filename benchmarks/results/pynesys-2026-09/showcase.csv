@@ -1,0 +1,9 @@
+strategy,feature,tvTrades,pineforgeTier,matchPct,countAbsDelta
+bracket-atr-trail-series-int-points-01,a bracket exit with a trailing stop,792,excellent,100.0,0
+bracket-compass-partial-ladder-01,a partial close (FIFO lot fragmentation),836,excellent,100.0,0
+mtf-htf-60-close-change-baseline-01,a multi-timeframe request.security,8779,excellent,100.0,0
+pyramid-deferred-flip-close-all-01,pyramiding into a position,2356,excellent,100.0,0
+session-ny-spring-forward-dst-01,a session window across a DST spring-forward,396,excellent,100.0,0
+magnifier-tick-dist-endpoints-rsi-cross-08a,the intrabar bar magnifier,2345,excellent,100.0,0
+bracket-rivet-calc-on-fill-01,calc_on_order_fills intrabar re-evaluation,541,excellent,100.0,0
+order-process-on-close-true-01,process_orders_on_close,857,excellent,100.0,0

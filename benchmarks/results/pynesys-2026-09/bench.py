@@ -8,6 +8,11 @@
   pc <workdir> <ver>         pyne run (ver 646|691) -> pc<ver>_trades.csv
   grade <workdir>            grade every engine output vs tv_trades.csv -> grade.json
   renorm <workdir>           re-normalize pc*_raw.csv already on disk (no PyneCore rerun)
+  pc-re <workdir>            PyneCore 6.9.1 on the strategy recompiled with today's PyneComp
+  finer-lanes                convert the campaign's 1m feeds into PyneCore .ohlcv (+ lane-fact toml)
+  pc-finer <workdir> [--rs]  PyneCore with the campaign 1m feed offered for every security context
+  pc-best <workdir>          PyneCore's maximal configuration: --security (campaign 1m where the
+                             lane has one) AND the probe's own --from/--to window
 Every step writes <step>.json {status, wallS, rc, error, maxRssKb, ...}; a failure is a row, never an omission."""
 import csv, json, os, re, shutil, subprocess, sys, time, hashlib, resource
 from datetime import datetime, timezone, timedelta
@@ -476,7 +481,7 @@ def cmd_grade(work):
     meta_clean.setdefault("tv_trades_csv_tz", "utc_plus_8")
     res = dict(slug=probe["slug"], lane=probe["lane"], set=probe["set"], grader="verify_corpus.analyze_strategy@" + ENGINE_HEAD, engines={})
     scratch_root = Path("/dev/shm/pf-grade") / probe["set"] / probe["lane"] / probe["slug"]
-    for tag in ("pf", "pf_raw", "pf_rs", "pf_finer", "pf_finer_rs", "pc646", "pc691", "pc691_re", "pc646_rs", "pc691_rs", "pc691_sec", "pc646_sec"):
+    for tag in ("pf_campaign", "pf", "pf_raw", "pf_rs", "pf_finer", "pf_finer_rs", "pc646", "pc691", "pc691_re", "pc646_rs", "pc691_rs", "pc691_sec", "pc646_sec", "pc691_finer", "pc691_finer_rs", "pc691_best", "pc691_bestd"):
         st = rjson(work/f"{tag}.json")
         if st is None: continue
         e = dict(status=st.get("status"), wallS=st.get("wallS"), error=st.get("error"))
@@ -518,6 +523,314 @@ def cmd_renorm(work):
             out["tags"][tag] = dict(error=str(e)[:300])
     return out
 
+
+# ---------------- the campaign's 1-minute feeds, as PyneCore data (best-supported-configuration headline) ----------------
+# The 2026-09-07 fairness criterion: no input PineForge is given may be withheld from PyneCore.
+# PineForge answers a finer request.security from the campaign's 1m auxiliary feed (cmd_pf_finer);
+# PyneCore's runtime takes exactly the same input by the route its own --list-data prints
+# ("needs --security '<TF>=<base file>'") and pre-resamples it itself --
+# script_runner.py::_spawn_security_process, "Context fed a FINER base feed: pre-resample to the
+# security timeframe ... (TradingView's 'resampled from the chart base data')", with the raw
+# sub-bars used directly for a request.security_lower_tf context. So both engines receive the same
+# 1-minute bytes and each does its own aggregation; nothing of mine sits between the data and either
+# engine.
+def finer_lane_dir(ver): return PYNE_WD / ("lanes-finer" if ver == "691" else f"lanes-finer{ver}")
+
+def cmd_finer_lanes(ver="691"):
+    """Convert every staged campaign 1m feed into a PyneCore .ohlcv + .toml carrying the lane's own
+    symbol facts and period "1". One conversion per distinct feed sha (lanes share feeds: btcusdt and
+    btcusdt-1d are one file), hard-linked into each lane that uses it."""
+    venv = VENVS[ver]; m = rjson(FINER / "lanes.json", {}) or {}
+    by_sha = {}
+    for lane in sorted(m):
+        if lane not in LANES: print("finer-lane", lane, "skipped (not a bench lane)"); continue
+        e = m[lane]; csv_in = FINER / e["file"]
+        if not csv_in.exists(): print("finer-lane", lane, "skipped (feed not staged)"); continue
+        sym, tf, _feed, facts = LANES[lane]
+        ticker = sym.split(":")[1]; base = ticker.replace("!", "").replace(".", "_") + "_1"
+        d = finer_lane_dir(ver) / lane; d.mkdir(parents=True, exist_ok=True)
+        ohlcv = d / f"{base}.ohlcv"; toml = d / f"{base}.toml"
+        if not ohlcv.exists():
+            cached = by_sha.get((e["sha256"], base))
+            if cached is not None:
+                os.link(cached, ohlcv)
+            else:
+                # pyne's writer fsyncs per record; convert on tmpfs, then move (as cmd_lanes does).
+                tmp = Path("/dev/shm/pf-finer") / ver / lane; tmp.mkdir(parents=True, exist_ok=True)
+                shutil.copy(csv_in, tmp / f"{base}.csv")
+                r = timed([str(venv/"bin/pyne"), "-w", str(PYNE_WD/"workdir"), "data", "convert-from",
+                           "--provider", "pineforge", "--symbol", ticker.replace("!", "").replace(".", "_"),
+                           "--timezone", facts["timezone"], str(tmp / f"{base}.csv")], cwd=str(PYNE_WD), timeout=7200)
+                if r["rc"] != 0:
+                    print("finer-lane", lane, "convert failed", (r["stderr"] or "")[-400:]); shutil.rmtree(tmp, ignore_errors=True); continue
+                shutil.move(str(tmp / f"{base}.ohlcv"), ohlcv); shutil.rmtree(tmp, ignore_errors=True)
+                by_sha[(e["sha256"], base)] = ohlcv
+        # the security context's syminfo comes from this toml, so it carries the LANE's facts,
+        # exactly as the chart lane's toml does -- only the period differs (1 minute).
+        ticker_pfx = sym.split(":")[0]; mt = facts["mintick"]
+        quote = "USDT" if "USDT" in ticker else ("INR" if ticker == "NIFTY" else "USD")
+        basecur = {"ETHUSDT.P": "ETH", "BTCUSDT": "BTC", "EURUSD": "EUR", "XAUUSD": "XAU"}.get(ticker, ticker)
+        sym_lines = ["[symbol]", f'prefix = "{ticker_pfx}"', f'description = "{sym}"', f'ticker = "{ticker}"',
+                     f'currency = "{quote}"', f'basecurrency = "{basecur}"', 'period = "1"',
+                     f'type = "{PC_TYPE[facts["type"]]}"', f"mintick = {mt:.8f}", f"pricescale = {int(round(1/mt))}",
+                     "minmove = 1", f"pointvalue = {float(facts['pointvalue']):.8f}",
+                     f"mincontract = {float(facts['qty_step']):.8f}", f'timezone = "{facts["timezone"]}"', 'volumetype = "base"']
+        iv, (ss, se) = session_intervals(facts["session"])
+        lines = sym_lines + ["", "# Opening hours"] + [f'[[opening_hours]]\nday = {dd}\nstart = "{s}"\nend = "{e2}"\n' for dd, s, e2 in iv]
+        lines += ["# Session starts", f'[[session_starts]]\nday = {iv[0][0]}\ntime = "{ss}"\n',
+                  "# Session ends", f'[[session_ends]]\nday = {iv[-1][0]}\ntime = "{se}"\n']
+        toml.write_text("\n".join(lines))
+        wjson(d / "finer.json", dict(lane=lane, pynecore=ver, symbol=sym, chartTimeframe=tf, finerTimeframe="1",
+                                     campaignFeedSha256=e["sha256"], campaignFeedBytes=e["bytes"], campaignLaneId=e.get("laneId"),
+                                     csv=str(csv_in), ohlcv=str(ohlcv), toml=str(toml)))
+        print("finer-lane", lane, "ok", ohlcv)
+
+def cmd_pc_finer(work, ver="691", rs=False):
+    """PyneCore in its best supported configuration: the chart feed it always had, PLUS the campaign's
+    1-minute feed offered for every request.security context on the chart's own symbol.
+
+    The --security key is the bare SYMBOL (``PREFIX:TICKER``), which _resolve_security_data matches
+    after an exact ``SYMBOL:TF`` and before a bare ``TF`` -- so it answers finer, coarser AND
+    runtime-dynamic contexts from one mapping. That matters here: only 4 of the 13 probes PineForge
+    refuses report a ``lower`` requirement to --list-data; the other 9 report ``dynamic`` (tf="*"),
+    so a per-timeframe key could not be built for them at all.
+
+    ``rs`` bounds the chart feed at the tape's range start, the rung cmd_pf_finer(rs=True) uses.
+    """
+    work = Path(work).resolve(); tag = f"pc{ver}_finer_rs" if rs else f"pc{ver}_finer"
+    lane = rjson(work/"probe.json")["lane"]
+    laneinfo = rjson(lanes_dir(ver)/lane/("rs/lane.json" if rs else "lane.json"))
+    if laneinfo is None:
+        rec = dict(step=tag, status="no_lane_data"); wjson(work/f"{tag}.json", rec); return rec
+    fi = rjson(finer_lane_dir(ver)/lane/"finer.json")
+    if fi is None:
+        rec = dict(step=tag, status="no_finer_feed", lane=lane); wjson(work/f"{tag}.json", rec); return rec
+    if not (work/"strategy_pyne.py").exists():
+        rec = dict(step=tag, status="no_compile"); wjson(work/f"{tag}.json", rec); return rec
+    sec_args = ["--security", f"{LANES[lane][0]}={fi['ohlcv']}"]
+    venv = VENVS[ver]; wd = PYNE_WD / f"workdir{ver}"; (wd/"scripts").mkdir(parents=True, exist_ok=True)
+    raw = work / f"{tag}_raw.csv"; stats = work / f"{tag}_stats.csv"
+    for f in (raw, stats): f.unlink(missing_ok=True)
+    shutil.rmtree(work / "__pycache__", ignore_errors=True)   # PyneCore's AST cache: never shared across versions
+    r = timed([str(venv/"bin/pyne"), "-w", str(wd), "run", str(work/"strategy_pyne.py"), laneinfo["ohlcv"], *sec_args,
+               "--trade", str(raw), "--strat", str(stats)], cwd=str(work), env={**os.environ, "PYTHONHASHSEED": "0"})
+    rec = dict(step=tag, pynecore=ver, securityArgs=sec_args, auxFeedSha256=fi["campaignFeedSha256"], auxFeedTf="1",
+               chartFeedSha256=laneinfo.get("feedSha256"), rangeStart=bool(rs),
+               **{k: r[k] for k in ("rc", "wallS", "maxRssKb", "timeout", "userS", "sysS")})
+    if r["timeout"]: rec.update(status="timeout")
+    elif r["rc"] != 0: rec.update(status="run_error", error=err_class(r["stderr"] or r["stdout"]), stderr=r["stderr"][-2500:])
+    elif not raw.exists():
+        rec.update(status="ok", trades=0, note="no trade csv written (no closed trades)")
+        (work/f"{tag}_trades.csv").write_text("Trade #,Type,Date and time,Price,Qty,Net PnL,Net PnL %,MFE,MAE,Cumulative PnL," + ENGINE_RANGE_END_COLUMN + "\n")
+    else:
+        try: n, marks = normalize_pyne(raw, work/f"{tag}_trades.csv"); rec.update(status="ok", trades=n, rangeEndMarks=marks, outSha256=sha256(work/f"{tag}_trades.csv"))
+        except Exception as e: rec.update(status="normalize_error", error=str(e)[:300])
+    wjson(work/f"{tag}.json", rec); return rec
+
+
+
+def tape_end_date(work):
+    """YYYY-MM-DD of the last trade on the probe's TradingView tape, or None.
+
+    The tape's own column order is newest-first with an exit row before its entry row, so the
+    maximum over every parsed timestamp is taken rather than trusting the first row.
+    """
+    p = Path(work)/"tv_trades.csv"
+    if not p.exists(): return None
+    best = None
+    try:
+        with open(p, newline="", encoding="utf-8-sig") as f:
+            rd = csv.DictReader(f)
+            col = next((c for c in (rd.fieldnames or []) if "ate" in c and ("ime" in c or "/" in c)), None)
+            if col is None: return None
+            for row in rd:
+                v = (row.get(col) or "").strip()[:10].replace("/", "-")
+                if len(v) == 10 and (best is None or v > best): best = v
+    except Exception: return None
+    if best is None: return None
+    # one day past the tape's last trade: --to bounds the DATA, and a bound landing exactly on
+    # the last trade's date can cut the bar that trade closes on.
+    try: return (datetime.strptime(best, "%Y-%m-%d") + timedelta(days=1)).strftime("%Y-%m-%d")
+    except Exception: return best
+
+DAILY = Path(os.environ.get("PF_DAILY", B / "daily"))
+
+def daily_lane_dir(ver): return PYNE_WD / ("lanes-daily" if ver == "691" else f"lanes-daily{ver}")
+
+def cmd_daily_lanes(ver="691"):
+    """Convert every staged campaign NATIVE DAILY feed into a PyneCore .ohlcv + .toml carrying the
+    lane's own symbol facts and period "1D".
+
+    The campaign hands PineForge TradingView's OWN 1D bars of the lane's symbol on the five intraday
+    lanes whose lane_input_templates declare one (aapl-15, es1-15, f-15, nifty-15, nq1-15), because
+    on those charts request.security(syminfo.tickerid, "D", ...) reads the settlement/official close
+    and not the aggregate of the intraday bars. No input PineForge receives may be denied to
+    PyneCore, so the same bytes are converted here and offered to PyneCore under exact
+    ``SYMBOL:D`` / ``SYMBOL:1D`` --security keys (cmd_pc_best(daily=True)).
+    """
+    venv = VENVS[ver]; m = rjson(DAILY / "lanes.json", {}) or {}
+    for lane in sorted(m):
+        if lane not in LANES: print("daily-lane", lane, "skipped (not a bench lane)"); continue
+        e = m[lane]; csv_in = DAILY / e["file"]
+        if not csv_in.exists(): print("daily-lane", lane, "skipped (feed not staged)"); continue
+        sym, tf, _feed, facts = LANES[lane]
+        ticker = sym.split(":")[1]; base = ticker.replace("!", "").replace(".", "_") + "_1D"
+        d = daily_lane_dir(ver) / lane; d.mkdir(parents=True, exist_ok=True)
+        ohlcv = d / f"{base}.ohlcv"; toml = d / f"{base}.toml"
+        if not ohlcv.exists():
+            tmp = Path("/dev/shm/pf-daily") / ver / lane; tmp.mkdir(parents=True, exist_ok=True)
+            shutil.copy(csv_in, tmp / f"{base}.csv")
+            r = timed([str(venv/"bin/pyne"), "-w", str(PYNE_WD/"workdir"), "data", "convert-from",
+                       "--provider", "pineforge", "--symbol", ticker.replace("!", "").replace(".", "_"),
+                       "--timezone", facts["timezone"], str(tmp / f"{base}.csv")], cwd=str(PYNE_WD), timeout=3600)
+            if r["rc"] != 0:
+                print("daily-lane", lane, "convert failed", (r["stderr"] or "")[-400:]); shutil.rmtree(tmp, ignore_errors=True); continue
+            shutil.move(str(tmp / f"{base}.ohlcv"), ohlcv); shutil.rmtree(tmp, ignore_errors=True)
+        ticker_pfx = sym.split(":")[0]; mt = facts["mintick"]
+        quote = "USDT" if "USDT" in ticker else ("INR" if ticker == "NIFTY" else "USD")
+        basecur = {"ETHUSDT.P": "ETH", "BTCUSDT": "BTC", "EURUSD": "EUR", "XAUUSD": "XAU"}.get(ticker, ticker)
+        sym_lines = ["[symbol]", f'prefix = "{ticker_pfx}"', f'description = "{sym}"', f'ticker = "{ticker}"',
+                     f'currency = "{quote}"', f'basecurrency = "{basecur}"', 'period = "1D"',
+                     f'type = "{PC_TYPE[facts["type"]]}"', f"mintick = {mt:.8f}", f"pricescale = {int(round(1/mt))}",
+                     "minmove = 1", f"pointvalue = {float(facts['pointvalue']):.8f}",
+                     f"mincontract = {float(facts['qty_step']):.8f}", f'timezone = "{facts["timezone"]}"', 'volumetype = "base"']
+        iv, (ss, se) = session_intervals(facts["session"])
+        lines = sym_lines + ["", "# Opening hours"] + [f'[[opening_hours]]\nday = {dd}\nstart = "{s}"\nend = "{e2}"\n' for dd, s, e2 in iv]
+        lines += ["# Session starts", f'[[session_starts]]\nday = {iv[0][0]}\ntime = "{ss}"\n',
+                  "# Session ends", f'[[session_ends]]\nday = {iv[-1][0]}\ntime = "{se}"\n']
+        toml.write_text("\n".join(lines))
+        wjson(d / "daily.json", dict(lane=lane, pynecore=ver, symbol=sym, chartTimeframe=tf, dailyTimeframe="1D",
+                                     campaignFeedSha256=e["sha256"], campaignFeedBytes=e["bytes"], campaignLaneId=e.get("laneId"),
+                                     csv=str(csv_in), ohlcv=str(ohlcv), toml=str(toml)))
+        print("daily-lane", lane, "ok", ohlcv)
+
+
+# ---------------- import the CAMPAIGN verifier's PineForge result ----------------
+def cmd_import_campaign(work, xcroot=None, lane_dir=None):
+    """Record pineforge-lab's verify-engine-local.py result for this probe as the ``pf_campaign``
+    rung, so the benchmark's PineForge column IS the parity campaign's own measurement.
+
+    The verifier writes engine_trades.csv (the winning ladder candidate's trades) and
+    engine_verify.json (its receipts) beside the probe. Both are copied here verbatim; the trade CSV
+    is then graded by the same verify_corpus.analyze_strategy call every other rung goes through, so
+    the benchmark's number is reproduced from the bytes rather than imported as a claim.
+    """
+    work = Path(work).resolve(); tag = "pf_campaign"
+    src = Path(lane_dir) if lane_dir else None
+    if src is None or not (src / "engine_verify.json").exists():
+        rec = dict(step=tag, status="not_run", note="no campaign verifier output staged for this probe")
+        wjson(work/f"{tag}.json", rec); return rec
+    v = rjson(src/"engine_verify.json", {}) or {}
+    trades = src / "engine_trades.csv"
+    rec = dict(step=tag, engine="pineforge", harness="pineforge-lab scripts/verify-engine-local.py",
+               engineHead=v.get("engineHead"), codegenHead=v.get("codegenHead"),
+               ohlcvTrim=v.get("ohlcvTrim"), chartWarmup=v.get("chartWarmup"), securityWarmup=v.get("securityWarmup"),
+               verifierTier=v.get("canonicalTier"), verifierMatchPct=v.get("canonicalMatchPct"),
+               verifierCountAbsDelta=v.get("canonicalCountAbsDelta"), wallS=v.get("verifySeconds"),
+               laneProvenance=v.get("laneProvenance"), verifierStatus=v.get("status"))
+    if v.get("status") != "ok" or not trades.exists():
+        rec.update(status="run_error" if v.get("status") not in (None, "ok") else "no_output",
+                   error=str(v.get("error") or v.get("status") or "no engine_trades.csv")[:300])
+    else:
+        shutil.copy(trades, work/f"{tag}_trades.csv")
+        rec.update(status="ok", trades=sum(1 for _ in open(work/f"{tag}_trades.csv")) - 1,
+                   outSha256=sha256(work/f"{tag}_trades.csv"))
+    wjson(work/f"{tag}.json", rec); return rec
+
+
+def cmd_pc_best(work, ver="691", daily=False):
+    """PyneCore's maximal supported configuration, the 2026-09-07 headline rung.
+
+    Everything the CLI exposes, at once -- which no earlier variant did:
+      * ``--security`` for every context the script needs.  When the lane has a campaign
+        1-minute feed it is offered under the bare SYMBOL key, so finer, coarser AND
+        runtime-dynamic contexts all resolve from it (PyneCore resamples, see cmd_pc_finer);
+        otherwise the coarser mapping ``--list-data`` asks for, exactly as cmd_pc_sec builds it.
+      * ``--from`` / ``--to`` at the probe's own deep-backtest window (metrics.json), the
+        window rung ``pyne run --help`` documents.  pc<ver>_sec was full-feed with security and
+        pc<ver>_rs was range-start without it; this is the first variant that has both.
+
+    PineForge's own window handling (``--disable-trading-before-window``: keep the pre-window
+    bars as warm-up history, gate only the TRADING) has no counterpart in PyneCore's CLI --
+    ``--from`` trims the data itself, warm-up included.  That is recorded on the row as
+    ``windowMode: data-trim`` and written up as a limitation, never hidden.
+    """
+    work = Path(work).resolve(); tag = f"pc{ver}_bestd" if daily else f"pc{ver}_best"
+    probe = rjson(work/"probe.json"); lane = probe["lane"]
+    laneinfo = rjson(lanes_dir(ver)/lane/"lane.json")
+    if laneinfo is None:
+        rec = dict(step=tag, status="no_lane_data"); wjson(work/f"{tag}.json", rec); return rec
+    if not (work/"strategy_pyne.py").exists():
+        rec = dict(step=tag, status="no_compile"); wjson(work/f"{tag}.json", rec); return rec
+    shutil.rmtree(work / "__pycache__", ignore_errors=True)
+    fi = rjson(finer_lane_dir(ver)/lane/"finer.json")
+    reqs, _lr = pc_list_data(work, ver)
+    if reqs is None:
+        rec = dict(step=tag, status="no_compile"); wjson(work/f"{tag}.json", rec); return rec
+    sec_args, unsupplied = sec_args_for(reqs, laneinfo["ohlcv"], LANES[lane][1]); sec_source = "chart-feed"
+    if fi is not None:
+        # Mixed routing, which is what each context actually wants and is far cheaper than routing
+        # everything through the 1m file: a COARSER context keeps the chart feed (PyneCore resamples
+        # it up exactly as before) under an exact ``SYMBOL:TF`` key, and the bare ``SYMBOL`` key
+        # catches everything else -- finer contexts and the runtime-dynamic ones --- from the
+        # campaign's 1-minute feed. _resolve_security_data matches ``SYMBOL:TF`` before ``SYMBOL``
+        # before a bare ``TF``, so the specific keys win and the catch-all only fires for the rest.
+        sym = LANES[lane][0]; qualified = []
+        for value in sec_args[1::2]:            # each arg pair is ("--security", "<TF>=<file>")
+            tf, path = value.split("=", 1)
+            qualified += ["--security", f"{sym}:{tf}={path}"]
+        sec_args = qualified + ["--security", f"{sym}={fi['ohlcv']}"]
+        sec_source = "chart-feed(coarser)+campaign-1m(finer/dynamic)"
+    da = None
+    if daily:
+        # The symmetric gift: the campaign hands PineForge TradingView's OWN daily bars for this
+        # lane (PINEFORGE_VERIFY_FEED_1D), so PyneCore is handed the same bytes under the exact
+        # ``SYMBOL:D`` and ``SYMBOL:1D`` keys. _resolve_security_data matches an exact SYMBOL:TF
+        # before the bare SYMBOL catch-all, so a "D" context reads TV's own daily bars here and
+        # everything else keeps the routing above.
+        da = rjson(daily_lane_dir(ver)/lane/"daily.json")
+        if da is None:
+            rec = dict(step=tag, status="no_daily_feed",
+                       note="the campaign declares no native daily feed for this lane")
+            wjson(work/f"{tag}.json", rec); return rec
+        sym = LANES[lane][0]
+        sec_args = ["--security", f"{sym}:D={da['ohlcv']}", "--security", f"{sym}:1D={da['ohlcv']}"] + sec_args
+        sec_source += "+campaign-native-daily(D/1D)"
+    # The window rung.  PineForge's pf rung keeps the pre-window bars as warm-up and gates only
+    # ORDER EXECUTION to the TV tape's span (run_strategy.py --disable-trading-before-window /
+    # _tv_entry_emit_window).  PyneCore has no trading gate, so it is given the widest bound its
+    # CLI does support, preferring the one that costs it the least warm-up:
+    #   --from  the probe's deep-backtest range start (metrics.json "from") when the probe has
+    #           one -- the same bound pf_rs and pc<ver>_rs use; omitted otherwise, so the full
+    #           history stays available as warm-up rather than being trimmed away.
+    #   --to    the probe's range end, else the date of the last trade on TradingView's own tape,
+    #           so PyneCore stops where TV's tape stops instead of trading months past it.
+    m = rjson(work/"metrics.json", {}) or {}
+    win = []; win_src = {}
+    if m.get("from"): win += ["--from", str(m["from"])]; win_src["from"] = "metrics.json"
+    if m.get("to"): win += ["--to", str(m["to"])]; win_src["to"] = "metrics.json"
+    elif tape_end_date(work): win += ["--to", tape_end_date(work)]; win_src["to"] = "tv_trades.csv last trade"
+    venv = VENVS[ver]; wd = PYNE_WD / f"workdir{ver}"; (wd/"scripts").mkdir(parents=True, exist_ok=True)
+    raw = work / f"{tag}_raw.csv"; stats = work / f"{tag}_stats.csv"
+    for f in (raw, stats): f.unlink(missing_ok=True)
+    shutil.rmtree(work / "__pycache__", ignore_errors=True)
+    r = timed([str(venv/"bin/pyne"), "-w", str(wd), "run", str(work/"strategy_pyne.py"), laneinfo["ohlcv"], *sec_args, *win,
+               "--trade", str(raw), "--strat", str(stats)], cwd=str(work), env={**os.environ, "PYTHONHASHSEED": "0"})
+    rec = dict(step=tag, pynecore=ver, securityArgs=sec_args, securitySource=sec_source, securityRequests=reqs,
+               unsuppliedRequests=unsupplied, windowArgs=win, windowSource=win_src, windowMode="data-trim",
+               auxFeedSha256=(fi or {}).get("campaignFeedSha256"), auxFeedTf=("1" if fi else None),
+               dailyFeedSha256=(da or {}).get("campaignFeedSha256"), dailyFeedTf=("1D" if da else None),
+               **{k: r[k] for k in ("rc", "wallS", "maxRssKb", "timeout", "userS", "sysS")})
+    if r["timeout"]: rec.update(status="timeout")
+    elif r["rc"] != 0: rec.update(status="run_error", error=err_class(r["stderr"] or r["stdout"]), stderr=r["stderr"][-2500:])
+    elif not raw.exists():
+        rec.update(status="ok", trades=0, note="no trade csv written (no closed trades)")
+        (work/f"{tag}_trades.csv").write_text("Trade #,Type,Date and time,Price,Qty,Net PnL,Net PnL %,MFE,MAE,Cumulative PnL," + ENGINE_RANGE_END_COLUMN + "\n")
+    else:
+        try: n, marks = normalize_pyne(raw, work/f"{tag}_trades.csv"); rec.update(status="ok", trades=n, rangeEndMarks=marks, outSha256=sha256(work/f"{tag}_trades.csv"))
+        except Exception as e: rec.update(status="normalize_error", error=str(e)[:300])
+    wjson(work/f"{tag}.json", rec); return rec
+
 if __name__ == "__main__":
     a = sys.argv[1:]
     if a[0] == "lanes": cmd_lanes(*(a[1:2]))
@@ -529,6 +842,14 @@ if __name__ == "__main__":
     elif a[0] == "pf-finer": print(json.dumps(cmd_pf_finer(a[1], rs="--rs" in a)))
     elif a[0] == "pc": print(json.dumps(cmd_pc(a[1], a[2], rs="--rs" in a)))
     elif a[0] == "pc-sec": print(json.dumps(cmd_pc_sec(a[1], a[2])))
+    elif a[0] == "finer-lanes": cmd_finer_lanes(*(a[1:2]))
+    elif a[0] == "daily-lanes": cmd_daily_lanes(*(a[1:2]))
+    elif a[0] == "import-campaign": print(json.dumps(cmd_import_campaign(a[1], lane_dir=a[2])))
+    elif a[0] == "pc-best": print(json.dumps(cmd_pc_best(a[1], (a[2] if len(a) > 2 and not a[2].startswith("--") else "691"), daily="--daily" in a)))
+    elif a[0] == "pc-finer": print(json.dumps(cmd_pc_finer(a[1], (a[2] if len(a) > 2 and not a[2].startswith("--") else "691"), rs="--rs" in a)))
+    # set A's compiler-drift column: the same 6.9.1 runtime on the strategy recompiled
+    # with today's PyneComp, against the committed 6.0.31 sources the pc691 column used.
+    elif a[0] == "pc-re": print(json.dumps(cmd_pc(a[1], "691", script="strategy_pyne_recompiled.py", tag="pc691_re")))
     elif a[0] == "list-data": print(json.dumps(pc_list_data(a[1], a[2])[0]))
     elif a[0] == "grade": print(json.dumps(cmd_grade(a[1])))
     elif a[0] == "fixperiod": cmd_fixperiod(*(a[1:2]))
