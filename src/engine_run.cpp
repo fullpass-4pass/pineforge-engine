@@ -1303,6 +1303,11 @@ void BacktestEngine::run_magnified_bar_calc_on_order_fills(
 
 
 // --- New run() overload with full parameter set ---
+// Public entry: clears last_error_/last_run_status_/abort_requested_ exactly
+// once, then hands off to run_tf_impl, which owns the actual work and must
+// not clear any of those itself (see run_tf_impl's doc comment in
+// engine.hpp -- the SymInfo/overrides overload below calls run_tf_impl
+// directly for the same reason).
 void BacktestEngine::run(const Bar* input_bars, int n_input,
                           const std::string& input_tf,
                           const std::string& script_tf,
@@ -1312,6 +1317,16 @@ void BacktestEngine::run(const Bar* input_bars, int n_input,
     last_error_.clear();
     last_run_status_ = 0;
     abort_requested_.store(false, std::memory_order_relaxed);
+    run_tf_impl(input_bars, n_input, input_tf, script_tf, bar_magnifier,
+                magnifier_samples, magnifier_dist);
+}
+
+void BacktestEngine::run_tf_impl(const Bar* input_bars, int n_input,
+                          const std::string& input_tf,
+                          const std::string& script_tf,
+                          bool bar_magnifier,
+                          int magnifier_samples,
+                          MagnifierDistribution magnifier_dist) {
     if (n_input > 0 && input_bars != nullptr) {
         last_bar_time_ = input_bars[n_input - 1].timestamp;
     } else {
@@ -2025,12 +2040,14 @@ void BacktestEngine::run(const Bar* input_bars, int n_input,
                           MagnifierDistribution magnifier_dist) {
     last_error_.clear();
     last_run_status_ = 0;
-    // abort_requested_ is NOT cleared here: this overload only sets up
-    // syminfo/inputs/overrides before delegating to the TF-aware run below,
-    // which owns the clear at its own entry. Clearing it here too would open
-    // a window (between this store and the delegate's own store) where a
-    // request_abort() from another thread is silently discarded and the run
-    // completes with status 0 instead of being consumed.
+    // Clears once, here, at the earliest point of this public entry --
+    // before the syminfo/inputs/overrides setup below runs. Delegating to
+    // run_tf_impl (not the public TF-aware run() overload, which would
+    // clear a second time) means nothing after this line can wipe a
+    // request_abort() that arrives from another thread during that setup:
+    // the flag survives untouched until run_tf_impl's own check_abort()
+    // calls consume it once the bar loop actually starts.
+    abort_requested_.store(false, std::memory_order_relaxed);
     try {
     // Store syminfo and inputs
     syminfo_ = syminfo;
@@ -2066,10 +2083,12 @@ void BacktestEngine::run(const Bar* input_bars, int n_input,
             close_entries_rule_any_ = (overrides->close_entries_rule != 0);
     }
 
-    // Delegate to the TF-aware run
-    run(input_bars, n_input, input_tf, script_tf, bar_magnifier, magnifier_samples, magnifier_dist);
+    // Delegate to the TF-aware run's actual work directly (run_tf_impl, not
+    // the public run() overload above) so the flag this overload just
+    // cleared is not cleared a second time.
+    run_tf_impl(input_bars, n_input, input_tf, script_tf, bar_magnifier, magnifier_samples, magnifier_dist);
     // Defensive: nothing in this overload's own body calls check_abort(), and
-    // the delegate above already converts AbortRequested to last_run_status_
+    // run_tf_impl above already converts AbortRequested to last_run_status_
     // == 1 internally, so this clause cannot fire today. Kept for symmetry
     // with the other two overloads and as a guard if that ever changes.
     } catch (const AbortRequested&) {

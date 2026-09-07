@@ -206,9 +206,9 @@ PF_API void strategy_set_trade_start_time(pf_strategy_t s, int64_t timestamp_ms)
 
 /* Cooperative abort of the run in progress on ``s`` (live runtime: a settle
  * supersedes an in-flight probe). Atomic; consumed by the running loop at its
- * next bar. Cleared at every run() entry so a request made while idle is a
- * no-op. The aborted run reports strategy_last_run_status() == 1 and leaves
- * the handle reusable. */
+ * next bar. Cleared once at every public run() entry so a request made
+ * while idle is a no-op. The aborted run reports strategy_last_run_status()
+ * == 1 and leaves the handle reusable. */
 PF_API void strategy_request_abort(pf_strategy_t s) {
     if (!s) return;
     static_cast<pineforge::BacktestEngine*>(s)->request_abort();

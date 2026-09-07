@@ -4280,6 +4280,19 @@ private:
     void run_simple_bar_loop(const Bar* input_bars, int n_input);
     void run_aggregation_bar_loop(const Bar* input_bars, int n_input,
                                   bool bar_magnifier, int expected_script_bars);
+    // The TF-aware run()'s actual work (dispatch loop selection, the
+    // try/catch, both cleanup paths). Does NOT touch last_error_,
+    // last_run_status_, or abort_requested_ -- every public run() overload
+    // clears those exactly once at its own entry before reaching here, so a
+    // request_abort() arriving during a delegating overload's own setup
+    // (e.g. the SymInfo/overrides overload's syminfo/inputs copy) is never
+    // silently wiped by a second, later clear.
+    void run_tf_impl(const Bar* input_bars, int n_input,
+                     const std::string& input_tf,
+                     const std::string& script_tf,
+                     bool bar_magnifier,
+                     int magnifier_samples,
+                     MagnifierDistribution magnifier_dist);
     bool stream_finalize_until(int64_t timestamp_ms);
     void stream_feed_input_bar(const Bar& bar, bool had_tick);
     void stream_dispatch_script_bar(const Bar& bar, bool had_tick);
