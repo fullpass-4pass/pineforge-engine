@@ -1236,6 +1236,10 @@ class Strategy:
             L.strategy_set_realtime_tail.argtypes = [
                 ctypes.c_void_p, ctypes.c_int, ctypes.c_int]
             L.strategy_set_realtime_tail.restype = None
+        if hasattr(L, "strategy_set_probe_suppress_tail_logic"):
+            L.strategy_set_probe_suppress_tail_logic.argtypes = [
+                ctypes.c_void_p, ctypes.c_int]
+            L.strategy_set_probe_suppress_tail_logic.restype = None
         # ``strategy_set_chart_timezone`` lets the harness tell the engine
         # which IANA wall-clock zone Pine's ``hour`` / ``minute`` /
         # ``dayofweek`` (and the 1-arg function overloads) should produce.
@@ -1306,6 +1310,7 @@ class Strategy:
     def run(self, bars_csv: Path, params: dict | None = None,
             *, trace_enabled: bool = False, trade_start_time_ms: int | None = None,
             realtime_tail_horizon: int | None = None,
+            probe_suppress_tail: bool = False,
             strategy_overrides: dict | None = None,
             chart_timezone: str | None = None,
             syminfo_timezone: str | None = None,
@@ -1446,6 +1451,13 @@ class Strategy:
             # bar. Off unless a horizon is given.
             if realtime_tail_horizon is not None and hasattr(self.lib, "strategy_set_realtime_tail"):
                 self.lib.strategy_set_realtime_tail(state, 1, int(realtime_tail_horizon))
+            # Live probe tail suppression (ABI v4, spec §3.2): the last bar of
+            # this run only runs dispatch_bar()'s pre-on_bar broker steps and
+            # returns, so the run's last-bar fills are the settled book's
+            # fills against the forming bar and the post-run book is the
+            # in-force book. Off unless requested.
+            if probe_suppress_tail and hasattr(self.lib, "strategy_set_probe_suppress_tail_logic"):
+                self.lib.strategy_set_probe_suppress_tail_logic(state, 1)
             # Wire chart TZ before the run so date builtins (hour/minute/
             # dayofweek + the 1-arg function overloads) land on the same
             # wall clock TV used at export time. Empty/None == leave the
@@ -2575,6 +2587,14 @@ def main() -> int:
                          "(barstate.islast false, no range-end close row) and freeze "
                          "pine_last_bar_index() at HORIZON - 1. Calls strategy_set_realtime_tail "
                          "with on=1 before the run. --runner ctypes only.")
+    ap.add_argument("--probe-suppress-tail", action="store_true",
+                    help="Live probe tail suppression (ABI v4, spec §3.2): the fed OHLCV's "
+                         "last bar runs only the broker's pre-on_bar steps (resting-order "
+                         "fills, max-intraday-loss path check, per-trade extremes) and "
+                         "on_bar is never invoked for it -- no chart-side fills, no margin "
+                         "call / intraday-cap close against the forming bar. Calls "
+                         "strategy_set_probe_suppress_tail_logic with on=1 before the run. "
+                         "--runner ctypes only.")
     ap.add_argument("--inputs-json", type=Path, default=None,
                     help="Use this inputs.json instead of strategy_dir/inputs.json. "
                          "Lets ad-hoc validation runs override strategy properties "
@@ -2707,6 +2727,10 @@ def main() -> int:
             sys.exit(
                 "error: --runner docker does not support --realtime-tail; "
                 "use --runner ctypes with a freshly built strategy library.")
+        if args.probe_suppress_tail:
+            sys.exit(
+                "error: --runner docker does not support --probe-suppress-tail; "
+                "use --runner ctypes with a freshly built strategy library.")
         strat = None
         report = _run_via_docker(strategy_dir, ohlcv_path, params, run_kwargs,
                                  trade_start_ms, args.image)
@@ -2717,6 +2741,7 @@ def main() -> int:
                            trace_enabled=args.trace_json is not None,
                            trade_start_time_ms=trade_start_ms,
                            realtime_tail_horizon=args.realtime_tail,
+                           probe_suppress_tail=args.probe_suppress_tail,
                            **run_kwargs)
     raw_trade_count = len(report["trades"])
     trades_to_write = _filter_trades_to_window(report["trades"], report_window)

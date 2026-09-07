@@ -40,6 +40,7 @@ EXPECTED_RUNTIME = frozenset({
     "strategy_request_abort",
     "strategy_last_run_status",
     "strategy_set_realtime_tail",
+    "strategy_set_probe_suppress_tail_logic",
     "pf_version_get",
     "pf_version_string",
     "pf_abi_version",

@@ -217,6 +217,7 @@ set(TEST_SOURCES
     test_session_predicates_daily_chart
     test_live_run_status
     test_live_realtime_tail
+    test_live_probe_suppress_tail
 )
 
 find_package(Threads REQUIRED)

@@ -634,6 +634,28 @@ PF_API int  strategy_last_run_status(pf_strategy_t s);
  *  Default off (@p on == 0): every historical run stays byte-identical to
  *  before this flag existed. */
 PF_API void strategy_set_realtime_tail(pf_strategy_t s, int on, int horizon_bars);
+/** Live probe tail suppression (spec §3.2): the LAST bar of the array fed to
+ *  every subsequent run() runs only the broker's pre-`on_bar` steps and
+ *  returns, in this order: intraday-cap deferred close, advancing native
+ *  source-series history (`_push_source_series`), settling resting
+ *  stop/limit orders against the bar (`process_pending_orders`), the
+ *  max-intraday-loss path check (`evaluate_max_intraday_loss_over_path`),
+ *  and updating per-trade extremes (`update_per_trade_extremes`).
+ *  `on_bar` is never invoked for that bar, and nothing that ordinarily runs
+ *  after it runs either -- no `invoke_chart_on_bar`, no
+ *  `flush_same_bar_close`, no POOC second pass, no `process_margin_call`,
+ *  no `settle_dormant_bracket_reissues`, no post-liquidation sizing
+ *  refresh. A margin call or intraday-cap close that would ordinarily fire
+ *  against the forming bar therefore surfaces only at settlement (the next
+ *  non-suppressed run), never against the still-forming probe bar itself.
+ *  The run's last-bar fills are exactly the settled book's fills against
+ *  the forming bar, and the post-run pending-order book is the book in
+ *  force during that bar. This is persistent configuration, like
+ *  #strategy_set_realtime_tail, and independent of it -- do not assume the
+ *  two flags are coupled; set each explicitly.
+ *  Default off (@p on == 0): every historical run stays byte-identical to
+ *  before this flag existed. */
+PF_API void strategy_set_probe_suppress_tail_logic(pf_strategy_t s, int on);
 /** @} */
 
 /** @addtogroup pf_config

@@ -171,6 +171,17 @@ void BacktestEngine::dispatch_bar() {
         }
     }
 
+    if (probe_suppress_tail_logic_ && is_tail_bar_) {
+        // Live probe (spec §3.2): the forming bar runs only the pre-on_bar
+        // steps, so the run's last-bar fills are the settled book's fills
+        // against the forming bar and the post-run book is the in-force book.
+        _push_source_series();
+        process_pending_orders(current_bar_);
+        evaluate_max_intraday_loss_over_path(current_bar_);
+        update_per_trade_extremes();
+        return;
+    }
+
     // Advance native source-series history before strategy logic so
     // get_input_source()'s returned series is current for this bar. Covers
     // the simple run() loop, run_simple_bar_loop, and the no-magnifier
@@ -853,6 +864,7 @@ void BacktestEngine::run(const Bar* bars, int n) {
         check_abort();
         current_bar_ = bars[i];
         bar_index_ = i;
+        is_tail_bar_ = (i == n - 1);
         is_first_tick_ = true;
         is_last_tick_ = true;
         barstate_islast_ = !stream_warmup_mode_ && !realtime_tail_ && (i == n - 1);
@@ -1783,6 +1795,7 @@ void BacktestEngine::run_simple_bar_loop(const Bar* input_bars, int n_input) {
         check_abort();
         current_bar_ = input_bars[i];
         bar_index_ = i;
+        is_tail_bar_ = (i == n_input - 1);
         is_first_tick_ = true;
         is_last_tick_ = true;
         barstate_islast_ = !stream_warmup_mode_ && !realtime_tail_ && (i == n_input - 1);
@@ -1929,6 +1942,7 @@ void BacktestEngine::run_aggregation_bar_loop(const Bar* input_bars, int n_input
             // bar and the on/off curves would disagree on that label.
             const int64_t script_bar_ts = ab.bar.timestamp;
             bar_index_ = script_bar_index++;
+            is_tail_bar_ = (i == n_input - 1);
             emitted_script_bars++;
             barstate_islast_ = !stream_warmup_mode_ && !realtime_tail_
                 && (emitted_script_bars == expected_script_bars);

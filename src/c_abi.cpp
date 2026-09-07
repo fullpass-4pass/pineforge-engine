@@ -11,7 +11,8 @@
  *     incarnation accessor, setters, strategy_get_last_error,
  *     the auxiliary-security-feed setter, the strategy_stream_* lifecycle,
  *     the live-runtime surface (strategy_request_abort,
- *     strategy_last_run_status, strategy_set_realtime_tail),
+ *     strategy_last_run_status, strategy_set_realtime_tail,
+ *     strategy_set_probe_suppress_tail_logic),
  *     pf_version_get/pf_version_string,
  *     pf_abi_version — the authoritative list is EXPECTED_RUNTIME in
  *     scripts/check_c_abi_runtime.py, enforced by CI). The other
@@ -230,6 +231,22 @@ PF_API int strategy_last_run_status(pf_strategy_t s) {
 PF_API void strategy_set_realtime_tail(pf_strategy_t s, int on, int horizon_bars) {
     if (!s) return;
     static_cast<pineforge::BacktestEngine*>(s)->set_realtime_tail(on != 0, horizon_bars);
+}
+
+/* Live probe tail suppression (spec §3.2): the last bar of the array fed to
+ * the next run() runs only dispatch_bar()'s pre-on_bar broker steps
+ * (intraday-cap deferred close, source-series push, resting-order fills,
+ * max-intraday-loss path check, per-trade extreme update) and returns —
+ * on_bar is never invoked for that bar, and nothing after it runs (no
+ * flush_same_bar_close, no POOC second pass, no process_margin_call, no
+ * settle_dormant_bracket_reissues, no sizing refresh). Margin-call /
+ * intraday-cap closes therefore surface only at settlement, not against the
+ * still-forming probe bar. Independent of strategy_set_realtime_tail.
+ * Default off (on=0): every historical run stays byte-identical to before
+ * this flag existed. */
+PF_API void strategy_set_probe_suppress_tail_logic(pf_strategy_t s, int on) {
+    if (!s) return;
+    static_cast<pineforge::BacktestEngine*>(s)->set_probe_suppress_tail_logic(on != 0);
 }
 
 PF_API int strategy_stream_begin(pf_strategy_t s,

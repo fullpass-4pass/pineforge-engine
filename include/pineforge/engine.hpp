@@ -1402,6 +1402,17 @@ protected:
     // historical bar. See set_realtime_tail() and apply_realtime_tail_horizon().
     bool realtime_tail_ = false;
     int realtime_tail_horizon_bars_ = 0;
+    // Live probe tail suppression (spec §3.2, ABI v4): when true, the LAST
+    // array bar (is_tail_bar_) runs only dispatch_bar()'s pre-on_bar broker
+    // steps and returns — the run's last-bar fills are the settled book's
+    // fills against the forming bar, and the post-run book is the in-force
+    // book. See set_probe_suppress_tail_logic(). Independent of
+    // realtime_tail_ (do not couple them).
+    bool probe_suppress_tail_logic_ = false;
+    // True while dispatching the last array bar (the three run loops set
+    // this right after bar_index_ = i). Read by dispatch_bar() to decide
+    // whether to apply probe_suppress_tail_logic_.
+    bool is_tail_bar_ = false;
     // Chart's display timezone — separate from ``syminfo_.timezone`` (the
     // exchange TZ). Set by ``set_chart_timezone`` / the C ABI's
     // ``strategy_set_chart_timezone``. See the doc on ``set_chart_timezone``
@@ -4660,6 +4671,24 @@ public:
         realtime_tail_horizon_bars_ = horizon_bars;
     }
     bool realtime_tail() const { return realtime_tail_; }
+
+    // Live probe tail suppression (spec §3.2, ABI v4): when `on`, the LAST
+    // bar of every subsequent run() runs only dispatch_bar()'s pre-on_bar
+    // broker steps (intraday-cap deferred close, _push_source_series,
+    // process_pending_orders, evaluate_max_intraday_loss_over_path,
+    // update_per_trade_extremes) and returns — on_bar is never invoked for
+    // that bar, and nothing after it runs (no flush_same_bar_close, no POOC
+    // second pass, no process_margin_call, no settle_dormant_bracket_
+    // reissues, no sizing refresh). Margin-call / intraday-cap closes
+    // therefore surface only at settlement (the next non-suppressed run),
+    // not against the still-forming probe bar. This is persistent
+    // configuration, like set_realtime_tail, and independent of it — do not
+    // couple the two flags. Default off (@p on == 0): every historical run
+    // stays byte-identical to before this flag existed.
+    void set_probe_suppress_tail_logic(bool on) {
+        probe_suppress_tail_logic_ = on;
+    }
+    bool probe_suppress_tail_logic() const { return probe_suppress_tail_logic_; }
 
     // Toggle volume-weighted per-sub-bar sampling inside run_magnified_bar.
     // Has no effect unless bar magnifier is enabled.
