@@ -14,7 +14,21 @@ namespace pineforge {
 namespace internal {
 
 
+namespace {
+// ABI v4 live-runtime surface (task 4): thread-local forced path order.
+// 0 AUTO, 1 HIGH_FIRST, 2 LOW_FIRST. thread_local is sufficient because a
+// BacktestEngine handle is single-threaded per run; PathOrderScope
+// (engine_run.cpp) installs this for exactly the duration of one run() and
+// restores AUTO (0) on every exit path, so it can never leak into a later
+// run on this thread that did not itself request a forced order.
+thread_local int g_path_order_override = 0;
+}  // namespace
+
+void set_path_order_override(int mode) { g_path_order_override = mode; }
+
 bool bar_path_uses_high_first(const Bar& bar) {
+    if (g_path_order_override == 1) return true;
+    if (g_path_order_override == 2) return false;
     // TradingView's broker emulator chooses the first intrabar leg from
     // the open's proximity to high vs low, not from candle color.
     return std::abs(bar.high - bar.open) < std::abs(bar.open - bar.low);

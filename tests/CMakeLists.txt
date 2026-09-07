@@ -218,6 +218,7 @@ set(TEST_SOURCES
     test_live_run_status
     test_live_realtime_tail
     test_live_probe_suppress_tail
+    test_live_path_order
 )
 
 find_package(Threads REQUIRED)

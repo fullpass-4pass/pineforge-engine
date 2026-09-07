@@ -12,7 +12,8 @@
  *     the auxiliary-security-feed setter, the strategy_stream_* lifecycle,
  *     the live-runtime surface (strategy_request_abort,
  *     strategy_last_run_status, strategy_set_realtime_tail,
- *     strategy_set_probe_suppress_tail_logic),
+ *     strategy_set_probe_suppress_tail_logic, strategy_set_path_order,
+ *     strategy_last_bar_dual_entry_path),
  *     pf_version_get/pf_version_string,
  *     pf_abi_version — the authoritative list is EXPECTED_RUNTIME in
  *     scripts/check_c_abi_runtime.py, enforced by CI). The other
@@ -250,6 +251,28 @@ PF_API void strategy_set_realtime_tail(pf_strategy_t s, int on, int horizon_bars
 PF_API void strategy_set_probe_suppress_tail_logic(pf_strategy_t s, int on) {
     if (!s) return;
     static_cast<pineforge::BacktestEngine*>(s)->set_probe_suppress_tail_logic(on != 0);
+}
+
+/* ABI v4 live-runtime surface (task 4): force the intrabar path order used
+ * by every subsequent run() -- 0 AUTO (the unchanged TV-emulator rule), 1
+ * HIGH_FIRST (O -> H -> L -> C), 2 LOW_FIRST (O -> L -> H -> C). A live
+ * probe runs the SAME forming bar under both forced orders and keeps only
+ * the fills that agree between the two. Persistent configuration, like
+ * strategy_set_realtime_tail. Default AUTO (mode=0): every historical run
+ * stays byte-identical to before this flag existed. */
+PF_API void strategy_set_path_order(pf_strategy_t s, int mode) {
+    if (!s) return;
+    static_cast<pineforge::BacktestEngine*>(s)->set_path_order(mode);
+}
+
+/* ABI v4 live-runtime surface (task 4): the winner of the most recent run()'s
+ * LAST bar's dual-entry-stop arbitration -- a flat position resting one long
+ * stop-only ENTRY and one short stop-only ENTRY, both touched on that bar.
+ * 0 = None (no such pair, or @p s is NULL), 1 = LongFirst, 2 = ShortFirst.
+ * Only the standard (non-calc_on_order_fills) dispatch path updates this. */
+PF_API int strategy_last_bar_dual_entry_path(pf_strategy_t s) {
+    if (!s) return 0;
+    return static_cast<const pineforge::BacktestEngine*>(s)->last_bar_dual_entry_path();
 }
 
 PF_API int strategy_stream_begin(pf_strategy_t s,

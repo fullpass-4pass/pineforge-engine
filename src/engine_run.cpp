@@ -826,6 +826,14 @@ void BacktestEngine::run(const Bar* bars, int n) {
         last_bar_time_ = 0;
         last_bar_index_ = 0;
     }
+    // ABI v4 live-runtime surface (task 4): install this run's forced path
+    // order as the thread-local internal::bar_path_uses_high_first override
+    // for exactly the duration of this call, restoring AUTO on every exit
+    // path (normal return or an exception unwinding through the try below).
+    struct PathOrderScope {
+        explicit PathOrderScope(int m) { internal::set_path_order_override(m); }
+        ~PathOrderScope() { internal::set_path_order_override(0); }
+    } path_order_scope(path_order_mode_);
     try {
     if (!account_currency_fx_timestamps_.empty() && calc_on_order_fills_) {
         throw std::runtime_error(
@@ -1360,6 +1368,16 @@ void BacktestEngine::run_tf_impl(const Bar* input_bars, int n_input,
     } else {
         last_bar_time_ = 0;
     }
+    // ABI v4 live-runtime surface (task 4): see the matching PathOrderScope
+    // in the single-TF run() above -- this is the TF-aware path's own copy
+    // of the same guard so every run's actual work (this function) installs
+    // and clears the override exactly once, however it was reached (the
+    // thin TF-aware run() wrapper, the syminfo/overrides overload, or
+    // stream_begin's warmup, which all delegate here).
+    struct PathOrderScope {
+        explicit PathOrderScope(int m) { internal::set_path_order_override(m); }
+        ~PathOrderScope() { internal::set_path_order_override(0); }
+    } path_order_scope(path_order_mode_);
     try {
     if (!account_currency_fx_timestamps_.empty()
         && (calc_on_order_fills_ || bar_magnifier)) {

@@ -673,6 +673,45 @@ PF_API void strategy_set_realtime_tail(pf_strategy_t s, int on, int horizon_bars
  *  Default off (@p on == 0): every historical run stays byte-identical to
  *  before this flag existed. */
 PF_API void strategy_set_probe_suppress_tail_logic(pf_strategy_t s, int on);
+/** Force this run's intrabar path order (ABI v4 live-runtime surface): the
+ *  leg order every OHLC-path helper (`bar_path_uses_high_first` and
+ *  everything built on it -- stop/limit fill priority, exit trail walking,
+ *  dual-entry-stop arbitration) uses for the CURRENT and every subsequent
+ *  run(), until a caller sets a different mode. Values:
+ *    - `0` AUTO (default): the unchanged TV-emulator rule -- the leg nearer
+ *      `open` (by `|high-open|` vs `|open-low|`) goes first.
+ *    - `1` HIGH_FIRST: force `O -> H -> L -> C` regardless of the bar's own
+ *      shape.
+ *    - `2` LOW_FIRST: force `O -> L -> H -> C` regardless of the bar's own
+ *      shape.
+ *  A live probe runs the SAME forming bar under BOTH forced orders and emits
+ *  only the fills that agree between the two -- a fill that depends on which
+ *  leg TradingView's own (unobservable, still-forming) bar will resolve to
+ *  is path-dependent and must be suppressed rather than guessed.
+ *  This is persistent configuration, like #strategy_set_realtime_tail -- it
+ *  stays in effect until a caller passes @p mode == 0, so a handle reused
+ *  for a later plain historical replay must be explicitly set back to AUTO.
+ *  Default AUTO (@p mode == 0): every historical run stays byte-identical to
+ *  before this flag existed. */
+PF_API void strategy_set_path_order(pf_strategy_t s, int mode);
+/** The winner of the most recent run()'s LAST bar's dual-entry-stop
+ *  arbitration: a flat position resting exactly one long stop-only ENTRY and
+ *  one short stop-only ENTRY, both touched on that bar
+ *  (`dual_entry_stop_path_winner`, internal). Values mirror
+ *  `internal::DualEntryStopPathWinner`'s enumerator order:
+ *    - `0` None -- no such pair this bar (not flat, no matching pair, or
+ *      neither/only one side touched), or @p s is NULL.
+ *    - `1` LongFirst -- the long stop's first-touch position on the intrabar
+ *      path came first (or the two tied, which the engine always resolves
+ *      in the long leg's favour).
+ *    - `2` ShortFirst -- the short stop's first-touch position came first.
+ *  A live probe reads this after a forming-bar run to see which side the
+ *  engine's own broker-emulator tie-break picked, without having to re-run
+ *  and infer it from which of the two possible fills came back.
+ *  Only the standard (non-`calc_on_order_fills`) dispatch path updates this
+ *  value; it is a silent no-op under the COOF scheduler, mirroring
+ *  #strategy_set_probe_suppress_tail_logic's dispatch-path-scope caveat. */
+PF_API int strategy_last_bar_dual_entry_path(pf_strategy_t s);
 /** @} */
 
 /** @addtogroup pf_config

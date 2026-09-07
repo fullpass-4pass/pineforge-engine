@@ -1409,6 +1409,13 @@ protected:
     // book. See set_probe_suppress_tail_logic(). Independent of
     // realtime_tail_ (do not couple them).
     bool probe_suppress_tail_logic_ = false;
+    // Forced intrabar path order (ABI v4 live-runtime surface, task 4): 0
+    // AUTO, 1 HIGH_FIRST, 2 LOW_FIRST. Persistent configuration, like
+    // realtime_tail_ / probe_suppress_tail_logic_ above -- reset_run_state()
+    // does not touch it. See set_path_order() and the PathOrderScope guard
+    // in engine_run.cpp that installs it as internal::set_path_order_override
+    // for exactly the duration of one run().
+    int path_order_mode_ = 0;
     // True while dispatching the last array bar (the three run loops set
     // this right after bar_index_ = i). Read by dispatch_bar() to decide
     // whether to apply probe_suppress_tail_logic_. In
@@ -1676,6 +1683,21 @@ protected:
     // Reusable scratch for process_pending_orders (capacity persists across
     // calls, mirroring scratch_skip_ids_). Always cleared before use.
     std::vector<size_t> scratch_filled_indices_;
+
+    // Per-bar dual-entry-stop arbitration winner (a flat position resting
+    // one long stop-only ENTRY + one short stop-only ENTRY, both touched
+    // this bar -- dual_entry_stop_path_winner, engine_path_resolve.cpp).
+    // Reset to None at the top of every process_pending_orders call (a
+    // process_orders_on_close_ script bar calls it twice per bar -- old-
+    // order settlement, then new-order fills -- and each pass re-derives
+    // its own flat-position winner) and written where that arbitration is
+    // decided. ABI v4 live-runtime surface (task 4): exposed read-only via
+    // last_bar_dual_entry_path() so a live probe can read the engine's own
+    // tie-break after a forming-bar run. Only the standard (non-
+    // calc_on_order_fills) dispatch path updates this; the COOF scheduler's
+    // process_next_pending_order keeps its own unrelated local of the same
+    // computation and does not persist it here.
+    internal::DualEntryStopPathWinner dual_entry_path_{};
 
     // --- Trailing stop state ---
     // Best favorable price since position entry (for trailing stop computation)
@@ -4699,6 +4721,34 @@ public:
         probe_suppress_tail_logic_ = on;
     }
     bool probe_suppress_tail_logic() const { return probe_suppress_tail_logic_; }
+
+    // Force this run's intrabar path order (ABI v4 live-runtime surface,
+    // task 4): 0 AUTO (the unchanged |H-O| vs |O-L| rule), 1 HIGH_FIRST
+    // (O -> H -> L -> C), 2 LOW_FIRST (O -> L -> H -> C). A live probe runs
+    // the SAME forming bar under both forced orders and keeps only the
+    // fills that agree between the two -- a fill that depends on which leg
+    // TradingView's own still-forming bar will resolve to is path-dependent
+    // and must be suppressed rather than guessed. See
+    // internal::bar_path_uses_high_first's thread-local override
+    // (engine_path_resolve.cpp) and the PathOrderScope guard in
+    // engine_run.cpp that installs/clears it for exactly the duration of
+    // this run's own dispatch.
+    // Persistent configuration, like set_realtime_tail -- stays set until a
+    // caller passes mode=0. Default AUTO (mode=0): every historical run
+    // stays byte-identical to before this flag existed.
+    void set_path_order(int mode) { path_order_mode_ = mode; }
+
+    // The winner of this run's LAST bar's dual-entry-stop arbitration: 0
+    // None, 1 LongFirst, 2 ShortFirst -- internal::DualEntryStopPathWinner's
+    // own enumerator order (its Tie value never reaches here;
+    // dual_entry_stop_path_winner always resolves a tie to LongFirst). Only
+    // the standard (non-calc_on_order_fills) dispatch path updates
+    // dual_entry_path_; this is a silent no-op (stays at its last standard-
+    // path value) under the COOF scheduler, mirroring
+    // set_probe_suppress_tail_logic's dispatch-path-scope caveat.
+    int last_bar_dual_entry_path() const {
+        return static_cast<int>(dual_entry_path_);
+    }
 
     // Toggle volume-weighted per-sub-bar sampling inside run_magnified_bar.
     // Has no effect unless bar magnifier is enabled.

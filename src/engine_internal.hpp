@@ -302,6 +302,14 @@ inline double snap_trail_level_to_tick_grid(double price, double mintick) {
 
 bool bar_path_uses_high_first(const Bar& bar);
 
+// ABI v4 live-runtime surface (task 4): force bar_path_uses_high_first's
+// verdict for the calling thread -- 0 AUTO (the real |H-O| vs |O-L| rule,
+// unchanged), 1 HIGH_FIRST, 2 LOW_FIRST. thread_local: a handle is
+// single-threaded per run, and this is installed/cleared for exactly one
+// run's duration by the PathOrderScope guard in engine_run.cpp. See
+// BacktestEngine::set_path_order (engine.hpp).
+void set_path_order_override(int mode);
+
 
 // Returns: -1 = stop hit first, +1 = limit hit first, 0 = neither
 // Walks a 4-waypoint intra-bar price path to determine fill priority.

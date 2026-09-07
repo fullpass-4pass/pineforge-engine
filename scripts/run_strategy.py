@@ -1240,6 +1240,16 @@ class Strategy:
             L.strategy_set_probe_suppress_tail_logic.argtypes = [
                 ctypes.c_void_p, ctypes.c_int]
             L.strategy_set_probe_suppress_tail_logic.restype = None
+        # ABI v4 live-runtime surface (task 4): force the intrabar path order
+        # / read the last bar's dual-entry-stop arbitration winner. Older
+        # .so builds may predate these exports -- hasattr-guarded like the
+        # other live-runtime setters above.
+        if hasattr(L, "strategy_set_path_order"):
+            L.strategy_set_path_order.argtypes = [ctypes.c_void_p, ctypes.c_int]
+            L.strategy_set_path_order.restype = None
+        if hasattr(L, "strategy_last_bar_dual_entry_path"):
+            L.strategy_last_bar_dual_entry_path.argtypes = [ctypes.c_void_p]
+            L.strategy_last_bar_dual_entry_path.restype = ctypes.c_int
         # ``strategy_set_chart_timezone`` lets the harness tell the engine
         # which IANA wall-clock zone Pine's ``hour`` / ``minute`` /
         # ``dayofweek`` (and the 1-arg function overloads) should produce.
@@ -1311,6 +1321,7 @@ class Strategy:
             *, trace_enabled: bool = False, trade_start_time_ms: int | None = None,
             realtime_tail_horizon: int | None = None,
             probe_suppress_tail: bool = False,
+            path_order: str | None = None,
             strategy_overrides: dict | None = None,
             chart_timezone: str | None = None,
             syminfo_timezone: str | None = None,
@@ -1458,6 +1469,13 @@ class Strategy:
             # in-force book. Off unless requested.
             if probe_suppress_tail and hasattr(self.lib, "strategy_set_probe_suppress_tail_logic"):
                 self.lib.strategy_set_probe_suppress_tail_logic(state, 1)
+            # ABI v4 live-runtime surface: force this run's intrabar path
+            # order (see strategy_set_path_order doc in pineforge.h). None
+            # (default) leaves the engine on AUTO.
+            if path_order is not None and hasattr(self.lib, "strategy_set_path_order"):
+                _PATH_ORDER_INT = {"auto": 0, "high": 1, "low": 2}
+                self.lib.strategy_set_path_order(
+                    state, _PATH_ORDER_INT[str(path_order).lower()])
             # Wire chart TZ before the run so date builtins (hour/minute/
             # dayofweek + the 1-arg function overloads) land on the same
             # wall clock TV used at export time. Empty/None == leave the
@@ -2595,6 +2613,13 @@ def main() -> int:
                          "call / intraday-cap close against the forming bar. Calls "
                          "strategy_set_probe_suppress_tail_logic with on=1 before the run. "
                          "--runner ctypes only.")
+    ap.add_argument("--path-order", choices=["auto", "high", "low"], default=None,
+                    help="ABI v4 live-runtime surface: force this run's intrabar path order "
+                         "instead of the engine's own |H-O| vs |O-L| AUTO rule -- 'high' for "
+                         "O->H->L->C, 'low' for O->L->H->C. A live probe runs the same forming "
+                         "bar under both forced orders and keeps only the fills that agree. "
+                         "Calls strategy_set_path_order before the run. Default (unset) leaves "
+                         "the engine on AUTO. --runner ctypes only.")
     ap.add_argument("--inputs-json", type=Path, default=None,
                     help="Use this inputs.json instead of strategy_dir/inputs.json. "
                          "Lets ad-hoc validation runs override strategy properties "
@@ -2731,6 +2756,10 @@ def main() -> int:
             sys.exit(
                 "error: --runner docker does not support --probe-suppress-tail; "
                 "use --runner ctypes with a freshly built strategy library.")
+        if args.path_order is not None:
+            sys.exit(
+                "error: --runner docker does not support --path-order; "
+                "use --runner ctypes with a freshly built strategy library.")
         strat = None
         report = _run_via_docker(strategy_dir, ohlcv_path, params, run_kwargs,
                                  trade_start_ms, args.image)
@@ -2742,6 +2771,7 @@ def main() -> int:
                            trade_start_time_ms=trade_start_ms,
                            realtime_tail_horizon=args.realtime_tail,
                            probe_suppress_tail=args.probe_suppress_tail,
+                           path_order=args.path_order,
                            **run_kwargs)
     raw_trade_count = len(report["trades"])
     trades_to_write = _filter_trades_to_window(report["trades"], report_window)

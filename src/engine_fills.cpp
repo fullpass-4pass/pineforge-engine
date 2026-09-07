@@ -274,7 +274,14 @@ void BacktestEngine::process_pending_orders(const Bar& bar) {
     // heap allocation per process_pending_orders call). Must start empty.
     std::unordered_set<std::string>& pass0_opposing_skip_ids = scratch_skip_ids_;
     pass0_opposing_skip_ids.clear();
-    DualEntryStopPathWinner dual_entry_path_ = DualEntryStopPathWinner::None;
+    // dual_entry_path_ is genuine per-bar engine state (member, engine.hpp),
+    // not a scratchpad -- exposed read-only via last_bar_dual_entry_path()
+    // for the live runtime (ABI v4, task 4) to read the engine's own
+    // dual-entry-stop tie-break after a probe run. Reset at the top of
+    // every process_pending_orders call: a process_orders_on_close_ script
+    // bar calls this twice (old-order settlement, then new-order fills),
+    // and each pass re-derives its own flat-position winner.
+    dual_entry_path_ = DualEntryStopPathWinner::None;
     if (position_side_ == PositionSide::FLAT) {
         // design-stop-tick-rounding: stop touches on the tick-quantized bar,
         // walked in the RAW bar's leg order.
