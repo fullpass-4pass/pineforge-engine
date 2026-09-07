@@ -643,16 +643,33 @@ PF_API void strategy_set_realtime_tail(pf_strategy_t s, int on, int horizon_bars
  *  and updating per-trade extremes (`update_per_trade_extremes`).
  *  `on_bar` is never invoked for that bar, and nothing that ordinarily runs
  *  after it runs either -- no `invoke_chart_on_bar`, no
- *  `flush_same_bar_close`, no POOC second pass, no `process_margin_call`,
- *  no `settle_dormant_bracket_reissues`, no post-liquidation sizing
- *  refresh. A margin call or intraday-cap close that would ordinarily fire
- *  against the forming bar therefore surfaces only at settlement (the next
- *  non-suppressed run), never against the still-forming probe bar itself.
+ *  `flush_same_bar_close`, no POOC second pass, no `process_margin_call`
+ *  (and, under process_orders_on_close, the pre-script carried-position
+ *  margin helpers), no `settle_dormant_bracket_reissues`, no
+ *  post-liquidation sizing refresh. A margin call or intraday-cap close that
+ *  would ordinarily fire against the forming bar therefore surfaces only at
+ *  settlement (the next non-suppressed run), never against the
+ *  still-forming probe bar itself.
  *  The run's last-bar fills are exactly the settled book's fills against
  *  the forming bar, and the post-run pending-order book is the book in
  *  force during that bar. This is persistent configuration, like
  *  #strategy_set_realtime_tail, and independent of it -- do not assume the
  *  two flags are coupled; set each explicitly.
+ *  Dispatch-path scope (ABI v4 / live v1): this flag is honoured only on the
+ *  standard `dispatch_bar` path -- the single-timeframe run loop and the
+ *  input_tf == script_tf simple bar loop. It is a silent no-op under
+ *  `calc_on_order_fills` (the COOF scheduler dispatches the last bar in full,
+ *  `on_bar` included) and under the bar magnifier (`run_magnified_bar` never
+ *  reaches `dispatch_bar`); both are gated features in v1 and a probe must
+ *  not enable them. On the non-magnifier aggregation path
+ *  (input_tf < script_tf) the semantics are UNDEFINED until the partial-
+ *  bucket forming-bar flag lands: today the bar suppressed is whichever
+ *  script bar is dispatched while walking the array's last input bar (a
+ *  completed bucket, when that input bar opens a new one), and a trailing
+ *  partial bucket is never dispatched at all. Callers must feed an
+ *  input_tf == script_tf array until that flag exists.
+ *  Clear this flag (on = 0) before `strategy_stream_begin`; the warmup
+ *  replay is a run().
  *  Default off (@p on == 0): every historical run stays byte-identical to
  *  before this flag existed. */
 PF_API void strategy_set_probe_suppress_tail_logic(pf_strategy_t s, int on);

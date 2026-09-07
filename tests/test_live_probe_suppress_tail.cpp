@@ -1,5 +1,6 @@
 #include <pineforge/bar.hpp>
 #include <pineforge/engine.hpp>
+#include <cmath>
 #include <cstdio>
 #include <string>
 #include <vector>
@@ -7,12 +8,14 @@ using namespace pineforge;
 namespace {
 int failures = 0;
 #define CHECK(cond) do { if (!(cond)) { std::fprintf(stderr, "FAIL %s:%d  %s\n", __FILE__, __LINE__, #cond); ++failures; } } while (0)
+bool near(double a, double b, double eps = 1e-9) { return std::fabs(a - b) <= eps; }
 Bar bar(double o, double h, double l, double c, int64_t ts) { return Bar{o, h, l, c, 1.0, ts}; }
 // Re-issues a stop exit every bar (the dominant Pine idiom) at 1% below the
 // current close, entering long on bar 1. Snapshots the pending book as seen
 // at on_bar entry (= the book in force during that bar).
 class ReissueStop final : public BacktestEngine {
 public:
+    using BacktestEngine::position_side_;  // expose the protected member for CHECKs below
     std::vector<std::vector<double>> book_at_on_bar_entry;  // stop prices per bar
     int on_bar_calls = 0;
     void on_bar(const Bar& b) override {
@@ -47,5 +50,29 @@ int main() {
     CHECK(probe.on_bar_calls == 3);                       // tail on_bar skipped
     CHECK(probe.book_now() == in_force_on_last);          // post-run book == in-force book
     CHECK(probe.trade_count() == plain.trade_count());    // no tail fill differs (stop not touched)
+
+    // Discriminating case: the tail bar's low CROSSES the in-force stop
+    // (bar 2's close 102 * 0.99 = 100.98; tail low here is 100.5). A bare
+    // `return;` in the suppressed branch would leave the stop resting and
+    // the position open -- only actually running process_pending_orders
+    // against the forming bar produces the settled fill spec S3.2 requires.
+    const std::vector<Bar> crossing_bars = {
+        bar(100, 101, 99, 100, 0), bar(100, 102, 99, 101, 60'000),
+        bar(101, 103, 100, 102, 120'000), bar(102, 104, 100.5, 103, 180'000),
+    };
+    ReissueStop plain2;
+    plain2.run(crossing_bars.data(), 4);
+    CHECK(plain2.trade_count() == 1);
+    CHECK(near(plain2.get_trade(0).exit_price, 100.98));  // stop fill, step 1 of dispatch_bar
+
+    ReissueStop probe2;
+    probe2.set_probe_suppress_tail_logic(true);
+    probe2.run(crossing_bars.data(), 4);
+    CHECK(probe2.trade_count() == 1);                              // tail fill happened
+    CHECK(near(probe2.get_trade(0).exit_price, 100.98));           // same fill as plain2
+    CHECK(near(probe2.get_trade(0).exit_price, plain2.get_trade(0).exit_price));
+    CHECK(probe2.book_now().empty());                              // stop consumed, no re-issue (on_bar skipped)
+    CHECK(probe2.position_side_ == PositionSide::FLAT);            // settled book: position closed
+
     return failures == 0 ? 0 : 1;
 }

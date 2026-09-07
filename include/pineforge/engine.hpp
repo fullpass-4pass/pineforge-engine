@@ -1411,7 +1411,10 @@ protected:
     bool probe_suppress_tail_logic_ = false;
     // True while dispatching the last array bar (the three run loops set
     // this right after bar_index_ = i). Read by dispatch_bar() to decide
-    // whether to apply probe_suppress_tail_logic_.
+    // whether to apply probe_suppress_tail_logic_. In
+    // run_aggregation_bar_loop this is keyed off the INPUT index i, not the
+    // emitted script-bar count -- see set_probe_suppress_tail_logic() for
+    // why that is only a placeholder today.
     bool is_tail_bar_ = false;
     // Chart's display timezone — separate from ``syminfo_.timezone`` (the
     // exchange TZ). Set by ``set_chart_timezone`` / the C ABI's
@@ -4683,8 +4686,15 @@ public:
     // therefore surface only at settlement (the next non-suppressed run),
     // not against the still-forming probe bar. This is persistent
     // configuration, like set_realtime_tail, and independent of it — do not
-    // couple the two flags. Default off (@p on == 0): every historical run
-    // stays byte-identical to before this flag existed.
+    // couple the two flags.
+    // Honoured only on the standard dispatch_bar path (single-TF run loop,
+    // run_simple_bar_loop). Silent no-op under calc_on_order_fills (COOF
+    // scheduler) and under the bar magnifier (run_magnified_bar) -- both
+    // gated in live v1. Semantics UNDEFINED on the non-magnifier aggregation
+    // path (input_tf < script_tf) until the partial-bucket forming-bar flag
+    // lands; see pineforge.h.
+    // Default off (@p on == 0): every historical run stays byte-identical to
+    // before this flag existed.
     void set_probe_suppress_tail_logic(bool on) {
         probe_suppress_tail_logic_ = on;
     }

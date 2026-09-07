@@ -242,6 +242,9 @@ PF_API void strategy_set_realtime_tail(pf_strategy_t s, int on, int horizon_bars
  * settle_dormant_bracket_reissues, no sizing refresh). Margin-call /
  * intraday-cap closes therefore surface only at settlement, not against the
  * still-forming probe bar. Independent of strategy_set_realtime_tail.
+ * Honoured only on the standard dispatch_bar path; no-op under COOF and the
+ * bar magnifier (gated in v1); undefined on input_tf < script_tf until the
+ * partial-bucket flag lands -- see pineforge.h.
  * Default off (on=0): every historical run stays byte-identical to before
  * this flag existed. */
 PF_API void strategy_set_probe_suppress_tail_logic(pf_strategy_t s, int on) {
