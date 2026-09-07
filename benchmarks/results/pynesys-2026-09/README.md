@@ -495,7 +495,10 @@ lanes involved.
 | `pf_finer_rs` | + campaign 1m auxiliary feed and the tape's range-start bound | 13 | **13** | 0 | 0 | **0** |
 
 The three that still refuse under `pf_finer` are not a request the campaign refuses either — the
-campaign grades all 13 *excellent* at 100 % matched. They are this benchmark's fixed whole-feed
+campaign grades all 13 *excellent* at 100 % matched (its own verifier reports, read back with
+`lab verify show`; note those are at the campaign's current baseline engine `a03ac6d3`, several
+rounds ahead of this benchmark's pinned `76518c6b`, so they corroborate that the *inputs* are
+answerable, not that the two engines' trades are identical). They are this benchmark's fixed whole-feed
 invocation: the CME_MINI `ES1!`/`NQ1!` 1D chart feeds start 2021-05-02 while the campaign's 1m
 feeds for those lanes start 2023-08-25, so two years of 1D bars have no 1m coverage
 (`native chart bar has no matching auxiliary request.security bars`), and the NSE 1D feed has a
