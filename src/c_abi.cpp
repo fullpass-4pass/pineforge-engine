@@ -11,7 +11,8 @@
  *     incarnation accessor, setters, strategy_get_last_error,
  *     the auxiliary-security-feed setter, the strategy_stream_* lifecycle,
  *     the live-runtime surface (strategy_request_abort,
- *     strategy_last_run_status), pf_version_get/pf_version_string,
+ *     strategy_last_run_status, strategy_set_realtime_tail),
+ *     pf_version_get/pf_version_string,
  *     pf_abi_version — the authoritative list is EXPECTED_RUNTIME in
  *     scripts/check_c_abi_runtime.py, enforced by CI). The other
  *     `extern "C"` symbols listed in pineforge.h (strategy_create,
@@ -220,6 +221,15 @@ PF_API void strategy_request_abort(pf_strategy_t s) {
 PF_API int strategy_last_run_status(pf_strategy_t s) {
     if (!s) return -1;
     return static_cast<const pineforge::BacktestEngine*>(s)->last_run_status();
+}
+
+/* Live-runtime tail semantics (spec §3.1): the last bar of the array fed to
+ * the next run() is a still-forming bar, not the chart's rightmost
+ * historical bar. Default off (on=0): every historical run stays
+ * byte-identical to before this flag existed. */
+PF_API void strategy_set_realtime_tail(pf_strategy_t s, int on, int horizon_bars) {
+    if (!s) return;
+    static_cast<pineforge::BacktestEngine*>(s)->set_realtime_tail(on != 0, horizon_bars);
 }
 
 PF_API int strategy_stream_begin(pf_strategy_t s,

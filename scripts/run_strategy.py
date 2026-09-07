@@ -1232,6 +1232,10 @@ class Strategy:
             L.strategy_request_abort.restype = None
             L.strategy_last_run_status.argtypes = [ctypes.c_void_p]
             L.strategy_last_run_status.restype = ctypes.c_int
+        if hasattr(L, "strategy_set_realtime_tail"):
+            L.strategy_set_realtime_tail.argtypes = [
+                ctypes.c_void_p, ctypes.c_int, ctypes.c_int]
+            L.strategy_set_realtime_tail.restype = None
         # ``strategy_set_chart_timezone`` lets the harness tell the engine
         # which IANA wall-clock zone Pine's ``hour`` / ``minute`` /
         # ``dayofweek`` (and the 1-arg function overloads) should produce.
@@ -1301,6 +1305,7 @@ class Strategy:
 
     def run(self, bars_csv: Path, params: dict | None = None,
             *, trace_enabled: bool = False, trade_start_time_ms: int | None = None,
+            realtime_tail_horizon: int | None = None,
             strategy_overrides: dict | None = None,
             chart_timezone: str | None = None,
             syminfo_timezone: str | None = None,
@@ -1436,6 +1441,11 @@ class Strategy:
                 self.lib.strategy_set_trace_enabled(state, 1)
             if trade_start_time_ms is not None and hasattr(self.lib, "strategy_set_trade_start_time"):
                 self.lib.strategy_set_trade_start_time(state, int(trade_start_time_ms))
+            # Live-runtime tail (ABI v4, spec §3.1): the last bar of this run
+            # is a still-forming bar, not the chart's rightmost historical
+            # bar. Off unless a horizon is given.
+            if realtime_tail_horizon is not None and hasattr(self.lib, "strategy_set_realtime_tail"):
+                self.lib.strategy_set_realtime_tail(state, 1, int(realtime_tail_horizon))
             # Wire chart TZ before the run so date builtins (hour/minute/
             # dayofweek + the 1-arg function overloads) land on the same
             # wall clock TV used at export time. Empty/None == leave the
@@ -2559,6 +2569,12 @@ def main() -> int:
     ap.add_argument("--allow-trading-before-window", action="store_true",
                     help="When tv_trades_csv defines an emit window, keep broker order execution active before that window. "
                          "This matches TV exports that carry positions opened before the displayed date range.")
+    ap.add_argument("--realtime-tail", type=int, default=None, metavar="HORIZON",
+                    help="Live-runtime tail (ABI v4, spec §3.1): treat the fed OHLCV's last bar as "
+                         "still forming instead of the chart's rightmost historical bar "
+                         "(barstate.islast false, no range-end close row) and freeze "
+                         "pine_last_bar_index() at HORIZON - 1. Calls strategy_set_realtime_tail "
+                         "with on=1 before the run. --runner ctypes only.")
     ap.add_argument("--inputs-json", type=Path, default=None,
                     help="Use this inputs.json instead of strategy_dir/inputs.json. "
                          "Lets ad-hoc validation runs override strategy properties "
@@ -2687,6 +2703,10 @@ def main() -> int:
                 "error: --runner docker does not support native "
                 "request.security feeds; use --runner ctypes with a freshly "
                 "built strategy library.")
+        if args.realtime_tail is not None:
+            sys.exit(
+                "error: --runner docker does not support --realtime-tail; "
+                "use --runner ctypes with a freshly built strategy library.")
         strat = None
         report = _run_via_docker(strategy_dir, ohlcv_path, params, run_kwargs,
                                  trade_start_ms, args.image)
@@ -2696,6 +2716,7 @@ def main() -> int:
         report = strat.run(ohlcv_path, params=params,
                            trace_enabled=args.trace_json is not None,
                            trade_start_time_ms=trade_start_ms,
+                           realtime_tail_horizon=args.realtime_tail,
                            **run_kwargs)
     raw_trade_count = len(report["trades"])
     trades_to_write = _filter_trades_to_window(report["trades"], report_window)

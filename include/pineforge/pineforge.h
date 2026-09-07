@@ -615,6 +615,21 @@ PF_API int strategy_stream_fill_report(pf_strategy_t s, pf_report_t* out);
 PF_API void strategy_request_abort(pf_strategy_t s);
 /** 0 = completed, 1 = NOT_COMPLETED (aborted), -1 = @p s is NULL. */
 PF_API int  strategy_last_run_status(pf_strategy_t s);
+/** Live-runtime tail semantics (spec §3.1): the LAST bar of the array fed to
+ *  the next run() is a still-forming bar, not the chart's rightmost
+ *  historical bar. Effects when @p on is non-zero:
+ *    1. `barstate.islast` is false for that bar.
+ *    2. `session.islastbar` is computed from the bucket calendar (no next
+ *       bar to peek at, so it evaluates whether the next bucket -- this
+ *       bar's timestamp plus one script-TF step -- falls out of session).
+ *    3. `bar_index` / `last_bar_index` stay put, but `pine_last_bar_index()`
+ *       is frozen at `horizon_bars - 1` (when @p horizon_bars > 0).
+ *    4. The range-end synthetic close row/trade is skipped (no
+ *       `open_at_end` row); the final equity point keeps `open_profit`.
+ *    5. Interior bars (every bar before the last) are unaffected.
+ *  Default off (@p on == 0): every historical run stays byte-identical to
+ *  before this flag existed. */
+PF_API void strategy_set_realtime_tail(pf_strategy_t s, int on, int horizon_bars);
 /** @} */
 
 /** @addtogroup pf_config

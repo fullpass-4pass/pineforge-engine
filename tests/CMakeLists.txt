@@ -216,6 +216,7 @@ set(TEST_SOURCES
     test_trail_activation_tick_bar
     test_session_predicates_daily_chart
     test_live_run_status
+    test_live_realtime_tail
 )
 
 find_package(Threads REQUIRED)

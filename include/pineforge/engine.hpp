@@ -1397,6 +1397,11 @@ protected:
     SymInfo syminfo_;
     int64_t last_bar_time_ = 0;
     int last_bar_index_ = 0;
+    // Live-runtime tail semantics (spec §3.1, ABI v4): when true, the LAST
+    // bar of the fed array is a still-forming bar, not the chart's rightmost
+    // historical bar. See set_realtime_tail() and apply_realtime_tail_horizon().
+    bool realtime_tail_ = false;
+    int realtime_tail_horizon_bars_ = 0;
     // Chart's display timezone — separate from ``syminfo_.timezone`` (the
     // exchange TZ). Set by ``set_chart_timezone`` / the C ABI's
     // ``strategy_set_chart_timezone``. See the doc on ``set_chart_timezone``
@@ -4280,6 +4285,11 @@ private:
     void run_simple_bar_loop(const Bar* input_bars, int n_input);
     void run_aggregation_bar_loop(const Bar* input_bars, int n_input,
                                   bool bar_magnifier, int expected_script_bars);
+    // Live-runtime tail (spec §3.1): once script_tf_seconds_ is known for
+    // this run, freeze pine_last_bar_index()/last_bar_time_ at the horizon
+    // bar instead of the fed array's actual last index. No-op unless
+    // realtime_tail_ is on and horizon_bars_ > 0.
+    void apply_realtime_tail_horizon(const Bar* bars, int n);
     // The TF-aware run()'s actual work (dispatch loop selection, the
     // try/catch, both cleanup paths). Does NOT touch last_error_,
     // last_run_status_, or abort_requested_ -- every public run() overload
@@ -4634,6 +4644,19 @@ public:
     const std::string& main_period() const { return script_tf_; }
     int pine_bar_index() const { return bar_index_ + bar_index_offset_; }
     int pine_last_bar_index() const { return last_bar_index_ + bar_index_offset_; }
+
+    // Live-runtime tail semantics (spec §3.1, ABI v4): the caller's fed array
+    // ends with a still-forming bar rather than the chart's rightmost
+    // historical bar. When `on`, the LAST bar of the next run() gets
+    // barstate.islast == false, session.islastbar computed from the bucket
+    // calendar (no i+1 bar to peek at), pine_last_bar_index() frozen at
+    // `horizon_bars - 1`, and no range-end close row/trade. Default off:
+    // every historical run is byte-identical to before this flag existed.
+    void set_realtime_tail(bool on, int horizon_bars) {
+        realtime_tail_ = on;
+        realtime_tail_horizon_bars_ = horizon_bars;
+    }
+    bool realtime_tail() const { return realtime_tail_; }
 
     // Toggle volume-weighted per-sub-bar sampling inside run_magnified_bar.
     // Has no effect unless bar magnifier is enabled.

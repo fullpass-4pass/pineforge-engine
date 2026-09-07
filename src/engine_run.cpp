@@ -830,6 +830,7 @@ void BacktestEngine::run(const Bar* bars, int n) {
     input_tf_ = detected_tf;
     script_tf_ = detected_tf;
     script_tf_seconds_ = tf_to_seconds(script_tf_);
+    apply_realtime_tail_horizon(bars, n);
 
     // Runtime diagnostics (single-timeframe path)
     diag_input_bars_processed_ = n;
@@ -854,7 +855,7 @@ void BacktestEngine::run(const Bar* bars, int n) {
         bar_index_ = i;
         is_first_tick_ = true;
         is_last_tick_ = true;
-        barstate_islast_ = !stream_warmup_mode_ && (i == n - 1);
+        barstate_islast_ = !stream_warmup_mode_ && !realtime_tail_ && (i == n - 1);
         diag_script_bars_processed_++;
         // Reset per-bar pending-close accumulator. Each on_bar call
         // captures fresh ``strategy.close*`` qty for the same-bar
@@ -868,8 +869,10 @@ void BacktestEngine::run(const Bar* bars, int n) {
     // TradingView's range-end accounting: a position still open after the
     // last bar is reported as a closed trade at that bar's close
     // (record_range_end_close_trades, engine_orders.cpp). Report-only:
-    // the live position is untouched.
-    record_range_end_close_trades();
+    // the live position is untouched. Skipped under the live-runtime tail
+    // (spec §3.1): the last bar is still forming, so it never gets a
+    // synthetic range-end close row.
+    if (!realtime_tail_) record_range_end_close_trades();
     } catch (const AbortRequested&) {
         last_run_status_ = 1;
     } catch (const std::exception& e) {
@@ -877,6 +880,19 @@ void BacktestEngine::run(const Bar* bars, int n) {
     } catch (...) {
         last_error_ = "unknown error during BacktestEngine::run";
     }
+}
+
+
+// Live-runtime tail (spec §3.1): once script_tf_seconds_ is known for this
+// run, freeze pine_last_bar_index()/last_bar_time_ at the horizon bar
+// instead of the fed array's actual last index/timestamp. No-op unless
+// realtime_tail_ is on and a positive horizon was configured.
+void BacktestEngine::apply_realtime_tail_horizon(const Bar* bars, int n) {
+    if (!realtime_tail_ || realtime_tail_horizon_bars_ <= 0 || n <= 0 || bars == nullptr) return;
+    last_bar_index_ = realtime_tail_horizon_bars_ - 1;
+    last_bar_time_ = bars[0].timestamp
+        + static_cast<int64_t>(realtime_tail_horizon_bars_ - 1)
+          * static_cast<int64_t>(script_tf_seconds_ > 0 ? script_tf_seconds_ : 0) * 1000;
 }
 
 
@@ -1409,6 +1425,10 @@ void BacktestEngine::run_tf_impl(const Bar* input_bars, int n_input,
     int expected_script_bars =
         count_expected_script_bars(input_bars, n_input, needs_aggregation);
     last_bar_index_ = expected_script_bars - 1;
+    // Live-runtime tail (spec §3.1): freeze last_bar_index_/last_bar_time_ at
+    // the horizon bar. Must run AFTER the expected_script_bars assignment
+    // above, which would otherwise clobber it.
+    apply_realtime_tail_horizon(input_bars, n_input);
     // reset_run_state() already ran above — reserve AFTER it so the capacity
     // hint isn't wiped (clear() retains capacity but order still matters for
     // any future reset that releases).
@@ -1461,8 +1481,9 @@ void BacktestEngine::run_tf_impl(const Bar* input_bars, int n_input,
     // last script bar is reported as a closed trade at that bar's close
     // (record_range_end_close_trades, engine_orders.cpp). Report-only: the
     // live position is untouched, and the stream warmup replay, whose bars
-    // are not a range end, is skipped.
-    record_range_end_close_trades();
+    // are not a range end, is skipped. Also skipped under the live-runtime
+    // tail (spec §3.1): the last bar is still forming.
+    if (!realtime_tail_) record_range_end_close_trades();
     clear_historical_security_lookahead_projections();
 #ifdef PINEFORGE_HAS_AUX_SECURITY_FEED_V1
     clear_aux_security_chart_ranges();
@@ -1764,7 +1785,7 @@ void BacktestEngine::run_simple_bar_loop(const Bar* input_bars, int n_input) {
         bar_index_ = i;
         is_first_tick_ = true;
         is_last_tick_ = true;
-        barstate_islast_ = !stream_warmup_mode_ && (i == n_input - 1);
+        barstate_islast_ = !stream_warmup_mode_ && !realtime_tail_ && (i == n_input - 1);
         diag_script_bars_processed_++;
         // Reset per-bar pending-close accumulator. Each on_bar call captures
         // fresh ``strategy.close*`` qty for the same-bar close-then-entry
@@ -1802,6 +1823,12 @@ void BacktestEngine::run_simple_bar_loop(const Bar* input_bars, int n_input) {
             bool next_in_session = false;
             if (in_session && i + 1 < n_input) {
                 next_in_session = chart_bar_ismarket(input_bars[i + 1].timestamp);
+            } else if (in_session && realtime_tail_ && script_tf_seconds_ > 0) {
+                // Live tail: no i+1 exists; use the bucket calendar (the rule
+                // engine_stream.cpp applies to a forming bar).
+                next_in_session = chart_bar_ismarket(
+                    current_bar_.timestamp
+                    + static_cast<int64_t>(script_tf_seconds_) * 1000);
             }
             set_session_bar_state(in_session, in_session && !next_in_session);
         }
@@ -1897,7 +1924,7 @@ void BacktestEngine::run_aggregation_bar_loop(const Bar* input_bars, int n_input
             const int64_t script_bar_ts = ab.bar.timestamp;
             bar_index_ = script_bar_index++;
             emitted_script_bars++;
-            barstate_islast_ = !stream_warmup_mode_
+            barstate_islast_ = !stream_warmup_mode_ && !realtime_tail_
                 && (emitted_script_bars == expected_script_bars);
             diag_script_bars_processed_++;
             // Reset per-bar pending-close accumulator. See run_simple_bar_loop
