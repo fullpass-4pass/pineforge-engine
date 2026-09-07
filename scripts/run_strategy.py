@@ -795,9 +795,12 @@ class ReportC(ctypes.Structure):
 # pf_report_t is CALLER-allocated: running an old .so against the v3
 # ReportC mirror (or vice versa) silently corrupts memory, so the .so's
 # pf_abi_version() export is asserted before any run. v3 appended
-# pf_trade_t::open_at_end (TradeC above); v4 is groundwork for the
-# live-runtime surface (last_run_status_ etc.) and does not change the
-# pf_report_t/pf_trade_t layout this mirror describes.
+# pf_trade_t::open_at_end (TradeC above); v4 is this groundwork commit
+# (last_run_status_ etc.) — pf_report_t itself grows later on this
+# branch (a broker_state_hash array after equity_curve_len). Extend
+# ReportC above when that lands; this guard only checks the version
+# number, so it would keep passing (4 == 4) against an under-sized
+# mirror if ReportC isn't grown first.
 # test_run_strategy_range_end.py pins this constant to the header's
 # macro, because the campaign's verifier runs every probe through THIS
 # harness and a stale guard here is a run-error on every slug (the

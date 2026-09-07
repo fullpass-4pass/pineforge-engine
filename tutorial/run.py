@@ -113,8 +113,11 @@ class ReportC(ctypes.Structure):
 
 # pf_report_t is caller-allocated, so a stale mirror means the runtime
 # writes past our buffer. Assert the .so's ABI version before any run.
-# v4 is groundwork for the live-runtime surface and does not change
-# the pf_report_t/pf_trade_t layout this mirror describes.
+# v4 is this groundwork commit: pf_report_t grows (a broker_state_hash
+# array after equity_curve_len) in a later commit on this branch —
+# extend this ReportC mirror when it does; the guard only checks the
+# version number, so it would keep passing (4 == 4) against an
+# under-sized mirror if ReportC isn't grown first.
 EXPECTED_PF_ABI = 4
 
 def check_abi(lib: ctypes.CDLL) -> None:

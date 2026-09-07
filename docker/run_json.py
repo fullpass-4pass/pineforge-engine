@@ -704,8 +704,11 @@ def engine_version(lib: ctypes.CDLL) -> dict:
 
 # pf_report_t is CALLER-allocated: a .so built against a different ABI
 # writes past (or short of) our ReportC buffer. Assert version up front.
-# v4 is groundwork for the live-runtime surface and does not change
-# the pf_report_t/pf_trade_t layout this mirror describes.
+# v4 is this groundwork commit: pf_report_t grows (a broker_state_hash
+# array after equity_curve_len) in a later commit on this branch —
+# extend this ReportC mirror when it does; the guard only checks the
+# version number, so it would keep passing (4 == 4) against an
+# under-sized mirror if ReportC isn't grown first.
 EXPECTED_PF_ABI = 4
 
 
