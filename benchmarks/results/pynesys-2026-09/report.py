@@ -14,7 +14,7 @@ LANE_LABEL = {"eth": "BINANCE:ETHUSDT.P@15", "btcusdt": "BINANCE:BTCUSDT@15", "b
               "es1": "CME_MINI:ES1!@15", "es1-1d": "CME_MINI:ES1!@1D", "nq1": "CME_MINI:NQ1!@15", "nq1-1d": "CME_MINI:NQ1!@1D",
               "aapl": "NASDAQ:AAPL@15", "nifty": "NSE:NIFTY@15", "nifty-1d": "NSE:NIFTY@1D", "f": "NYSE:F@15", "f-1d": "NYSE:F@1D",
               "eurusd": "OANDA:EURUSD@15", "xauusd": "OANDA:XAUUSD@15", "xauusd-1d": "OANDA:XAUUSD@1D",
-              "eth-suite": "BINANCE:ETHUSDT@15 (public benchmark suite)", "eth-corpus": "BINANCE:ETHUSDT.P@15 (public corpus)"}
+              "eth-suite": "BINANCE:ETHUSDT.P@15 (public benchmark suite)", "eth-corpus": "BINANCE:ETHUSDT.P@15 (public corpus)"}
 # ---- the 2026-09-07 headline criterion: BEST SUPPORTED CONFIGURATION per engine ----
 # Each engine is scored on the best rung of its OWN ladder, on the same underlying market data.
 # The ladders are the configurations each engine's own CLI/runtime supports; no input one engine
@@ -43,7 +43,7 @@ LADDERS = {
     "pc691_bestcfg": ["pc691", "pc691_rs", "pc691_sec", "pc691_finer", "pc691_finer_rs", "pc691_best", "pc691_bestd", "pc691_re"],
     "pc646_bestcfg": ["pc646", "pc646_rs"],
 }
-# Set A is the engine's own public benchmark suite: 100 USD-denominated scripts on a BINANCE:ETHUSDT
+# Set A is the engine's own public benchmark suite: 100 USD-denominated scripts on a BINANCE:ETHUSDT.P
 # chart. The campaign verifier refuses every one of them by name under the round-9 no-account-FX
 # rule ("a probe's account currency is its symbol's quote currency"), so there is no campaign
 # configuration to import and the benchmark's own ladder is the headline there -- graded by the
@@ -361,7 +361,7 @@ for sel, others, caption in COND_SELECTORS:
     cmd_.append(f"\n### Selector: {ENAME[sel]} — {caption}\n")
     cmd_.append(md_table([d for d in cond_rows if d["selector"] == ENAME[sel]],
                          ["set", "lane", "engine", "n"] + TIERS + ["errors", "timeouts", "not_run"]))
-    cmd_.append("Sets A and B are single-lane (set A: BINANCE:ETHUSDT@15, the public benchmark suite; "
+    cmd_.append("Sets A and B are single-lane (set A: BINANCE:ETHUSDT.P@15, the public benchmark suite; "
                 "set B: BINANCE:ETHUSDT.P@15, the public corpus), so they carry no per-lane breakdown.\n")
 if cond_rows:
     wcsv(OUT/"conditional.csv", cond_rows, list(cond_rows[0].keys()))

@@ -132,6 +132,31 @@ verifier's own candidate ladder, which is why its numbers there are the campaign
 PyneCore is given the same market data, including the campaign's 1-minute auxiliary feed and its
 native TradingView daily feed, and its own best rung out of seven.
 
+### Secondary — one chart CSV, no setup
+
+This is revisions 1–2's headline, kept because it answers a different and equally real question:
+what do you get with one chart CSV, no auxiliary feeds and no configuration? Both engines are on
+the identical single feed here, PineForge on its tape-window rung and PyneCore on its plain run.
+
+| | set A — public suite (100) | set B — public corpus (311) | set C — closed sample (200) |
+|---|---:|---:|---:|
+| **PineForge** excellent | 89 | 311 | 140 |
+| **PineForge** excellent + strong | 100 / 100 | 311 / 311 | 169 / 200 |
+| PyneCore 6.9.1 excellent | 81 | 230 | 67 |
+| PyneCore 6.9.1 excellent + strong | 99 / 100 | 281 / 311 | 127 / 200 |
+| PyneCore 6.4.6 excellent | 69 | 205 | 43 |
+| PyneCore 6.4.6 excellent + strong | 87 / 100 | 255 / 311 | 92 / 200 |
+| PineForge failures | 0 | 0 | 13 |
+| PyneCore 6.9.1 failures | 0 | 20 | 32 |
+| PyneCore 6.4.6 failures | 1 | 33 | 54 |
+
+Read the two tables together and the shape of the argument is visible: giving each engine what it
+asks for lifts **both** (PyneCore 6.9.1 gains +1 / +42 / +47 excellent, PineForge +1 / −1 / +58),
+and it is the only way to compare the engines rather than the harness. Set B is the one place
+PineForge's headline is *lower* than its single-feed row — because the headline follows the
+campaign verifier's rung choice and the single-feed row does not; see
+[set B](#set-b--public-corpus-311-strategies-with-a-tape-222295-bars-431244-tv-trades).
+
 **The four things this benchmark actually shows.**
 
 1. **On the closed third-party set PineForge is now exact on 198 of 200.** These are 200 scripts
@@ -223,7 +248,7 @@ engine's own error text — never a silent handicap, and never a failure blamed 
    176,093,499 bytes). Set A's lane is the engine's own benchmark asset feed, not a campaign
    lane, and has none — and needs none: no set-A probe of either engine fails on a finer
    `request.security`.
-3b. **The campaign's native TradingView daily feed, on the five lanes that pin one** — `aapl-15`,
+4. **The campaign's native TradingView daily feed, on the five lanes that pin one** — `aapl-15`,
    `es1-15`, `f-15`, `nifty-15`, `nq1-15`. On an intraday equity/futures chart TradingView's
    `request.security(syminfo.tickerid, "D", …)` reads the exchange's own daily bars — the
    settlement or official close — which are *not* derivable from 15-minute bars across sessions
@@ -232,12 +257,20 @@ engine's own error text — never a silent handicap, and never a failure blamed 
    `SYMBOL:1D` `--security` keys. Hashes and byte counts: [`daily_lanes.json`](daily_lanes.json).
    Revisions 1–2 gave this feed to neither engine; it was the last input asymmetry left, and it
    ran against PineForge.
-4. TradingView's full-precision trade list for that probe (`tv_trades.csv`).
-5. The probe's `inputs.json` / `metrics.json` overrides, applied to both engines the same way;
-   PyneCore additionally receives the lane's symbol facts through its `.toml` `[symbol]` block
-   and the session through `opening_hours` / `session_starts` / `session_ends`, derived from the
-   same lane manifest the campaign uses. The 1-minute feed's `.toml` carries the identical lane
-   facts, differing only in `period = "1"`.
+5. TradingView's full-precision trade list for that probe (`tv_trades.csv`), and the probe's
+   `metrics.json` — for set C these are the campaign's own evidence documents, hash-checked
+   against the campaign's case inputs (200 / 200 / 200 matched for `strategy.pine`,
+   `tv_trades.csv` and `metrics.json`; the 20 `meta.json` the campaign ships were fetched by
+   content and sha-verified).
+6. The probe's `inputs.json` where one exists, applied to both engines the same way. The public
+   corpus ships one for 121 of its 311 strategies; the closed set-C probes ship none, and their
+   symbol facts, session, timezone, mintick, point value and quantity step come from the
+   campaign's own per-lane environment ([`campaign_lane_env.json`](campaign_lane_env.json)),
+   which is the same document the campaign's pipeline passes its verifier. PyneCore receives
+   those same lane facts through its `.toml` `[symbol]` block and the session through
+   `opening_hours` / `session_starts` / `session_ends`. The auxiliary feeds' `.toml` files carry
+   the identical lane facts, differing only in `period` (`"1"` for the 1-minute feed, `"1D"` for
+   the daily one).
 
 **The ladders.** Each engine is scored on the best rung of its own ladder. Every rung is measured
 and published; nothing is hidden behind the word "best".
@@ -521,12 +554,12 @@ table above is that re-run ([`rerunB.sh`](rerunB.sh)). Sets A and C were never a
 were always run one version per stage.
 
 What survives as genuine version skew is small — 3 × `ImportError: pine_loop`, 1 ×
-`chart.point` — and it is dwarfed by the real 6.4.6 limitation: that version has **no
-`--security` option at all**, so 58 of its 80 failures across all three sets are security
-contexts it has no way to be given. See [Failure classes](#failure-classes).
+`chart.point`, 1 × `strategy` attribute — and it is dwarfed by the real 6.4.6 limitation: that
+version has **no `--security` option at all**, so 59 of its 88 failures across all three sets are
+security contexts it has no way to be given. See [Failure classes](#failure-classes).
 
 **`matched %` also differs in what it is computed over.** Each engine's figure covers only the
-strategies it finished, so on set B PineForge's is over 429,610 in-window TV trades and
+strategies it finished, so on set B PineForge's is over its full 311 and
 PyneCore 6.9.1's over far fewer. Compare tier counts and failure counts; read `matched %` only
 within one engine's column.
 
@@ -671,7 +704,7 @@ across the three sets. The converse does not hold.
 ### Conditional, set C, by symbol@timeframe
 
 Restricted to the probes PineForge reproduces trade-for-trade on each lane, this is what
-PyneCore 6.9.1 grades there. Sets A and B are single-lane (set A: BINANCE:ETHUSDT@15, the public
+PyneCore 6.9.1 grades there. Sets A and B are single-lane (set A: BINANCE:ETHUSDT.P@15, the public
 benchmark suite; set B: BINANCE:ETHUSDT.P@15, the public corpus), so they have no per-lane
 breakdown — the rows above are their whole story.
 
@@ -1291,9 +1324,12 @@ Read these before quoting any number above.
    ([`accuracy_finer_both_engines.csv`](accuracy_finer_both_engines.csv)). What replaces this
    limitation are items 4–6 below.
 4. **The headline is a best-of-N, per engine, and that is disclosed rather than buried.** Each
-   engine is scored on the best-ranked rung of its own ladder (ranking: tier, then `matched %`,
-   then the smaller absolute count mismatch). Picking a configuration after seeing its grade
-   flatters *both* engines relative to a single blind configuration. It is the parity campaign's
+   engine is scored on the best-ranked rung of a ladder (ranking: tier, then `matched %`, then the
+   smaller absolute count mismatch). For PyneCore, and for PineForge on set A, that ladder is this
+   benchmark's; for PineForge on sets B and C it is the campaign verifier's own, which is a
+   *larger* N than this file has and is maintained by the engine's authors — item 8a. Picking a
+   configuration after seeing its grade flatters *both* engines relative to a single blind
+   configuration. It is the parity campaign's
    own doctrine — its verifier runs a candidate ladder per probe and keeps the best-ranked
    candidate (`verify_routing.canonical_candidate_rank`) — it is applied symmetrically, every rung
    is published in [`tables.md`](tables.md), and the "Which configuration won" table there says
