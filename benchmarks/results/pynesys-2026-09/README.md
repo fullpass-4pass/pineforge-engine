@@ -47,8 +47,8 @@ revision 2's fixes and every disclosure it carried are kept below unchanged.
 - **Closed-set aggregates only:** [`accuracy_closed_aggregates.csv`](accuracy_closed_aggregates.csv)
 - **The finer-feed rung, both engines:**
   [`accuracy_finer_both_engines.csv`](accuracy_finer_both_engines.csv) — replaces revision 2's
-  PineForge-only `accuracy_finer_supplementary.csv`, which was withdrawn when PyneCore was given
-  the same 1-minute feeds
+  PineForge-only `accuracy_finer_supplementary.csv`, which was withdrawn (and its file deleted)
+  when PyneCore was given the same 1-minute feeds; it survives in this branch's history
 - **Campaign cross-check:** [`campaign_crosscheck.csv`](campaign_crosscheck.csv) — the campaign's
   own grade vs this benchmark's, per set and per symbol@timeframe
 - **Conditional tables, both directions:** [`conditional.csv`](conditional.csv)
@@ -637,6 +637,39 @@ Residual zero means more than matching totals: for all 509 probes the **tier**, 
 `canonicalMatchPct` and the `canonicalCountAbsDelta` are equal, probe by probe. The full per-lane
 table is [`campaign_crosscheck.csv`](campaign_crosscheck.csv) and is mirrored in
 [`tables.md`](tables.md), broken out by symbol@timeframe.
+
+**Where the campaign's side of the comparison comes from.** Its grades are the `grades` map of
+snapshot `14e12951…` (4,190 probes). Its per-probe *configuration* — the winning trim, chart
+warm-up, security warm-up and the feeds it was given — is its own `verify_reports` documents,
+reached by joining `verify_reports` to `case_results` on `output_id` for the candidate sweep
+`cand-round24b-20260907`; 200 of 200 set-C probes and 309 of 309 campaign corpus probes have one.
+That is the same drilldown `lab verify show <dataset>/<slug>` prints.
+
+| lane | sampled | PineForge exc / strong | PyneCore 6.9.1 exc / strong | PyneCore 6.4.6 exc / strong | campaign exc / strong | delta |
+|---|---:|---|---|---|---|---:|
+| BINANCE:ETHUSDT.P@15 | 20 | 20 / 0 | 11 / 7 | 4 / 6 | 20 / 0 | 0 |
+| BINANCE:BTCUSDT@15 | 18 | 18 / 0 | 12 / 2 | 2 / 7 | 18 / 0 | 0 |
+| BINANCE:BTCUSDT@1D | 13 | 13 / 0 | 7 / 2 | 3 / 1 | 13 / 0 | 0 |
+| CME_MINI:ES1!@15 | 9 | 9 / 0 | 8 / 1 | 7 / 0 | 9 / 0 | 0 |
+| CME_MINI:ES1!@1D | 8 | 8 / 0 | 1 / 3 | 0 / 3 | 8 / 0 | 0 |
+| CME_MINI:NQ1!@15 | 9 | 9 / 0 | 8 / 0 | 5 / 1 | 9 / 0 | 0 |
+| CME_MINI:NQ1!@1D | 8 | 8 / 0 | 3 / 2 | 3 / 1 | 8 / 0 | 0 |
+| NASDAQ:AAPL@15 | 18 | 18 / 0 | 9 / 4 | 6 / 2 | 18 / 0 | 0 |
+| NSE:NIFTY@15 | 9 | 9 / 0 | 8 / 0 | 5 / 1 | 9 / 0 | 0 |
+| NSE:NIFTY@1D | 8 | 8 / 0 | 3 / 2 | 2 / 2 | 8 / 0 | 0 |
+| NYSE:F@15 | 17 | 17 / 0 | 13 / 1 | 9 / 3 | 17 / 0 | 0 |
+| NYSE:F@1D | 13 | 13 / 0 | 5 / 3 | 4 / 2 | 13 / 0 | 0 |
+| OANDA:EURUSD@15 | 19 | 17 / 2 | 8 / 6 | 4 / 3 | 17 / 2 | 0 |
+| OANDA:XAUUSD@15 | 19 | 19 / 0 | 10 / 6 | 0 / 12 | 19 / 0 | 0 |
+| OANDA:XAUUSD@1D | 12 | 12 / 0 | 8 / 3 | 6 / 2 | 12 / 0 | 0 |
+| **set C, all lanes** | **200** | **198 / 2** | 114 / 42 | 60 / 46 | **198 / 2** | **0** |
+| set B — public corpus (the 309 in the campaign's population) | 309 | 309 / 0 | 272 / 22 | 233 / 23 | 309 / 0 | 0 |
+
+The only two non-excellent PineForge probes in the whole closed sample are on
+`OANDA:EURUSD@15`, and they are the same two the campaign grades *strong*. That table is
+[`lanes.csv`](lanes.csv), which additionally carries each lane's symbol, timeframe, bar count,
+feed SHA-256, mintick, point value, quantity step, timezone and session, plus its conditional
+columns.
 
 **What this cost, and what it found.** When this check was first run against revision 2's harness
 it did *not* pass: the campaign graded the same 200 probes 198 + 2 while the benchmark graded them
