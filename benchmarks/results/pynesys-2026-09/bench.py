@@ -4,8 +4,10 @@
   prepare A|B|C              build work dirs under ~/pf/bench/work/<set>/<lane>/<slug>
   build <workdir>            codegen transpile + g++ -> strategy.so
   pf <workdir> [--raw]       run_strategy.py -> pf_trades.csv (raw: no tape gating)
+  pf-finer <workdir> [--rs]  PineForge only: re-run with the campaign 1m aux security feed
   pc <workdir> <ver>         pyne run (ver 646|691) -> pc<ver>_trades.csv
   grade <workdir>            grade every engine output vs tv_trades.csv -> grade.json
+  renorm <workdir>           re-normalize pc*_raw.csv already on disk (no PyneCore rerun)
 Every step writes <step>.json {status, wallS, rc, error, maxRssKb, ...}; a failure is a row, never an omission."""
 import csv, json, os, re, shutil, subprocess, sys, time, hashlib, resource
 from datetime import datetime, timezone, timedelta
@@ -230,7 +232,76 @@ def cmd_pf(work, raw=False, rs=False):
     else: rec.update(status="ok", trades=sum(1 for _ in open(out)) // 2, outSha256=sha256(out))
     wjson(work/f"{tag}.json", rec); return rec
 
+# ---------------- PineForge run WITH the campaign's finer-timeframe feed ----------------
+# A request.security to a timeframe FINER than the staged chart feed cannot be
+# synthesized from that feed, and PineForge refuses it by name rather than
+# guessing. The campaign does not run the engine that way: its lane input
+# template stages a 1-minute feed beside the chart feed (lane_input_templates
+# feeds.finer, delivered as feed-<lane>-finer-NN inputs), the case runner hands
+# it over as PINEFORGE_VERIFY_FEED_1M, and the verifier retries the refused case
+# on the split-feed route -- native chart bars plus the 1m feed as the engine's
+# auxiliary security feed (pineforge-lab verify-engine-local.py
+# _finer_security_feed_route, taken when engine_supports_aux_security_feed()).
+# This variant reproduces exactly that retry.
+#
+# It is PineForge-ONLY. PyneCore is NOT re-run on these inputs, so a pf_finer
+# row is a supplementary measurement of PineForge with more data staged, never a
+# head-to-head number: every table that shows both engines keeps the chart-feed
+# runs on both sides. The symmetric version -- staging the same 1m series for
+# PyneCore 6.9.1 with `pyne run --security '1=<file>'` -- is one command and was
+# deliberately not run.
+FINER = Path(os.environ.get("PF_FINER", B / "finer"))
+
+def finer_feed(lane):
+    """(path, sha256) of the campaign's 1m feed for a bench lane, or (None, None)."""
+    m = rjson(FINER / "lanes.json", {}) or {}
+    e = m.get(lane)
+    if not e: return None, None
+    p = FINER / e["file"]
+    return (p, e["sha256"]) if p.exists() else (None, None)
+
+def cmd_pf_finer(work, rs=False):
+    """``rs`` additionally bounds the chart feed at the tape's range start, the
+    way the bench's own pf_rs variant and the campaign's verifier do. That bound
+    is not cosmetic here: on a 1D lane the whole-feed invocation hands the engine
+    chart bars from a span the campaign's 1m feed does not cover (CME_MINI ES1!/
+    NQ1! 1D charts start 2021-05-02, their 1m feeds start 2023-08-25), or a
+    pre-range NSE trading-period identity collision, and the engine refuses
+    rather than guessing. The campaign's case never sees that span."""
+    work = Path(work).resolve(); probe = rjson(work/"probe.json"); lane = probe["lane"]; feed = LANES[lane][2]
+    tag = "pf_finer_rs" if rs else "pf_finer"; out = work / f"{tag}_trades.csv"
+    aux, aux_sha = finer_feed(lane)
+    if aux is None:
+        rec = dict(step=tag, status="no_finer_feed", lane=lane); wjson(work/f"{tag}.json", rec); return rec
+    if not (work/"strategy.so").exists():
+        rec = dict(step=tag, status="no_build"); wjson(work/f"{tag}.json", rec); return rec
+    bi = dict(rjson(work/"bench_inputs.json"))
+    bi["aux_security_ohlcv_csv"] = str(aux); bi["aux_security_input_tf"] = "1"
+    if rs: bi["ohlcv_start_ms"] = range_start_ms(lane)
+    inputs = work/f"bench_inputs_{tag}.json"; wjson(inputs, bi)
+    r = timed([sys.executable, str(ENGINE/"scripts/run_strategy.py"), str(work), "--ohlcv", str(feed),
+               "--inputs-json", str(inputs), "-o", str(out), "--disable-trading-before-window"], cwd=str(ENGINE))
+    rec = dict(step=tag, auxFeedSha256=aux_sha, auxFeedTf="1", **{k: r[k] for k in ("rc", "wallS", "maxRssKb", "timeout", "userS", "sysS")})
+    if r["timeout"]: rec.update(status="timeout")
+    elif r["rc"] != 0: rec.update(status="run_error", error=err_class(r["stderr"] or r["stdout"]), stderr=r["stderr"][-1500:])
+    elif not out.exists(): rec.update(status="no_output")
+    else: rec.update(status="ok", trades=sum(1 for _ in open(out)) // 2, outSha256=sha256(out))
+    wjson(work/f"{tag}.json", rec); return rec
+
 # ---------------- PyneCore run ----------------
+# A position still open after the last bar is exported by BOTH engines, and both
+# say so on the exit row: TradingView's browser export and PyneCore write Signal
+# "Open"; PineForge writes "open" in the trailing "Engine range-end" column
+# (run_strategy.py write_engine_trades_csv). The canonical grader pairs the two
+# marks of one lot before anything else looks at the rows and gates neither exit
+# nor P&L on the pair (verify_corpus.pair_range_end_marks), so the mark must
+# survive normalization or PyneCore is graded on a mark PineForge is not.
+# PyneCore's raw CSV is read as engine_trades.csv, so it is translated into the
+# engine-side spelling of the mark rather than passed through as a Signal.
+PYNE_OPEN_SIGNAL = "Open"
+ENGINE_RANGE_END_COLUMN = "Engine range-end"
+ENGINE_RANGE_END_OPEN = "open"
+
 def normalize_pyne(raw_csv, out_csv):
     def piso(s):
         s = s[:-1] + "+00:00" if s.endswith("Z") else s
@@ -245,17 +316,19 @@ def normalize_pyne(raw_csv, out_csv):
         ruc = next((c for c in cols if c.startswith("Run-up ") and "%" not in c), None); ddc = next((c for c in cols if c.startswith("Drawdown ") and "%" not in c), None); cuc = next((c for c in cols if c.startswith("Cumulative profit ") and "%" not in c), None)
         for row in rd:
             n = int(row["Trade #"]); slot = by.setdefault(n, {}); kind = row["Type"]
-            slot["entry" if kind.startswith("Entry") else "exit"] = dict(type=kind, t=piso(row["Date/Time"]), price=float(row[pc]), qty=float(row[qc]), pnl=float(row[prc] or 0), pnl_pct=float(row[ppc] or 0), mfe=float(row.get(ruc) or 0) if ruc else 0.0, mae=float(row.get(ddc) or 0) if ddc else 0.0, cum=float(row.get(cuc) or 0) if cuc else 0.0)
-    n_ok = 0
+            slot["entry" if kind.startswith("Entry") else "exit"] = dict(type=kind, t=piso(row["Date/Time"]), price=float(row[pc]), qty=float(row[qc]), pnl=float(row[prc] or 0), pnl_pct=float(row[ppc] or 0), mfe=float(row.get(ruc) or 0) if ruc else 0.0, mae=float(row.get(ddc) or 0) if ddc else 0.0, cum=float(row.get(cuc) or 0) if cuc else 0.0, signal=str(row.get("Signal") or "").strip())
+    n_ok = n_marks = 0
     with open(out_csv, "w", newline="") as f:
-        w = csv.writer(f); w.writerow(["Trade #", "Type", "Date and time", "Price", "Qty", "Net PnL", "Net PnL %", "MFE", "MAE", "Cumulative PnL"])
+        w = csv.writer(f); w.writerow(["Trade #", "Type", "Date and time", "Price", "Qty", "Net PnL", "Net PnL %", "MFE", "MAE", "Cumulative PnL", ENGINE_RANGE_END_COLUMN])
         for n in sorted(by, reverse=True):
             s = by[n]
             if "entry" not in s or "exit" not in s: continue
             n_ok += 1
+            mark = ENGINE_RANGE_END_OPEN if s["exit"].get("signal", "").lower() == PYNE_OPEN_SIGNAL.lower() else ""
+            n_marks += bool(mark)
             for side in (s["exit"], s["entry"]):
-                w.writerow([n, side["type"], datetime.fromtimestamp(side["t"]/1000, tz=timezone.utc).strftime("%Y-%m-%d %H:%M"), f"{side['price']:.6f}", f"{side['qty']:g}", f"{side['pnl']:.6f}", f"{side['pnl_pct']:.4f}", f"{side['mfe']:.6f}", f"{side['mae']:.6f}", f"{side['cum']:.6f}"])
-    return n_ok
+                w.writerow([n, side["type"], datetime.fromtimestamp(side["t"]/1000, tz=timezone.utc).strftime("%Y-%m-%d %H:%M"), f"{side['price']:.6f}", f"{side['qty']:g}", f"{side['pnl']:.6f}", f"{side['pnl_pct']:.4f}", f"{side['mfe']:.6f}", f"{side['mae']:.6f}", f"{side['cum']:.6f}", mark if side is s["exit"] else ""])
+    return n_ok, n_marks
 
 def cmd_pc(work, ver, script="strategy_pyne.py", tag=None, rs=False):
     work = Path(work).resolve(); tag = tag or (f"pc{ver}_rs" if rs else f"pc{ver}"); lane = rjson(work/"probe.json")["lane"]
@@ -274,9 +347,9 @@ def cmd_pc(work, ver, script="strategy_pyne.py", tag=None, rs=False):
     elif r["rc"] != 0: rec.update(status="run_error", error=err_class(r["stderr"] or r["stdout"]), stderr=r["stderr"][-2500:])
     elif not raw.exists():
         # a script that closes no trade writes no trade csv; distinguish from a crash by rc==0
-        rec.update(status="ok", trades=0, note="no trade csv written (no closed trades)"); (work/f"{tag}_trades.csv").write_text("Trade #,Type,Date and time,Price,Qty,Net PnL,Net PnL %,MFE,MAE,Cumulative PnL\n")
+        rec.update(status="ok", trades=0, note="no trade csv written (no closed trades)"); (work/f"{tag}_trades.csv").write_text("Trade #,Type,Date and time,Price,Qty,Net PnL,Net PnL %,MFE,MAE,Cumulative PnL," + ENGINE_RANGE_END_COLUMN + "\n")
     else:
-        try: n = normalize_pyne(raw, work/f"{tag}_trades.csv"); rec.update(status="ok", trades=n, outSha256=sha256(work/f"{tag}_trades.csv"))
+        try: n, marks = normalize_pyne(raw, work/f"{tag}_trades.csv"); rec.update(status="ok", trades=n, rangeEndMarks=marks, outSha256=sha256(work/f"{tag}_trades.csv"))
         except Exception as e: rec.update(status="normalize_error", error=str(e)[:300])
     wjson(work/f"{tag}.json", rec); return rec
 
@@ -375,9 +448,9 @@ def cmd_pc_sec(work, ver, script="strategy_pyne.py"):
     elif r["rc"] != 0: rec.update(status="run_error", error=err_class(r["stderr"] or r["stdout"]), stderr=r["stderr"][-2500:])
     elif not raw.exists():
         rec.update(status="ok", trades=0, note="no trade csv written (no closed trades)")
-        (work/f"{tag}_trades.csv").write_text("Trade #,Type,Date and time,Price,Qty,Net PnL,Net PnL %,MFE,MAE,Cumulative PnL\n")
+        (work/f"{tag}_trades.csv").write_text("Trade #,Type,Date and time,Price,Qty,Net PnL,Net PnL %,MFE,MAE,Cumulative PnL," + ENGINE_RANGE_END_COLUMN + "\n")
     else:
-        try: n = normalize_pyne(raw, work/f"{tag}_trades.csv"); rec.update(status="ok", trades=n, outSha256=sha256(work/f"{tag}_trades.csv"))
+        try: n, marks = normalize_pyne(raw, work/f"{tag}_trades.csv"); rec.update(status="ok", trades=n, rangeEndMarks=marks, outSha256=sha256(work/f"{tag}_trades.csv"))
         except Exception as e: rec.update(status="normalize_error", error=str(e)[:300])
     wjson(work/f"{tag}.json", rec); return rec
 
@@ -403,7 +476,7 @@ def cmd_grade(work):
     meta_clean.setdefault("tv_trades_csv_tz", "utc_plus_8")
     res = dict(slug=probe["slug"], lane=probe["lane"], set=probe["set"], grader="verify_corpus.analyze_strategy@" + ENGINE_HEAD, engines={})
     scratch_root = Path("/dev/shm/pf-grade") / probe["set"] / probe["lane"] / probe["slug"]
-    for tag in ("pf", "pf_raw", "pf_rs", "pc646", "pc691", "pc691_re", "pc646_rs", "pc691_rs", "pc691_sec", "pc646_sec"):
+    for tag in ("pf", "pf_raw", "pf_rs", "pf_finer", "pf_finer_rs", "pc646", "pc691", "pc691_re", "pc646_rs", "pc691_rs", "pc691_sec", "pc646_sec"):
         st = rjson(work/f"{tag}.json")
         if st is None: continue
         e = dict(status=st.get("status"), wallS=st.get("wallS"), error=st.get("error"))
@@ -426,13 +499,34 @@ def cmd_grade(work):
     res["tvTradesTotal"] = sum(1 for _ in open(work/"tv_trades.csv")) // 2
     wjson(work/"grade.json", res); return res
 
+# ---------------- renorm (re-normalize PyneCore output already on disk) ----------------
+def cmd_renorm(work):
+    """Rewrite every pc*_trades.csv from the pc*_raw.csv beside it, without running
+    PyneCore again. The raw export is what PyneCore produced; normalization is the
+    harness's, so a normalization fix (carrying the range-end mark) is replayed from
+    disk and the run's timings, rc and status stay exactly as measured."""
+    work = Path(work).resolve(); out = dict(work=str(work), tags={})
+    for raw in sorted(work.glob("pc*_raw.csv")):
+        tag = raw.name[:-len("_raw.csv")]
+        rec = rjson(work/f"{tag}.json")
+        if rec is None or rec.get("status") != "ok": out["tags"][tag] = dict(skipped=(rec or {}).get("status", "no_json")); continue
+        try:
+            n, marks = normalize_pyne(raw, work/f"{tag}_trades.csv")
+            rec.update(trades=n, rangeEndMarks=marks, outSha256=sha256(work/f"{tag}_trades.csv")); wjson(work/f"{tag}.json", rec)
+            out["tags"][tag] = dict(trades=n, rangeEndMarks=marks)
+        except Exception as e:
+            out["tags"][tag] = dict(error=str(e)[:300])
+    return out
+
 if __name__ == "__main__":
     a = sys.argv[1:]
     if a[0] == "lanes": cmd_lanes(*(a[1:2]))
+    elif a[0] == "renorm": print(json.dumps(cmd_renorm(a[1])))
     elif a[0] == "prepare": cmd_prepare(a[1])
     elif a[0] == "lanes-rs": cmd_lanes_rs(*(a[1:2]))
     elif a[0] == "build": print(json.dumps(cmd_build(a[1], *(a[2:3]))))
     elif a[0] == "pf": print(json.dumps(cmd_pf(a[1], raw="--raw" in a, rs="--rs" in a)))
+    elif a[0] == "pf-finer": print(json.dumps(cmd_pf_finer(a[1], rs="--rs" in a)))
     elif a[0] == "pc": print(json.dumps(cmd_pc(a[1], a[2], rs="--rs" in a)))
     elif a[0] == "pc-sec": print(json.dumps(cmd_pc_sec(a[1], a[2])))
     elif a[0] == "list-data": print(json.dumps(pc_list_data(a[1], a[2])[0]))

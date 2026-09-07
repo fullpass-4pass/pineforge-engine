@@ -116,6 +116,50 @@ for S in ("A", "B", "C"):
         for e in ENGINES:
             if not any(r[f"{e}_status"] not in (None, "not_run", "not_run_quota") for r in rs): continue
             c = tier_counts(rs, e); bk.append(dict(set=S, bucketKind="feature", bucket=fk, engine=ENAME[e], n=len(rs), **{t: c.get(t, 0) for t in TIERS}, fail=sum(c.get(k, 0) for k in ("compile_fail", "build_fail", "run_error", "timeout")), not_run=c.get("not_run", 0), excellentPct=round(100*c.get("excellent", 0)/len(rs), 1), excellentStrongPct=round(100*(c.get("excellent", 0)+c.get("strong", 0))/len(rs), 1)))
+# ---- supplementary, PineForge only: the finer-timeframe feeds the campaign stages ----
+# Kept OUT of every head-to-head table on purpose. The engines are compared on
+# identical staged inputs (chart feed only), where these probes are run_error for
+# PineForge and refused for PyneCore too. PyneCore was NOT rerun with a finer
+# feed, so these rows are not a comparison; they answer one question only - what
+# does PineForge do on the probes the campaign gives more data to.
+FINER_LABEL = ("PineForge with the campaign's finer-timeframe feeds staged "
+               "(PyneCore not rerun on these inputs - not a head-to-head number)")
+FINER_TAGS = [("pf", "PineForge, chart feed only (the head-to-head row)"),
+              ("pf_finer", "+ campaign 1m auxiliary security feed"),
+              ("pf_finer_rs", "+ campaign 1m auxiliary feed and the tape's range-start bound")]
+fin = []
+for gp in sorted(glob.glob(str(B/"work/C/*/*/grade.json"))):
+    g = rj(gp); pr = rj(Path(gp).parent/"probe.json")
+    if not (g["engines"].get("pf_finer") or g["engines"].get("pf_finer_rs")): continue
+    fin.append((pr["lane"], g))
+if fin:
+    fr = []
+    for tag, what in FINER_TAGS:
+        c = collections.Counter()
+        for lane, g in fin:
+            x = g["engines"].get(tag) or {}
+            st = x.get("status")
+            c[x.get("tier") if st == "ok" and x.get("tier") else ("run_error" if st and st != "ok" else "not_run")] += 1
+        fr.append(dict(variant=tag, inputs=what, n=len(fin), **{t: c.get(t, 0) for t in TIERS},
+                       run_error=c.get("run_error", 0), not_run=c.get("not_run", 0)))
+    lanes = sorted({lane for lane, _ in fin})
+    for lane in lanes:
+        rs = [g for l, g in fin if l == lane]
+        for tag, what in FINER_TAGS:
+            c = collections.Counter()
+            for g in rs:
+                x = g["engines"].get(tag) or {}
+                st = x.get("status")
+                c[x.get("tier") if st == "ok" and x.get("tier") else ("run_error" if st and st != "ok" else "not_run")] += 1
+            fr.append(dict(variant=tag + " @ " + lane, inputs=what, n=len(rs), **{t: c.get(t, 0) for t in TIERS},
+                           run_error=c.get("run_error", 0), not_run=c.get("not_run", 0)))
+    wcsv(OUT/"accuracy_finer_supplementary.csv", fr, list(fr[0].keys()))
+    md.append("## SUPPLEMENTARY (not a head-to-head number) - " + FINER_LABEL + "\n\n"
+              + "The " + str(len(fin)) + " set-C probes whose chart-feed-only PineForge run was refused for a\n"
+              + "`request.security` timeframe finer than the staged feed. PyneCore was NOT rerun\n"
+              + "on these inputs; the head-to-head tables above are unchanged.\n\n"
+              + md_table(fr, ["variant", "inputs", "n"] + TIERS + ["run_error", "not_run"]) + "\n")
+
 wcsv(OUT/"buckets.csv", bk, list(bk[0].keys()) if bk else [])
 wcsv(OUT/"accuracy_closed_aggregates.csv", [a for a in agg if a["set"] == "C"], ["set", "group", "key"] + KEYS)
 wcsv(OUT/"accuracy_aggregates_all.csv", agg, ["set", "group", "key"] + KEYS)

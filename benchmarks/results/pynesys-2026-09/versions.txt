@@ -1,5 +1,6 @@
 PineForge vs PyneSys/PyneCore benchmark — versions, hardware, provenance
-generated 2026-09-06 (campaign scenario custom:benchmark/r13-bench-pynesys)
+generated 2026-09-06, revision 2 on 2026-09-07 (campaign scenario
+custom:benchmark/r13-bench-pynesys, stage fix-rerun)
 
 [hardware / OS]
 machine:    spark2 (all accuracy and performance measurements)
@@ -49,6 +50,19 @@ assets:     pineforge-benchmarks-assets bb97c51dcdd5192d33991db77fe7b3321016d3b0
 lane feeds: the campaign registry lane_input_templates fixedInputs feed-<lane>-chart
             documents, fetched by content sha with lab evidence get; per-lane sha256,
             bar count and symbol facts in results/lanes.csv
+finer feeds (revision 2, SUPPLEMENTARY, PineForge only — never in a head-to-head table):
+            the same templates' feeds.finer documents (feed-<lane>-finer-NN chunks,
+            concatenated and verified against the declared whole-file sha256), 1-minute
+            bars, 7 distinct feeds / 476 MB over 9 lanes:
+              btcusdt-15 + btcusdt-1d  787fd2e15bfeddb062cbb7905248ff4be2fe5c695bbe971f9322826f16528b86
+              es1-1d                   39ba22ce3c669b92576cd3b1c750c9220e4199045db2a6b01eb2144f59ac2781
+              eurusd-15                b3d921bb0af969ab5f7e16934914a31b4a7e9fc6b8a2cf514eff571061341a75
+              f-1d                     50bccb38da9cf08aeaca6c19ff9c3a266f00885fe2894c3e470b98f94e24bcc8
+              nifty-1d                 38e8107576e586755aff36f0271af00edababcc6716f527863331a514c943c22
+              nq1-1d                   3736801faf9991bb878b42dbb2a18bb249c06833f55019fe5357e56728910ffe
+              xauusd-15 + xauusd-1d    b2389ad2a29c7ba8896f3af8b1b51b236d8d41114d3a7040ae41752c7ac74c14
+            The chart feeds this benchmark stages were confirmed byte-identical to the
+            campaign's templates on all nine of those lanes.
 tv tapes:   set A/B = the corpus/assets tv_trades.csv; set C = the campaign registry tape
             pinned by each probe (TradingView deep-backtest export, full precision)
 
@@ -59,3 +73,6 @@ PyneComp daily quota is 300 compiles/day (hourly 120). It was exhausted at
   set B (public corpus, 312 scripts):    145/312 compiled, 0 compile errors, 167 blocked
   set A (public suite, 100 scripts):     0/100 re-compiled with 6.0.66 (never queued)
 A quota-blocked compile is reported as not_run, NEVER as a compile failure.
+Revision 2 (2026-09-07) resumed the blocked compiles after the 00:00Z reset with the same
+serial, resumable driver; see README "Known limitations" item 1 for the coverage this
+revision reached.

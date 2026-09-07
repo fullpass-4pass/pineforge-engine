@@ -30,11 +30,11 @@
 | PineForge (full feed, tape-window) | 200 | 140 | 29 | 8 | 3 | 7 | 0 | 0 | 13 | 0 | 0 | 165223 | 151629 | 98.9187 | 0.0000% | 0.5164% | 0.0000% | 0.0000% | 0.0000% | 0.0000% | 0.0000% | 0.1178% | 0.0000% | 16.4154% | 0.0000% | 0.344 | 1.524 |
 | PineForge (range-start feed) | 200 | 157 | 18 | 5 | 3 | 4 | 0 | 0 | 13 | 0 | 0 | 165223 | 151393 | 98.9817 | 0.0000% | 0.0994% | 0.0000% | 0.0000% | 0.0000% | 0.0000% | 0.0000% | 0.0000% | 0.0000% | 3.3898% | 0.0000% | 0.253 | 0.605 |
 | PineForge (full feed, raw) | 200 | 93 | 59 | 20 | 3 | 12 | 0 | 0 | 13 | 0 | 0 | 165223 | 744013 | 97.1624 | 0.0000% | 3.2010% | 0.0000% | 0.0000% | 0.0000% | 0.0049% | 0.0000% | 73.6169% | 1.4433% | 94.5207% | 1.3638% | 0.353 | 1.546 |
-| PyneCore 6.9.1 (full feed, --security supplied) | 200 | 68 | 62 | 22 | 14 | 13 | 0 | 0 | 19 | 2 | 0 | 165223 | 711270 | 95.5654 | 0.0000% | 10.0000% | 0.0000% | 0.0000% | 0.0000% | 0.0737% | 0.0000% | 100.0000% | 16.2577% | 124.3221% | 9.6976% | 2.864 | 110.386 |
-| PyneCore 6.9.1 (full feed) | 200 | 67 | 60 | 21 | 10 | 10 | 0 | 0 | 29 | 3 | 0 | 165223 | 707535 | 95.6897 | 0.0000% | 5.4496% | 0.0000% | 0.0000% | 0.0000% | 0.0555% | 0.0000% | 100.0000% | 16.2577% | 121.2802% | 8.5821% | 3.092 | 112.913 |
-| PyneCore 6.9.1 (range-start feed) | 200 | 107 | 38 | 13 | 10 | 3 | 0 | 0 | 29 | 0 | 0 | 165223 | 146186 | 98.2572 | 0.0000% | 0.8386% | 0.0000% | 0.0000% | 0.0000% | 0.0000% | 0.0000% | 75.0000% | 4.3658% | 100.0000% | 2.4196% | 0.974 | 30.658 |
-| PyneCore 6.4.6 (full feed) | 200 | 43 | 49 | 27 | 8 | 19 | 0 | 0 | 54 | 0 | 0 | 165223 | 707639 | 90.2836 | 0.0000% | 75.0000% | 0.0000% | 0.0003% | 0.0000% | 0.4548% | 0.0783% | 100.0000% | 18.7982% | 130.4566% | 11.6838% | 5.152 | 24.785 |
-| PyneCore 6.4.6 (range-start feed) | 200 | 60 | 45 | 25 | 5 | 11 | 0 | 0 | 54 | 0 | 0 | 165223 | 146032 | 90.8742 | 0.0000% | 40.1070% | 0.0000% | 0.0003% | 0.0000% | 0.2517% | 0.0139% | 100.0000% | 12.5345% | 114.7061% | 5.0745% | 1.033 | 4.417 |
+| PyneCore 6.9.1 (full feed, --security supplied) | 200 | 68 | 62 | 22 | 14 | 13 | 0 | 0 | 19 | 2 | 0 | 165223 | 711272 | 95.5649 | 0.0000% | 10.0000% | 0.0000% | 0.0000% | 0.0000% | 0.0747% | 0.0000% | 100.0000% | 16.9231% | 124.3221% | 8.9725% | 2.864 | 110.386 |
+| PyneCore 6.9.1 (full feed) | 200 | 67 | 60 | 21 | 10 | 10 | 0 | 0 | 29 | 3 | 0 | 165223 | 707537 | 95.6891 | 0.0000% | 5.4496% | 0.0000% | 0.0000% | 0.0000% | 0.0555% | 0.0000% | 100.0000% | 16.9231% | 118.2531% | 8.3560% | 3.092 | 112.913 |
+| PyneCore 6.9.1 (range-start feed) | 200 | 107 | 38 | 13 | 10 | 3 | 0 | 0 | 29 | 0 | 0 | 165223 | 146191 | 98.2573 | 0.0000% | 0.8386% | 0.0000% | 0.0000% | 0.0000% | 0.0000% | 0.0000% | 75.0000% | 3.2258% | 100.0000% | 2.1563% | 0.974 | 30.658 |
+| PyneCore 6.4.6 (full feed) | 200 | 43 | 49 | 27 | 8 | 19 | 0 | 0 | 54 | 0 | 0 | 165223 | 707641 | 90.2838 | 0.0000% | 75.0000% | 0.0000% | 0.0003% | 0.0000% | 0.4548% | 0.0783% | 100.0000% | 17.8564% | 130.4566% | 10.4792% | 5.152 | 24.785 |
+| PyneCore 6.4.6 (range-start feed) | 200 | 60 | 45 | 25 | 5 | 11 | 0 | 0 | 54 | 0 | 0 | 165223 | 146034 | 90.8744 | 0.0000% | 40.1070% | 0.0000% | 0.0003% | 0.0000% | 0.2517% | 0.0139% | 100.0000% | 11.5611% | 114.7061% | 4.9036% | 1.033 | 4.417 |
 
 
 ### Closed set by lane — PineForge (full feed, tape-window)
@@ -161,6 +161,46 @@
 | eurusd | 19 | 3 | 4 | 4 | 0 | 4 | 4 | 0 |
 | xauusd | 19 | 0 | 9 | 1 | 1 | 4 | 4 | 0 |
 | xauusd-1d | 12 | 4 | 2 | 2 | 1 | 0 | 3 | 0 |
+
+
+## SUPPLEMENTARY (not a head-to-head number) - PineForge with the campaign's finer-timeframe feeds staged (PyneCore not rerun on these inputs - not a head-to-head number)
+
+The 13 set-C probes whose chart-feed-only PineForge run was refused for a
+`request.security` timeframe finer than the staged feed. PyneCore was NOT rerun
+on these inputs; the head-to-head tables above are unchanged.
+
+| variant | inputs | n | excellent | strong | moderate | weak | minimal | run_error | not_run |
+|---|---|---|---|---|---|---|---|---|---|
+| pf | PineForge, chart feed only (the head-to-head row) | 13 | 0 | 0 | 0 | 0 | 0 | 13 | 0 |
+| pf_finer | + campaign 1m auxiliary security feed | 13 | 8 | 1 | 0 | 1 | 0 | 3 | 0 |
+| pf_finer_rs | + campaign 1m auxiliary feed and the tape's range-start bound | 13 | 13 | 0 | 0 | 0 | 0 | 0 | 0 |
+| pf @ btcusdt | PineForge, chart feed only (the head-to-head row) | 2 | 0 | 0 | 0 | 0 | 0 | 2 | 0 |
+| pf_finer @ btcusdt | + campaign 1m auxiliary security feed | 2 | 2 | 0 | 0 | 0 | 0 | 0 | 0 |
+| pf_finer_rs @ btcusdt | + campaign 1m auxiliary feed and the tape's range-start bound | 2 | 2 | 0 | 0 | 0 | 0 | 0 | 0 |
+| pf @ btcusdt-1d | PineForge, chart feed only (the head-to-head row) | 2 | 0 | 0 | 0 | 0 | 0 | 2 | 0 |
+| pf_finer @ btcusdt-1d | + campaign 1m auxiliary security feed | 2 | 2 | 0 | 0 | 0 | 0 | 0 | 0 |
+| pf_finer_rs @ btcusdt-1d | + campaign 1m auxiliary feed and the tape's range-start bound | 2 | 2 | 0 | 0 | 0 | 0 | 0 | 0 |
+| pf @ es1-1d | PineForge, chart feed only (the head-to-head row) | 1 | 0 | 0 | 0 | 0 | 0 | 1 | 0 |
+| pf_finer @ es1-1d | + campaign 1m auxiliary security feed | 1 | 0 | 0 | 0 | 0 | 0 | 1 | 0 |
+| pf_finer_rs @ es1-1d | + campaign 1m auxiliary feed and the tape's range-start bound | 1 | 1 | 0 | 0 | 0 | 0 | 0 | 0 |
+| pf @ eurusd | PineForge, chart feed only (the head-to-head row) | 1 | 0 | 0 | 0 | 0 | 0 | 1 | 0 |
+| pf_finer @ eurusd | + campaign 1m auxiliary security feed | 1 | 1 | 0 | 0 | 0 | 0 | 0 | 0 |
+| pf_finer_rs @ eurusd | + campaign 1m auxiliary feed and the tape's range-start bound | 1 | 1 | 0 | 0 | 0 | 0 | 0 | 0 |
+| pf @ f-1d | PineForge, chart feed only (the head-to-head row) | 2 | 0 | 0 | 0 | 0 | 0 | 2 | 0 |
+| pf_finer @ f-1d | + campaign 1m auxiliary security feed | 2 | 2 | 0 | 0 | 0 | 0 | 0 | 0 |
+| pf_finer_rs @ f-1d | + campaign 1m auxiliary feed and the tape's range-start bound | 2 | 2 | 0 | 0 | 0 | 0 | 0 | 0 |
+| pf @ nifty-1d | PineForge, chart feed only (the head-to-head row) | 1 | 0 | 0 | 0 | 0 | 0 | 1 | 0 |
+| pf_finer @ nifty-1d | + campaign 1m auxiliary security feed | 1 | 0 | 0 | 0 | 0 | 0 | 1 | 0 |
+| pf_finer_rs @ nifty-1d | + campaign 1m auxiliary feed and the tape's range-start bound | 1 | 1 | 0 | 0 | 0 | 0 | 0 | 0 |
+| pf @ nq1-1d | PineForge, chart feed only (the head-to-head row) | 1 | 0 | 0 | 0 | 0 | 0 | 1 | 0 |
+| pf_finer @ nq1-1d | + campaign 1m auxiliary security feed | 1 | 0 | 0 | 0 | 0 | 0 | 1 | 0 |
+| pf_finer_rs @ nq1-1d | + campaign 1m auxiliary feed and the tape's range-start bound | 1 | 1 | 0 | 0 | 0 | 0 | 0 | 0 |
+| pf @ xauusd | PineForge, chart feed only (the head-to-head row) | 1 | 0 | 0 | 0 | 0 | 0 | 1 | 0 |
+| pf_finer @ xauusd | + campaign 1m auxiliary security feed | 1 | 1 | 0 | 0 | 0 | 0 | 0 | 0 |
+| pf_finer_rs @ xauusd | + campaign 1m auxiliary feed and the tape's range-start bound | 1 | 1 | 0 | 0 | 0 | 0 | 0 | 0 |
+| pf @ xauusd-1d | PineForge, chart feed only (the head-to-head row) | 2 | 0 | 0 | 0 | 0 | 0 | 2 | 0 |
+| pf_finer @ xauusd-1d | + campaign 1m auxiliary security feed | 2 | 0 | 1 | 0 | 1 | 0 | 0 | 0 |
+| pf_finer_rs @ xauusd-1d | + campaign 1m auxiliary feed and the tape's range-start bound | 2 | 2 | 0 | 0 | 0 | 0 | 0 | 0 |
 
 
 ### Feature buckets — set A (a script counts in every feature it uses)

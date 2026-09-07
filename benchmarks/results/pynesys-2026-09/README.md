@@ -11,11 +11,24 @@ same grader. Every strategy that fails to compile, fails to build, crashes or ti
 better, and every place where this benchmark is *incomplete* or *handicapped* is stated in
 [Known limitations](#known-limitations) and carried as a `not_run` count in the tables.
 
+**As of 2026-09-07.** Revision 2. Two omissions the first revision carried were closed on
+operator instruction and every table was regenerated: the range-end open-position mark is
+now carried for **both** engines instead of only PineForge (tier-neutral — see
+[Fixes in revision 2](#fixes-in-revision-2)), and PineForge's 13 finer-timeframe refusals
+were re-measured with the parity campaign's own lower-timeframe feeds as a clearly labelled
+**supplementary, PineForge-only** row that is deliberately kept out of every head-to-head
+table. Set B's performance stage, still accumulating when revision 1 was written, is
+finished and its numbers are in. Every head-to-head tier count below is unchanged from
+revision 1.
+
 - **Versions, hardware, provenance:** [`versions.txt`](versions.txt)
 - **Raw tables:** [`tables.md`](tables.md)
 - **Per-strategy rows (public sets):** [`accuracy_public.csv`](accuracy_public.csv),
   [`accuracy_corpus.csv`](accuracy_corpus.csv)
 - **Closed-set aggregates only:** [`accuracy_closed_aggregates.csv`](accuracy_closed_aggregates.csv)
+- **Supplementary, PineForge only:**
+  [`accuracy_finer_supplementary.csv`](accuracy_finer_supplementary.csv) — the finer-feed
+  re-measurement, not a head-to-head number
 - **Feature buckets:** [`buckets.csv`](buckets.csv) · **Lane facts:** [`lanes.csv`](lanes.csv)
 - **Rerun the public half:** [`../../run_pynesys_bench.sh`](../../run_pynesys_bench.sh)
 - **The drivers the numbers came from**, shipped so every table is auditable:
@@ -24,7 +37,9 @@ better, and every place where this benchmark is *incomplete* or *handicapped* is
   [`determinism.py`](determinism.py), [`perf.py`](perf.py) + [`perf_report.py`](perf_report.py),
   [`pc_inproc.py`](pc_inproc.py) (PyneCore in-process timer), [`pf_tool.cpp`](pf_tool.cpp)
   (PineForge in-process timer), and the stage scripts [`run_set.sh`](run_set.sh),
-  [`perf1.sh`](perf1.sh), [`perfgate.sh`](perfgate.sh).
+  [`perf1.sh`](perf1.sh), [`perfgate.sh`](perfgate.sh), and
+  [`diag_unmatched.py`](diag_unmatched.py) (which rows one side holds and the other does not,
+  for any graded case).
 
   Plus the two re-measurement drivers written when this benchmark's own bugs were found:
   [`secrun.sh`](secrun.sh) (`--security` re-run) and [`rerunB.sh`](rerunB.sh) (set B, one
@@ -380,7 +395,10 @@ Every failure across all three sets, verbatim class, nothing aggregated into "ot
 finer than input '<Y>'. Use request.security_lower_tf for sub-chart data.`
 Breakdown: 240-on-1D × 6, 3-on-15 × 3, 15-on-1D × 1, 5-on-15 × 1, 60-on-1D × 1, 30-on-1D × 1.
 The chart feed genuinely cannot answer a finer-timeframe request; the engine refuses by name
-rather than guessing. **Zero failures on sets A and B, zero timeouts anywhere.**
+rather than guessing. **Zero failures on sets A and B, zero timeouts anywhere.** All 13 were
+re-measured with the parity campaign's own lower-timeframe feeds staged and all 13 then grade
+*excellent* — a **PineForge-only supplementary** result that changes nothing here, because
+PyneCore was not rerun on those inputs; see [Fixes in revision 2](#2-pineforge-with-the-campaigns-finer-timeframe-feeds--supplementary-not-head-to-head).
 
 **PyneCore 6.9.1 with `--security` supplied — 36 failures** (15 on set B, 21 on set C):
 
@@ -411,6 +429,85 @@ timeouts. The 21-failure difference is the cost of not passing `--security`.
 
 Only 4 of the 80 are compiler/runtime API skew. An earlier revision of this document claimed 44,
 on numbers corrupted by a race in our own harness; see the note under [set B](#set-b--public-corpus-311-strategies-with-a-tape-222295-bars-431244-tv-trades).
+
+
+## Fixes in revision 2
+
+Both were ordered after the first revision was reviewed. Neither touches the grader, the tiers or
+the parity campaign's own plane.
+
+### 1. The range-end open-position mark, for both engines
+
+A position still open after the last bar is exported by all three parties, and each says so on the
+exit row: TradingView's browser export and PyneCore write `Signal = "Open"`; PineForge writes
+`open` in the trailing `Engine range-end` column. The canonical grader pairs the two marks of one
+lot before anything else looks at the rows, counts the pair as matched, gates its entry like any
+other trade and keeps its cent-rounded exit and P&L out of every gated statistic
+(`verify_corpus.py::pair_range_end_marks`).
+
+PineForge's mark was already being carried — `openMarkPairs` was non-zero on 49 of 100 set-A rows
+and 34 of 200 set-C rows in revision 1. **PyneCore's was not**: `bench.py::normalize_pyne` dropped
+the raw export's `Signal` column entirely, so no PyneCore row could ever be marked and no PyneCore
+mark could ever pair. It now writes the engine-side spelling of the mark (`Engine range-end`),
+and a new `bench.py renorm <workdir>` replays normalization from the `pc*_raw.csv` already on
+disk, so **no run of either engine was repeated** — timings, return codes and statuses are exactly
+as measured.
+
+All 611 work dirs were re-graded. The effect:
+
+| | change |
+|---|---|
+| Tier counts, every engine, every set, every lane, every bucket | **none** |
+| `accuracy_public.csv`, `accuracy_corpus.csv`, `buckets.csv` | regenerate byte-identical |
+| PineForge, any set | nothing moved |
+| PyneCore, set C | `openMarkPairs` 0→1 on 102 rows across the six variants; with it `matched` on 15 rows, `tvInWindow` on 17, `engineInWindow` on 15, `coverage` on 15, `matchPct` on 8, `countAbsDelta` on 2 |
+| PyneCore, sets A and B | no pairs form — correctly |
+
+Why no pairs on A and B: PineForge's tape-window run is bounded at TradingView's range end, so its
+open lot *is* TV's open lot. PyneCore is given the whole lane feed, and on sets A and B that feed
+runs months past the tape — its open lot is a later, different lot, which the grader's entry window
+and entry-price gate refuse to pair (set A `32-momentum-roc`: TV's open lot enters
+2026-04-05 18:30, PyneCore's enters 2026-05-04 14:15). On set C many lane feeds end at or near the
+tape's range end, so the same lot is marked on both sides and pairs. Set B's corpus tapes are
+ws-report-v1 exports and carry no `Open` row at all.
+
+This is a symmetry fix, not a number: it is reported because "we grade both engines the same way"
+is a claim this benchmark makes, and it was not quite true.
+
+### 2. PineForge with the campaign's finer-timeframe feeds — SUPPLEMENTARY, not head-to-head
+
+> **PineForge with the campaign's finer-timeframe feeds staged (PyneCore not rerun on these
+> inputs — not a head-to-head number).**
+
+All 13 PineForge failures are one class: a `request.security` to a timeframe *finer* than the
+staged chart feed. The parity campaign never runs the engine on the chart feed alone — its lane
+input templates stage a 1-minute feed beside it, and its verifier retries a refused case on the
+split-feed route (native chart bars plus the 1m feed as the engine's auxiliary security feed). The
+13 probes were re-measured that way, on the campaign's own bytes: seven distinct 1m feeds
+(476 MB) fetched by content from the campaign's evidence store and verified against the templates'
+declared SHA-256, with the chart feeds confirmed byte-identical to the campaign's on all nine
+lanes involved.
+
+| variant | inputs | n | excellent | strong | weak | run_error |
+|---|---|---:|---:|---:|---:|---:|
+| `pf` | chart feed only — **the head-to-head row, unchanged** | 13 | 0 | 0 | 0 | **13** |
+| `pf_finer` | + campaign 1m auxiliary security feed | 13 | 8 | 1 | 1 | 3 |
+| `pf_finer_rs` | + campaign 1m auxiliary feed and the tape's range-start bound | 13 | **13** | 0 | 0 | **0** |
+
+The three that still refuse under `pf_finer` are not a request the campaign refuses either — the
+campaign grades all 13 *excellent* at 100 % matched. They are this benchmark's fixed whole-feed
+invocation: the CME_MINI `ES1!`/`NQ1!` 1D chart feeds start 2021-05-02 while the campaign's 1m
+feeds for those lanes start 2023-08-25, so two years of 1D bars have no 1m coverage
+(`native chart bar has no matching auxiliary request.security bars`), and the NSE 1D feed has a
+pre-range trading-period identity collision. The campaign's case never sees that span because it
+is bounded at the tape's range start — which is exactly what `pf_finer_rs` adds, and all three
+then run clean.
+
+**What this does and does not license.** It does not change any comparison: every table where both
+engines appear keeps the chart-feed-only `pf` row, measured on inputs both engines were given.
+PyneCore was **not** rerun with a finer feed. The symmetric experiment — staging the same 1m series
+for PyneCore 6.9.1 with `pyne run --security '1=<file>'` — is one command and was deliberately not
+run, so no claim is made about what PyneCore would score with it.
 
 
 ## Performance
@@ -564,10 +661,10 @@ timed on a **lane-stratified sample of 30 strategies**, seed `20260906` (set A s
 |---|---|---:|---:|---:|---:|---:|
 | **A** (100, whole) | ETHUSDT.P 15m, 53,929 bars | 0.147 s | 0.992 s | 6.3× / 5.6× / 34.5× | **59×** | 100 |
 | **C** (sample) | 15 lanes, 1,240 – 175,261 bars | 0.124 s | 1.266 s | **13.0×** / 10.5× / 779.5× | **76×** | 31 e2e, 25 in-proc |
-| **B** (sample) | ETHUSDT.P 15m, 222,295 bars | 0.276 s | 3.026 s | **15.0×** / 9.7× / 2420.4× | *(still running)* | 13 |
+| **B** (sample) | ETHUSDT.P 15m, 222,295 bars | 0.248 s | 3.026 s | **21.3×** / 9.7× / 2420.4× | **106×** | 14 |
 
 **The gap widens with the difficulty of the work.** On the easy 100-strategy suite it is 6×
-end-to-end; on 15 real market lanes it is 13×; on the 222k-bar corpus it is 15×, and the tails
+end-to-end; on 15 real market lanes it is 13×; on the 222k-bar corpus it is 21×, and the tails
 are extreme — the worst PyneCore case in the set-B sample is 566 s against PineForge's 0.234 s
 (2,420×), and in set C 102.9 s against 0.132 s (779×). Those are multi-timeframe strategies:
 they are exactly the scripts that also cost PyneCore accuracy.
@@ -576,12 +673,13 @@ Memory is the one place PyneCore wins, mildly: on the 222k-bar corpus feed PineF
 97 MB against PyneCore's 71 MB, and on set C the two are level (49 MB vs 48 MB).
 
 > **Coverage of this stage.** Set A is whole and complete on all six protocol items. Set C is
-> complete on the sample (36 strategies reached end-to-end, 30 in-process). Set B's end-to-end
-> run was still accumulating when this revision was written — 14 of 30 strategies — and its
-> in-process run had not started; both are labelled with their `n` in
-> [`performance.md`](performance.md) rather than averaged into a headline. To refresh:
-> `PF_PERF_SAMPLE=30 PF_PERF_SEED=20260906 python3 perf.py e2e B 3` then `… inproc B 3`, then
-> `perf_report.py`.
+> complete on the sample (36 strategies reached end-to-end, 30 in-process). Set B is now complete
+> too — PineForge timed on all 30 sampled strategies end-to-end and in-process — but **PyneCore
+> reached only 14 of the 30**, because the other 16 are corpus strategies the PyneComp daily quota
+> never compiled (limitation 1). Those 16 are `no_compile` rows in
+> [`performance.csv`](performance.csv), never averaged in, and every set-B speedup is quoted over
+> the 14 pairs that exist. Set B's ratio is therefore the least well-sampled of the three; set A
+> (100 whole pairs) is the one to argue from.
 
 
 ## Known limitations
@@ -595,7 +693,12 @@ Read these before quoting any number above.
    (recompile all 100 set-A strategies with today's PyneComp 6.0.66 and diff against the
    committed 6.0.31 output) therefore **has not been done**; set A's PyneCore columns use the
    committed 6.0.31 sources. Every blocked compile is a `not_run` row, never a compile failure.
-2. **Two harness bugs were found and fixed mid-benchmark; a third is disclosed but not fixed.**
+   This is also why set B's PyneCore column reads *of 144 run* and why its performance stage has
+   only 14 of 30 pairs: the same 167 strategies are missing from both.
+2. **Four harness bugs were found and fixed; one more is disclosed but not fixed.** (d), the
+   fourth, was found in revision 2: PyneCore's range-end open-position mark was being dropped in
+   normalization, so the two engines were not being graded identically after all — fixed, and
+   tier-neutral ([Fixes in revision 2](#1-the-range-end-open-position-mark-for-both-engines)).
    (a) Both PyneCore versions were run concurrently on the same strategy directory, racing over
    PyneCore's AST cache and manufacturing ~40 import errors on set B — fixed by running one
    version per stage and re-measuring ([`rerunB.sh`](rerunB.sh)). (b) `pyne run --security` was
@@ -605,9 +708,16 @@ Read these before quoting any number above.
    long-lived process, which is a running maximum over every child and reported an identical
    55 MB for both engines; now measured per run with `/usr/bin/time -f %M`. Any RSS figure not
    carrying that provenance should be ignored.
-3. **Neither engine was given auxiliary feeds beyond the chart feed.** That is symmetric, but it
-   means the `request.security` bucket measures *what each engine can derive from one feed plus
-   what its CLI lets you declare*, not what either could do with a full data plane.
+3. **Neither engine was given auxiliary feeds beyond the chart feed** *in any head-to-head table*.
+   That is symmetric, but it means the `request.security` bucket measures *what each engine can
+   derive from one feed plus what its CLI lets you declare*, not what either could do with a full
+   data plane. Revision 2 adds one **PineForge-only, clearly labelled supplementary** measurement
+   outside those tables — PineForge re-run on the 13 refused probes with the parity campaign's own
+   1-minute feeds staged, where all 13 grade *excellent*
+   ([Fixes in revision 2](#2-pineforge-with-the-campaigns-finer-timeframe-feeds--supplementary-not-head-to-head)).
+   PyneCore was **not** rerun on those inputs, so that result is not a comparison and must never be
+   quoted beside a PyneCore number. The symmetric experiment is one command
+   (`pyne run --security '1=<file>'`) and was not run.
 4. **Set C is not reproducible from public inputs** by design — third-party scripts. Only
    aggregates are published, and the sample is 200 of 3,881 probes.
    *Disclosure — two closed-set slips, both remediated.* (i) `report.py` also writes

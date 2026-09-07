@@ -12,12 +12,15 @@ case $STAGE in
   pc646)  CMD="python3 $B/tools/spark/bench.py pc" ;;
   pc691)  CMD="python3 $B/tools/spark/bench.py pc" ;;
   grade)  CMD="python3 $B/tools/spark/bench.py grade" ;;
+  renorm) CMD="python3 $B/tools/spark/bench.py renorm" ;;
 esac
 echo "$(date -u +%FT%TZ) start $S $STAGE P=$P n=$(wc -l < $LIST)" >> $B/logs/run_set.log
 if [ $STAGE = pf_raw ]; then
   xargs -a $LIST -P $P -I{} sh -c "python3 $B/tools/spark/bench.py pf {} --raw > /dev/null 2>&1 || echo FAIL {}" 
 elif [ $STAGE = pf_rs ]; then
   xargs -a $LIST -P $P -I{} sh -c "python3 $B/tools/spark/bench.py pf {} --rs > /dev/null 2>&1 || echo FAIL {}" 
+elif [ $STAGE = pf_finer ]; then
+  xargs -a $LIST -P $P -I{} sh -c "python3 $B/tools/spark/bench.py pf-finer {} > /dev/null 2>&1 || echo FAIL {}"
 elif [ $STAGE = pc646_rs ] || [ $STAGE = pc691_rs ]; then
   V=${STAGE#pc}; V=${V%_rs}
   xargs -a $LIST -P $P -I{} sh -c "python3 $B/tools/spark/bench.py pc {} $V --rs > /dev/null 2>&1 || echo FAIL {}"
