@@ -1454,6 +1454,10 @@ void BacktestEngine::run(const Bar* input_bars, int n_input,
 #endif
     } catch (const AbortRequested&) {
         last_run_status_ = 1;
+        clear_historical_security_lookahead_projections();
+#ifdef PINEFORGE_HAS_AUX_SECURITY_FEED_V1
+        clear_aux_security_chart_ranges();
+#endif
     } catch (const std::exception& e) {
         clear_historical_security_lookahead_projections();
 #ifdef PINEFORGE_HAS_AUX_SECURITY_FEED_V1
@@ -2021,7 +2025,12 @@ void BacktestEngine::run(const Bar* input_bars, int n_input,
                           MagnifierDistribution magnifier_dist) {
     last_error_.clear();
     last_run_status_ = 0;
-    abort_requested_.store(false, std::memory_order_relaxed);
+    // abort_requested_ is NOT cleared here: this overload only sets up
+    // syminfo/inputs/overrides before delegating to the TF-aware run below,
+    // which owns the clear at its own entry. Clearing it here too would open
+    // a window (between this store and the delegate's own store) where a
+    // request_abort() from another thread is silently discarded and the run
+    // completes with status 0 instead of being consumed.
     try {
     // Store syminfo and inputs
     syminfo_ = syminfo;
@@ -2059,6 +2068,10 @@ void BacktestEngine::run(const Bar* input_bars, int n_input,
 
     // Delegate to the TF-aware run
     run(input_bars, n_input, input_tf, script_tf, bar_magnifier, magnifier_samples, magnifier_dist);
+    // Defensive: nothing in this overload's own body calls check_abort(), and
+    // the delegate above already converts AbortRequested to last_run_status_
+    // == 1 internally, so this clause cannot fire today. Kept for symmetry
+    // with the other two overloads and as a guard if that ever changes.
     } catch (const AbortRequested&) {
         last_run_status_ = 1;
     } catch (const std::exception& e) {

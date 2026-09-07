@@ -613,7 +613,7 @@ PF_API int strategy_stream_fill_report(pf_strategy_t s, pf_report_t* out);
  *  them changes a historical run unless enabled. @{ */
 /** Request cooperative abort of the run in progress (see c_abi.cpp). */
 PF_API void strategy_request_abort(pf_strategy_t s);
-/** 0 = completed, 1 = NOT_COMPLETED (aborted). */
+/** 0 = completed, 1 = NOT_COMPLETED (aborted), -1 = @p s is NULL. */
 PF_API int  strategy_last_run_status(pf_strategy_t s);
 /** @} */
 

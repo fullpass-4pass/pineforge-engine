@@ -215,9 +215,10 @@ PF_API void strategy_request_abort(pf_strategy_t s) {
 }
 
 /* 0 when the most recent run() completed, 1 when it was aborted
- * (NOT_COMPLETED). Errors are reported by strategy_get_last_error. */
+ * (NOT_COMPLETED), -1 when ``s`` is NULL. Errors are reported by
+ * strategy_get_last_error. */
 PF_API int strategy_last_run_status(pf_strategy_t s) {
-    if (!s) return 0;
+    if (!s) return -1;
     return static_cast<const pineforge::BacktestEngine*>(s)->last_run_status();
 }
 
