@@ -14,6 +14,12 @@ perf pin:   taskset -c 5-9 (5 cores), one job at a time, box otherwise idle (loa
             than one core - the pin is for isolation from the other 15 cores, not headroom.
 accuracy:   xargs -P 30 (oversubscribed on purpose; wall times in the accuracy tables
             are therefore NOT the performance numbers — use performance.csv for those)
+pf_tool:    the in-process PineForge timer (pf_tool.cpp) is a driver: it dlopens the strategy's
+            .so and calls it through the C ABI, and links no engine code of its own. The measured
+            engine is whatever the .so was compiled against -- for revision 3, bfdbe9618c12,
+            rebuilt for all 611 strategies before the timing stage. The pf_tool binary itself was
+            not rebuilt between revisions; the C ABI is unchanged, which the run proves by not
+            failing to resolve a symbol.
 
 [toolchain]
 python:     3.12.3
