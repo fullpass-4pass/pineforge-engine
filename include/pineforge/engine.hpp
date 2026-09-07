@@ -4288,7 +4288,7 @@ private:
     // Live-runtime tail (spec §3.1): once script_tf_seconds_ is known for
     // this run, freeze pine_last_bar_index()/last_bar_time_ at the horizon
     // bar instead of the fed array's actual last index. No-op unless
-    // realtime_tail_ is on and horizon_bars_ > 0.
+    // realtime_tail_ is on and realtime_tail_horizon_bars_ > 0.
     void apply_realtime_tail_horizon(const Bar* bars, int n);
     // The TF-aware run()'s actual work (dispatch loop selection, the
     // try/catch, both cleanup paths). Does NOT touch last_error_,
@@ -4647,11 +4647,14 @@ public:
 
     // Live-runtime tail semantics (spec §3.1, ABI v4): the caller's fed array
     // ends with a still-forming bar rather than the chart's rightmost
-    // historical bar. When `on`, the LAST bar of the next run() gets
-    // barstate.islast == false, session.islastbar computed from the bucket
-    // calendar (no i+1 bar to peek at), pine_last_bar_index() frozen at
-    // `horizon_bars - 1`, and no range-end close row/trade. Default off:
-    // every historical run is byte-identical to before this flag existed.
+    // historical bar. When `on`, the LAST bar of every subsequent run() (this
+    // is persistent configuration, not a one-shot flag -- it stays set until
+    // a caller passes on=false, and reset_run_state() does not touch it)
+    // gets barstate.islast == false, session.islastbar computed from the
+    // bucket calendar (no i+1 bar to peek at), pine_last_bar_index() /
+    // last_bar_time_ frozen at the horizon bar (`horizon_bars - 1`), and no
+    // range-end close row/trade. Default off: every historical run is
+    // byte-identical to before this flag existed.
     void set_realtime_tail(bool on, int horizon_bars) {
         realtime_tail_ = on;
         realtime_tail_horizon_bars_ = horizon_bars;

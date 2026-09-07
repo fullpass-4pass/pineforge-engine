@@ -14,10 +14,12 @@ class HoldStrategy final : public BacktestEngine {
 public:
     std::vector<bool> islast, islastbar;
     std::vector<int> last_index;
+    int64_t last_time = 0;
     void on_bar(const Bar&) override {
         islast.push_back(barstate_islast_);
         islastbar.push_back(session_islastbar_);
         last_index.push_back(pine_last_bar_index());
+        last_time = last_bar_time_;
         if (bar_index_ == 2) strategy_entry("L", true);
     }
 };
@@ -34,10 +36,12 @@ int main() {
     off.run(bars.data(), 10);
     CHECK(off.islast.back());
     CHECK(off.last_index.back() == 9);
+    CHECK(off.last_time == 9 * 60'000LL);            // unchanged with the flag off
     ReportC r_off{};
     off.fill_report(&r_off);
     CHECK(r_off.trades_len == 1 && r_off.trades[0].open_at_end == 1);   // range-end row
     const double eq_off_last = r_off.equity_curve[r_off.equity_curve_len - 1].equity;
+    CHECK(near(r_off.equity_curve[r_off.equity_curve_len - 1].open_profit, 0.0));  // range-end re-mark
     BacktestEngine::free_report(&r_off);
 
     // Flag on, horizon 1000 bars.
@@ -48,6 +52,7 @@ int main() {
     for (int i = 0; i + 1 < 10; ++i) CHECK(on.islast[i] == off.islast[i]);   // interior identical
     CHECK(on.last_index.back() == 999);              // frozen horizon
     CHECK(!on.islastbar.back());                     // 24x7 default session: never last bar
+    CHECK(on.last_time == 999LL * 60'000LL);         // last_bar_time_ frozen at the horizon bar
     ReportC r_on{};
     on.fill_report(&r_on);
     CHECK(r_on.trades_len == 0);                     // no open_at_end row
@@ -56,6 +61,34 @@ int main() {
     // open_profit 6 is kept on the tail equity point; the flag-off curve was
     // re-marked by the range-end close and equals initial + realized 6 too.
     CHECK(near(eq_on_last, eq_off_last));
+    CHECK(near(r_on.equity_curve[r_on.equity_curve_len - 1].open_profit, 6.0));
     BacktestEngine::free_report(&r_on);
+
+    // TF-aware path (run_tf_impl -> run_simple_bar_loop): the only path that
+    // sets session state (session.islastbar), and the path pineforge-live
+    // drives. input_tf == script_tf == "1" selects run_simple_bar_loop with
+    // no aggregation/magnifier.
+    HoldStrategy tf_off;
+    tf_off.run(bars.data(), 10, "1", "1");
+    CHECK(tf_off.islast.back());
+    CHECK(tf_off.islastbar.back());                  // old rule: fires on the array's last bar
+    CHECK(tf_off.last_index.back() == 9);
+
+    HoldStrategy tf_on;
+    tf_on.set_realtime_tail(true, 1000);
+    tf_on.run(bars.data(), 10, "1", "1");
+    CHECK(!tf_on.islast.back());
+    CHECK(!tf_on.islastbar.back());                  // bucket rule: next minute is in a 24x7 session
+    for (int i = 0; i + 1 < 10; ++i) {
+        CHECK(tf_on.islast[i] == tf_off.islast[i]);
+        CHECK(tf_on.islastbar[i] == tf_off.islastbar[i]);   // interior untouched
+    }
+    CHECK(tf_on.last_index.back() == 999);           // freeze survives run_tf_impl's own assignment
+    CHECK(tf_on.last_time == 999LL * 60'000LL);
+    ReportC r_tf{};
+    tf_on.fill_report(&r_tf);
+    CHECK(r_tf.trades_len == 0);                     // range-end guard on this path too
+    BacktestEngine::free_report(&r_tf);
+
     return failures == 0 ? 0 : 1;
 }

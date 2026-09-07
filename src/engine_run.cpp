@@ -1829,6 +1829,12 @@ void BacktestEngine::run_simple_bar_loop(const Bar* input_bars, int n_input) {
                 next_in_session = chart_bar_ismarket(
                     current_bar_.timestamp
                     + static_cast<int64_t>(script_tf_seconds_) * 1000);
+            } else if (in_session && realtime_tail_) {
+                // Live tail with an unparseable/degenerate script_tf_seconds_
+                // (no bucket width to advance by): a forming bar is never the
+                // session's last bar, matching engine_stream.cpp's fallback
+                // for the same degenerate case.
+                next_in_session = true;
             }
             set_session_bar_state(in_session, in_session && !next_in_session);
         }
