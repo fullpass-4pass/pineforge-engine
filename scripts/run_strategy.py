@@ -795,12 +795,15 @@ class ReportC(ctypes.Structure):
 # pf_report_t is CALLER-allocated: running an old .so against the v3
 # ReportC mirror (or vice versa) silently corrupts memory, so the .so's
 # pf_abi_version() export is asserted before any run. v3 appended
-# pf_trade_t::open_at_end (TradeC above); test_run_strategy_range_end.py
-# pins this constant to the header's macro, because the campaign's
-# verifier runs every probe through THIS harness and a stale guard here
-# is a run-error on every slug (the f-1d spark pre-check of 2026-09-02
-# found exactly that: ".so reports 3, harness expects 2" x64).
-EXPECTED_PF_ABI = 3
+# pf_trade_t::open_at_end (TradeC above); v4 is groundwork for the
+# live-runtime surface (last_run_status_ etc.) and does not change the
+# pf_report_t/pf_trade_t layout this mirror describes.
+# test_run_strategy_range_end.py pins this constant to the header's
+# macro, because the campaign's verifier runs every probe through THIS
+# harness and a stale guard here is a run-error on every slug (the
+# f-1d spark pre-check of 2026-09-02 found exactly that: ".so reports
+# 3, harness expects 2" x64).
+EXPECTED_PF_ABI = 4
 
 
 def _check_abi(lib: ctypes.CDLL) -> None:

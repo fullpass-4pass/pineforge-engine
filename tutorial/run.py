@@ -113,7 +113,9 @@ class ReportC(ctypes.Structure):
 
 # pf_report_t is caller-allocated, so a stale mirror means the runtime
 # writes past our buffer. Assert the .so's ABI version before any run.
-EXPECTED_PF_ABI = 3
+# v4 is groundwork for the live-runtime surface and does not change
+# the pf_report_t/pf_trade_t layout this mirror describes.
+EXPECTED_PF_ABI = 4
 
 def check_abi(lib: ctypes.CDLL) -> None:
     try:

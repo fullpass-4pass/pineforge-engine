@@ -76,8 +76,9 @@
  *  macro have no pf_abi_version symbol — treat dlsym failure as
  *  version 1. Value 3 appends pf_trade_t::open_at_end (the range-end
  *  close flag); a v2 reader iterating trades with the v2 stride would
- *  misindex every row after the first. */
-#define PF_ABI_VERSION 3
+ *  misindex every row after the first. Value 4 appends the live-runtime
+ *  accessors and the per-bar broker-state hash array to pf_report_t. */
+#define PF_ABI_VERSION 4
 
 /** Feature probe for the opt-in split chart/request.security feed boundary.
  *  When defined, #strategy_set_aux_security_feed is available. */

@@ -214,6 +214,7 @@ set(TEST_SOURCES
     test_famae_declined_reversal_trail_gap
     test_trail_activation_tick_bar
     test_session_predicates_daily_chart
+    test_live_run_status
 )
 
 find_package(Threads REQUIRED)

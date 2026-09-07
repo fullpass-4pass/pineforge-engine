@@ -3472,6 +3472,11 @@ protected:
     // insert + ``string`` push_back; subsequent calls with the same name
     // are a single map lookup.
     bool trace_enabled_ = false;
+
+    // Live-runtime surface (ABI v4). All default off/zero; historical runs are
+    // byte-identical when untouched (tests/test_live_flags_off_identity.cpp).
+    int last_run_status_ = 0;               // 0 completed, 1 NOT_COMPLETED (abort)
+
     std::vector<TraceEntryC> trace_buffer_;
     std::vector<std::string> trace_names_;
     std::unordered_map<std::string, int32_t> trace_name_index_;
@@ -4595,6 +4600,9 @@ public:
     // per-bar values it wants to cross-reference against TradingView.
     void set_trace_enabled(bool on) { trace_enabled_ = on; }
     bool trace_enabled() const { return trace_enabled_; }
+
+    // --- Live-runtime status API (ABI v4) ---
+    int last_run_status() const { return last_run_status_; }
 
     // Push a typed per-bar value into the trace buffer. Cheap when
     // disabled — a single bool branch and return. When enabled, name

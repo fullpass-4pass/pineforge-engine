@@ -806,6 +806,7 @@ void BacktestEngine::reset_run_state() {
 
 void BacktestEngine::run(const Bar* bars, int n) {
     last_error_.clear();
+    last_run_status_ = 0;
     if (n > 0 && bars != nullptr) {
         last_bar_time_ = bars[n - 1].timestamp;
         last_bar_index_ = n - 1;
@@ -1305,6 +1306,7 @@ void BacktestEngine::run(const Bar* input_bars, int n_input,
                           int magnifier_samples,
                           MagnifierDistribution magnifier_dist) {
     last_error_.clear();
+    last_run_status_ = 0;
     if (n_input > 0 && input_bars != nullptr) {
         last_bar_time_ = input_bars[n_input - 1].timestamp;
     } else {
@@ -2009,6 +2011,7 @@ void BacktestEngine::run(const Bar* input_bars, int n_input,
                           int magnifier_samples,
                           MagnifierDistribution magnifier_dist) {
     last_error_.clear();
+    last_run_status_ = 0;
     try {
     // Store syminfo and inputs
     syminfo_ = syminfo;

@@ -704,7 +704,9 @@ def engine_version(lib: ctypes.CDLL) -> dict:
 
 # pf_report_t is CALLER-allocated: a .so built against a different ABI
 # writes past (or short of) our ReportC buffer. Assert version up front.
-EXPECTED_PF_ABI = 3
+# v4 is groundwork for the live-runtime surface and does not change
+# the pf_report_t/pf_trade_t layout this mirror describes.
+EXPECTED_PF_ABI = 4
 
 
 def check_abi(lib: ctypes.CDLL) -> None:

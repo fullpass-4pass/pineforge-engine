@@ -128,7 +128,9 @@ class pf_report_t(ctypes.Structure):
 
 # pf_report_t is caller-allocated; a layout mismatch means the runtime
 # writes past this script's report buffer. Verify the ABI before running.
-EXPECTED_PF_ABI = 3
+# v4 is groundwork for the live-runtime surface and does not change
+# the pf_report_t/pf_trade_t layout this mirror describes.
+EXPECTED_PF_ABI = 4
 
 def check_abi(lib):
     try:
