@@ -267,9 +267,15 @@ if fin:
                            no_finer_feed=c.get("no_finer_feed", 0), not_run=c.get("not_run", 0)))
     wcsv(OUT/"accuracy_finer_both_engines.csv", fr, list(fr[0].keys()))
     md.append("## " + FINER_LABEL.capitalize() + "\n\n"
-              + "The " + str(len(fin)) + " probes whose chart-feed-only run needed a `request.security`\n"
-              + "timeframe finer than the staged feed. BOTH engines refuse these inputs on the chart\n"
-              + "feed alone, and BOTH are given the campaign's own 1-minute bytes here.\n\n"
+              + "Every one of the " + str(len(fin)) + " set-B and set-C probes for which a finer rung was\n"
+              + "measured -- NOT only the 13 that require one. Offering the campaign's 1-minute feed to a\n"
+              + "probe that never needed it is harmless, because the ladder then keeps whichever rung graded\n"
+              + "better; but it does mean a `run_error` in a `*_finer` row here is usually the EXTRA feed\n"
+              + "being refused by a probe that did not want it, not a failure to run the strategy -- the\n"
+              + "whole-feed invocation hands the engine chart bars that predate the 1-minute feed's start.\n"
+              + "The bounded `*_finer_rs` row is the one to read. The 13 probes that genuinely need finer\n"
+              + "data are refused by BOTH engines on the chart feed alone, and BOTH are given the campaign's\n"
+              + "own 1-minute bytes here.\n\n"
               + md_table(fr, ["variant", "inputs", "n"] + TIERS + ["run_error", "timeout", "no_finer_feed", "not_run"]) + "\n")
 
 # ============================================================================================

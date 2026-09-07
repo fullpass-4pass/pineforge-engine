@@ -46,9 +46,11 @@ revision 2's fixes and every disclosure it carried are kept below unchanged.
   [`accuracy_corpus.csv`](accuracy_corpus.csv)
 - **Closed-set aggregates only:** [`accuracy_closed_aggregates.csv`](accuracy_closed_aggregates.csv)
 - **The finer-feed rung, both engines:**
-  [`accuracy_finer_both_engines.csv`](accuracy_finer_both_engines.csv) — replaces revision 2's
-  PineForge-only `accuracy_finer_supplementary.csv`, which was withdrawn (and its file deleted)
-  when PyneCore was given the same 1-minute feeds; it survives in this branch's history
+  [`accuracy_finer_both_engines.csv`](accuracy_finer_both_engines.csv) — all 511 set-B and set-C
+  probes for which a finer rung was measured (not only the 13 that require one), per rung and per
+  lane. Replaces revision 2's PineForge-only `accuracy_finer_supplementary.csv`, which was
+  withdrawn (and its file deleted) when PyneCore was given the same 1-minute feeds; it survives in
+  this branch's history
 - **Campaign cross-check:** [`campaign_crosscheck.csv`](campaign_crosscheck.csv) — the campaign's
   own grade vs this benchmark's, per set and per symbol@timeframe
 - **Conditional tables, both directions:** [`conditional.csv`](conditional.csv)
