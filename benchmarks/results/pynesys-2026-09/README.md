@@ -492,6 +492,22 @@ published row in [`tables.md`](tables.md)'s "every rung measured" table: `pf_cam
 this benchmark's own ladder (three rungs apply on that lane) — the same `analyze_strategy`
 grader, a different rung chooser. Read set A as the *public, reproducible* set, not as the campaign-verified one.
 
+**Set A's ten strong rows are the only PineForge residuals in this benchmark that the parity
+campaign does not already own**, precisely because it refuses to grade this suite. Their shape is
+uniform and worth stating, since a strong tier is easy to misread as "roughly right":
+
+- `entryP90` and `exitP90` are **exactly `0.000000`** on all ten. Every trade that pairs, pairs at
+  TradingView's own price. This is not an arithmetic residual.
+- `pnlP90` is 0.075 % – 0.106 %, an order of magnitude inside the strict profile's 1.0 % bound, so
+  P&L does not block the tier either.
+- What blocks it is `verify_corpus`'s `count_ok = (countAbsDelta == 0)`, which is exact by design.
+  **Eight of the ten miss by one to four trades** on tapes of 419 to 5,690 — a trade-admission
+  difference at the edges of the tape, not in the middle.
+- `17-bos-curv` is the odd one: `countAbsDelta` 0, 262 TV trades, 262 engine trades, 262 matched,
+  and coverage 96.3 % — under the 99 % excellent bound. A zero count delta with sub-99 % coverage
+  is a question about the coverage denominator on a small tape, not about the engine's fills.
+- `16-volty-expan` is the only large one: 64 of 7,235 (0.88 %), coverage 98.6 %.
+
 No set-A strategy uses `request.security`, so the `--security supplied` run is byte-for-byte
 identical to the plain one for both PyneCore versions. That equality is this benchmark's control
 — it is what proved that an earlier set-A discrepancy was a harness race, not the flag.
