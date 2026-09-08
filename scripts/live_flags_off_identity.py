@@ -135,7 +135,7 @@ def engine_head_label(repo: Path) -> str:
     against the named commit itself, so the evidence alone cannot show which
     sources were actually measured."""
     result = subprocess.run(
-        ["git", "-C", str(repo), "status", "--porcelain", "--", "src", "include", "scripts"],
+        ["git", "-C", str(repo), "status", "--porcelain", "--", "src", "include", "scripts", "CMakeLists.txt", "cmake"],
         capture_output=True, text=True, check=True,
     )
     dirty = bool(result.stdout.strip())
