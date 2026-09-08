@@ -66,8 +66,6 @@
 #include <pineforge/bar.hpp>
 #include <pineforge/timeframe.hpp>
 #include <cstdio>
-#include <cstdlib>
-#include <cstring>
 #include <string>
 #include <vector>
 
@@ -85,17 +83,32 @@ int main(int argc, char** argv) {
     }
     char line[1024];
     std::vector<Bar> bars;
-    if (!std::fgets(line, sizeof line, in)) {  // header
-        std::fclose(in);
-        return 2;
-    }
+    // Row receipt (finding 1): every line is either the header, a parsed
+    // data row, or a skipped (unparsable) row -- silently dropping rows
+    // with no count was the original defect. Line 1 must literally start
+    // with "timestamp" to be treated as the header; anything else on line 1
+    // falls through to the same parse-or-skip path as every other line, so
+    // a header-less feed's first data row is no longer eaten.
+    long rows_parsed = 0;
+    long rows_skipped = 0;
+    bool first_line = true;
     while (std::fgets(line, sizeof line, in)) {
+        if (first_line) {
+            first_line = false;
+            if (std::string(line).rfind("timestamp", 0) == 0) {
+                continue;  // header row: not data, not skipped
+            }
+            // else: no header present -- parse line 1 as data below.
+        }
         Bar b{};
         long long ts = 0;
         if (std::sscanf(line, "%lld,%lf,%lf,%lf,%lf,%lf",
                          &ts, &b.open, &b.high, &b.low, &b.close, &b.volume) == 6) {
             b.timestamp = ts;
             bars.push_back(b);
+            ++rows_parsed;
+        } else {
+            ++rows_skipped;
         }
     }
     std::fclose(in);
@@ -108,6 +121,10 @@ int main(int argc, char** argv) {
     // defaults (include/pineforge/engine.hpp:1043-1044). input_tf is always
     // "1" -- this tool's whole job is aggregating a 1-minute feed.
     TimeframeAggregator agg(std::string(argv[2]), "1", "UTC", "24x7");
+    // Provenance (finding 5): record what the aggregator was actually
+    // constructed with, so the lane can relay it into the JSON instead of
+    // asserting it from an unrelated constant.
+    std::fprintf(stderr, "aggregator: tf=%s input_tf=1 tz=UTC session=24x7\n", argv[2]);
 
     std::FILE* out = std::fopen(argv[3], "w");
     if (!out) {
@@ -137,8 +154,10 @@ int main(int argc, char** argv) {
             std::fprintf(out, "%lld,%.17g,%.17g,%.17g,%.17g,%.17g\n",
                          static_cast<long long>(ab.bar.timestamp), ab.bar.open,
                          ab.bar.high, ab.bar.low, ab.bar.close, ab.bar.volume);
-            if (ab.bar.timestamp == last_seen_bucket_start
-                || (bucket_ms > 0 && ab.bar.timestamp == this_bucket_start)) {
+            // last_seen_bucket_start == this_bucket_start always holds here
+            // (set together just above), so this is the sole condition --
+            // dropped the redundant second disjunct (finding 7).
+            if (ab.bar.timestamp == last_seen_bucket_start) {
                 last_bucket_completed = true;
             } else {
                 // Boundary-triggered completion: ab.bar is the PREVIOUS
@@ -154,6 +173,11 @@ int main(int argc, char** argv) {
     // last bucket-key ever reach completion? For this corpus's real data the
     // answer is "yes" (the file's tail happens to fill its bucket exactly),
     // but the check stays generic for any future feed.
-    std::fprintf(stderr, "trailing_partial=%d\n", last_bucket_completed ? 0 : 1);
-    return 0;
+    //
+    // Row receipt (finding 1): the lane parses this line and asserts
+    // rows_parsed against its own independent 1m row count, so any silent
+    // drop upstream of this print is now visible on both sides.
+    std::fprintf(stderr, "rows_parsed=%ld rows_skipped=%ld trailing_partial=%d\n",
+                 rows_parsed, rows_skipped, last_bucket_completed ? 0 : 1);
+    return rows_skipped > 0 ? 1 : 0;
 }

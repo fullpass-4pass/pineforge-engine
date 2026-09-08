@@ -571,6 +571,14 @@ def main() -> int:
         + (f": {', '.join(sorted(no_lib))}" if no_lib else "")
     )
 
+    out_path = resolve_out_path(args.out, args.only)
+    if out_path.exists() and not args.force:
+        existing_probes = _existing_probe_count(out_path)
+        if existing_probes is not None and existing_probes > len(cases):
+            sys.exit(
+                f"error: refusing to overwrite {out_path} (existing summary.probes="
+                f"{existing_probes} > this run's {len(cases)} probes); pass --force to override")
+
     # Pre-warm the feed-size cache sequentially, single-threaded, before the
     # worker pool starts below. process_probe() (run on pool worker threads)
     # calls feed_n_bars(probe_feed(strat_dir)) to size the two horizons, and
@@ -580,16 +588,19 @@ def main() -> int:
     # Populating every distinct feed's row count here, before any worker
     # thread can touch the dict, removes the race outright instead of
     # adding locking around a value that is idempotent per path anyway.
+    #
+    # Isolated per probe (finding 3): a missing/empty feed or malformed
+    # inputs.json here must not abort the whole lane -- process_probe()
+    # (run on the worker pool below) turns the same failure into a
+    # {"slug","error"} row for that one probe, so skipping it here just
+    # defers the (identical) failure to the worker, which records it. No
+    # worker ever observes a partially-populated cache write from here: the
+    # exception fires before feed_n_bars() writes anything.
     for strat_dir, _so_name in cases:
-        feed_n_bars(probe_feed(strat_dir))
-
-    out_path = resolve_out_path(args.out, args.only)
-    if out_path.exists() and not args.force:
-        existing_probes = _existing_probe_count(out_path)
-        if existing_probes is not None and existing_probes > len(cases):
-            sys.exit(
-                f"error: refusing to overwrite {out_path} (existing summary.probes="
-                f"{existing_probes} > this run's {len(cases)} probes); pass --force to override")
+        try:
+            feed_n_bars(probe_feed(strat_dir))
+        except Exception:
+            continue
 
     BUILD_TMP_ROOT.mkdir(parents=True, exist_ok=True)
     results: list[dict] = []

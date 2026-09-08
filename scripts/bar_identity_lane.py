@@ -16,9 +16,13 @@ documented rule above) or *_unexplained (anything else). A non-empty
 *_unexplained bucket is the lane's actual signal: it means the two
 aggregations disagree for a reason the derive rule does not predict, and the
 script reports the rows and exits 1 rather than being tweaked to pass.
+`volume` divergences and `missing_in_aggregate`/`missing_in_derived` buckets
+are unexplained by construction (no rule predicts either) and also count
+toward that exit-1 signal.
 """
 from __future__ import annotations
 
+import argparse
 import csv
 import json
 import subprocess
@@ -33,14 +37,33 @@ OUT_CSV = ROOT / "build/aggregate_15m.csv"
 OUT = ROOT / "build/bar_identity_row1.json"
 
 TF = "15"
-TF_SECONDS = 15 * 60
-BUCKET_MS = TF_SECONDS * 1000
 
 MIN_BARS_COMPARED = 100_000
-ROW_COUNT_TOLERANCE = 0.01
 MAX_EXAMPLES = 20
 
 FIELDS = ("open", "high", "low", "close")
+
+
+def build_arg_parser() -> argparse.ArgumentParser:
+    ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    ap.add_argument("--one-m", type=Path, default=ONE_M,
+                     help="1m OHLCV source CSV (default: %(default)s)")
+    ap.add_argument("--derived", type=Path, default=DERIVED,
+                     help="derived feed CSV to compare the aggregate against (default: %(default)s)")
+    ap.add_argument("--tf", default=TF,
+                     help="target timeframe, in integer minutes, passed straight to "
+                          "aggregate_feed (default: %(default)s)")
+    ap.add_argument("--out", type=Path, default=OUT,
+                     help="output JSON path (default: %(default)s)")
+    ap.add_argument("--aggregate-bin", type=Path, default=AGG,
+                     help="path to the built aggregate_feed binary (default: %(default)s)")
+    return ap
+
+
+def _parse_kv_line(line: str) -> dict[str, str]:
+    """Split a `key=value key2=value2 ...` stderr line (an optional leading
+    `label:` token is ignored -- it has no `=`) into a dict."""
+    return dict(tok.split("=", 1) for tok in line.split() if "=" in tok)
 
 
 def load(p: Path) -> dict[int, dict]:
@@ -51,11 +74,14 @@ def load(p: Path) -> dict[int, dict]:
         }
 
 
-def load_1m_row_count_and_divergent_buckets(p: Path, divergent_ts: set[int]) -> tuple[int, dict[int, list[dict]]]:
+def load_1m_row_count_and_divergent_buckets(
+    p: Path, divergent_ts: set[int], bucket_ms: int
+) -> tuple[int, dict[int, list[dict]]]:
     """One pass over the (3.3M-row) 1m CSV: count every row (for the
-    non-vacuity check) and, in the same pass, collect the source rows for
-    only the (typically small) set of already-known divergent bucket starts
-    -- classification never re-scans the file per divergence."""
+    non-vacuity check, and to cross-check the tool's own rows_parsed receipt)
+    and, in the same pass, collect the source rows for only the (typically
+    small) set of already-known divergent bucket starts -- classification
+    never re-scans the file per divergence."""
     n = 0
     buckets: dict[int, list[dict]] = {ts: [] for ts in divergent_ts}
     with p.open(newline="", encoding="utf-8") as f:
@@ -64,7 +90,7 @@ def load_1m_row_count_and_divergent_buckets(p: Path, divergent_ts: set[int]) -> 
             if not divergent_ts:
                 continue
             row_ts = int(r["timestamp"])
-            bucket_start = row_ts - (row_ts % BUCKET_MS)
+            bucket_start = row_ts - (row_ts % bucket_ms)
             bucket = buckets.get(bucket_start)
             if bucket is not None:
                 bucket.append({
@@ -98,31 +124,64 @@ def classify_open(bucket_rows: list[dict], agg_open: float, derived_open: float)
 def classify_hl_close(field: str, bucket_rows: list[dict], agg_val: float, derived_val: float) -> str:
     """high/low/close are expected identical between the two aggregations
     (both fold every row regardless of volume: high=max, low=min,
-    close=last). The only documented edge case that could still explain a
-    difference is a zero-volume row uniquely setting the high/low extreme
-    (close never depends on volume at all, so a close divergence has no
-    explained bucket). Anything else is unexplained -- the lane's signal."""
+    close=last). close never depends on volume at all, so a close
+    divergence has no explained bucket.
+
+    As strict as classify_open: a high/low divergence is explained only when
+    ALL THREE hold -- the aggregate's value equals the extreme over every
+    row in the bucket, the derived value equals the extreme over only the
+    positive-volume rows, and the two extremes actually differ. Under the
+    derive rule this script currently knows about (scripts/derive_corpus_feeds.py
+    :127-131 folds high/low over every row regardless of volume, same as the
+    engine's feed_merge_into_current, src/timeframe.cpp:916-923), those two
+    extremes can never differ -- so this bucket is unreachable today. That is
+    the honest state, not a bug: it stays unreachable until the derive rule
+    itself changes to something volume-sensitive."""
     if field in ("high", "low") and bucket_rows:
         reducer = max if field == "high" else min
-        extreme = reducer(r[field] for r in bucket_rows)
-        if any(r["volume"] == 0.0 and r[field] == extreme for r in bucket_rows):
-            return "hl_explained_zero_volume_row"
+        extreme_all = reducer(r[field] for r in bucket_rows)
+        positive_rows = [r for r in bucket_rows if r["volume"] > 0]
+        if positive_rows:
+            extreme_positive = reducer(r[field] for r in positive_rows)
+            if (agg_val == extreme_all and derived_val == extreme_positive
+                    and extreme_all != extreme_positive):
+                return "hl_explained_zero_volume_row"
     return f"{field}_unexplained"
 
 
 def main() -> int:
-    if not AGG.exists():
-        sys.exit(f"error: {AGG} not built -- run: cmake --build build -j8 --target aggregate_feed")
+    args = build_arg_parser().parse_args()
 
-    proc = subprocess.run([str(AGG), str(ONE_M), TF, str(OUT_CSV)], capture_output=True, text=True)
+    if not args.aggregate_bin.exists():
+        sys.exit(f"error: {args.aggregate_bin} not built -- "
+                  f"run: cmake --build build -j8 --target aggregate_feed")
+
+    try:
+        bucket_ms = int(args.tf) * 60 * 1000
+    except ValueError:
+        sys.exit(f"error: --tf {args.tf!r} must be an integer number of minutes")
+
+    proc = subprocess.run(
+        [str(args.aggregate_bin), str(args.one_m), args.tf, str(OUT_CSV)],
+        capture_output=True, text=True,
+    )
     trailing_partial = 0
+    rows_parsed: int | None = None
+    rows_skipped: int | None = None
+    aggregator_info: dict[str, str] = {}
     for line in proc.stderr.splitlines():
-        if line.startswith("trailing_partial="):
-            trailing_partial = int(line.split("=", 1)[1])
+        if line.startswith("rows_parsed="):
+            kv = _parse_kv_line(line)
+            rows_parsed = int(kv.get("rows_parsed", "0"))
+            rows_skipped = int(kv.get("rows_skipped", "0"))
+            trailing_partial = int(kv.get("trailing_partial", "0"))
+        elif line.startswith("aggregator:"):
+            aggregator_info = _parse_kv_line(line)
     if proc.returncode != 0:
-        sys.exit(f"error: {AGG} exited {proc.returncode}\nstdout:\n{proc.stdout}\nstderr:\n{proc.stderr}")
+        sys.exit(f"error: {args.aggregate_bin} exited {proc.returncode}\n"
+                  f"stdout:\n{proc.stdout}\nstderr:\n{proc.stderr}")
 
-    a, d = load(OUT_CSV), load(DERIVED)
+    a, d = load(OUT_CSV), load(args.derived)
 
     bars_compared = len(set(a) & set(d))
     agg_row_count = len(a)
@@ -136,38 +195,56 @@ def main() -> int:
     # First pass (over the small ~222k-row aggregate/derived dicts only):
     # find which bucket timestamps have any OHLC divergence, so the one
     # expensive pass over the 3.3M-row 1m file (below) only has to collect
-    # rows for those buckets, not re-scan the file per divergence.
+    # rows for those buckets, not re-scan the file per divergence. Also
+    # collects an example dump for every missing bucket -- expected zero,
+    # not a 1%-of-rows tolerance (finding 4).
     divergent_ts: set[int] = set()
+    missing_examples: list[dict] = []
     for ts in all_ts:
         if ts not in a:
             counts["missing_in_aggregate"] += 1
+            if len(missing_examples) < MAX_EXAMPLES:
+                missing_examples.append({"ts": ts, "missing_from": "aggregate", "derived": d[ts]})
             continue
         if ts not in d:
             counts["missing_in_derived"] += 1
+            if len(missing_examples) < MAX_EXAMPLES:
+                missing_examples.append({"ts": ts, "missing_from": "derived", "aggregate": a[ts]})
             continue
         av, dv = a[ts], d[ts]
         if any(av[k] != dv[k] for k in FIELDS):
             divergent_ts.add(ts)
 
-    one_m_rows, bucket_rows_by_ts = load_1m_row_count_and_divergent_buckets(ONE_M, divergent_ts)
+    one_m_rows, bucket_rows_by_ts = load_1m_row_count_and_divergent_buckets(args.one_m, divergent_ts, bucket_ms)
+
+    # Row receipt cross-check (finding 1): the tool's own parsed-row count
+    # must match the lane's independent count of the same file, or a silent
+    # drop on either side would go unnoticed.
+    if rows_parsed is None:
+        sys.exit(f"error: {args.aggregate_bin} did not report rows_parsed on stderr")
+    if rows_parsed != one_m_rows:
+        sys.exit(f"error: {args.aggregate_bin} reported rows_parsed={rows_parsed} but the lane "
+                  f"independently counted {one_m_rows} data rows in {args.one_m} "
+                  f"(tool rows_skipped={rows_skipped})")
 
     # Non-vacuity (brief step 3 + controller ruling 6): this lane exists to
     # publish counts over the whole ETH.P corpus, not a slice of it.
     if bars_compared <= MIN_BARS_COMPARED:
         sys.exit(f"error: only {bars_compared} bars compared (need > {MIN_BARS_COMPARED}); "
                   f"1m rows={one_m_rows}, aggregate rows={agg_row_count}, derived rows={derived_row_count}")
-    if abs(agg_row_count - derived_row_count) > ROW_COUNT_TOLERANCE * derived_row_count:
-        sys.exit(f"error: aggregate row count {agg_row_count} is not within "
-                  f"{ROW_COUNT_TOLERANCE:.0%} of derived row count {derived_row_count}")
 
     classification = {
         "open_explained_leading_zero_volume": 0, "open_unexplained": 0,
         "hl_explained_zero_volume_row": 0,
         "high_unexplained": 0, "low_unexplained": 0, "close_unexplained": 0,
+        "volume_unexplained": 0, "missing_unexplained": 0,
     }
     unexplained_examples: dict[str, list[dict]] = {
         "open_unexplained": [], "high_unexplained": [], "low_unexplained": [], "close_unexplained": [],
+        "volume_unexplained": [], "missing_unexplained": [],
     }
+    classification["missing_unexplained"] = counts["missing_in_aggregate"] + counts["missing_in_derived"]
+    unexplained_examples["missing_unexplained"] = missing_examples
 
     for ts in sorted(divergent_ts):
         av, dv = a[ts], d[ts]
@@ -188,6 +265,8 @@ def main() -> int:
                     "ts": ts, "aggregate": av[k], "derived": dv[k], "rows": bucket_rows,
                 })
 
+    # volume divergences are unexplained by construction -- no rule predicts
+    # one -- so they count toward the exit-1 signal too (finding 4).
     for ts in all_ts:
         if ts not in a or ts not in d:
             continue
@@ -196,19 +275,35 @@ def main() -> int:
             counts["volume"] += 1
             if len(examples) < MAX_EXAMPLES:
                 examples.append({"ts": ts, "field": "volume", "aggregate": av["volume"], "derived": dv["volume"]})
+            classification["volume_unexplained"] += 1
+            if len(unexplained_examples["volume_unexplained"]) < MAX_EXAMPLES:
+                unexplained_examples["volume_unexplained"].append(
+                    {"ts": ts, "aggregate": av["volume"], "derived": dv["volume"]})
+
+    # Provenance (finding 5): relay what the tool actually constructed the
+    # aggregator with, rather than asserting it from an unrelated constant.
+    aggregator = {
+        "tf": aggregator_info.get("tf", args.tf),
+        "input_tf": aggregator_info.get("input_tf", "1"),
+        "tz": aggregator_info.get("tz", "UTC"),
+        "session": aggregator_info.get("session", "24x7"),
+    }
 
     result = {
         "bars_compared": bars_compared,
         "one_m_rows": one_m_rows,
         "aggregate_rows": agg_row_count,
         "derived_rows": derived_row_count,
+        "rows_parsed": rows_parsed,
+        "rows_skipped": rows_skipped,
         "trailing_partial": trailing_partial,
+        "aggregator": aggregator,
         "divergence": counts,
         "classification": classification,
         "examples": examples,
         "unexplained_examples": unexplained_examples,
     }
-    OUT.write_text(json.dumps(result, indent=2))
+    args.out.write_text(json.dumps(result, indent=2))
 
     print(json.dumps({"bars_compared": bars_compared, **counts, "classification": classification,
                        "trailing_partial": trailing_partial}))
@@ -216,7 +311,7 @@ def main() -> int:
     unexplained_total = sum(v for k, v in classification.items() if k.endswith("_unexplained"))
     if unexplained_total:
         print(f"bar_identity_lane: {unexplained_total} unexplained divergence(s) -- "
-              f"see {OUT} unexplained_examples", file=sys.stderr)
+              f"see {args.out} unexplained_examples", file=sys.stderr)
         return 1
     return 0
 
