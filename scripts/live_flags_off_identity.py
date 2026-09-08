@@ -226,6 +226,33 @@ def main() -> int:
         + (f": {', '.join(sorted(no_lib))}" if no_lib else "")
     )
 
+    # A run with zero enumerated probes (no libraries compiled, or an
+    # --only filter matching nothing) would otherwise fall through every
+    # mode below and print "0 probes, 0 differ" / emit nothing / exit 0 --
+    # vacuously "passing" while proving nothing. Refuse it in every mode.
+    if not cases:
+        print(
+            "live_flags_off_identity: 0 probes enumerated"
+            + (f" (--only={args.only!r} matched nothing)" if args.only else " (no compiled libraries found)")
+            + " -- refusing a vacuous run",
+            file=sys.stderr,
+        )
+        return 1
+
+    # --reference mode's whole point is corroborating this run's trades
+    # against a known-good reference; a probe that is source-marked but has
+    # no compiled library silently narrows that coverage (it is absent from
+    # `cases` and never gets a MISSING row from the ref_slugs - run_slugs
+    # diff below, since it was never a "run" case at all). Treat it as a
+    # hard failure rather than a printed count.
+    if args.reference and no_lib:
+        print(
+            f"live_flags_off_identity: --reference requires every source-marked probe "
+            f"to have a compiled library; {len(no_lib)} missing: {', '.join(sorted(no_lib))}",
+            file=sys.stderr,
+        )
+        return 1
+
     if args.emit:
         emit_dir = Path(args.emit)
         if emit_dir.exists() and any(emit_dir.iterdir()):

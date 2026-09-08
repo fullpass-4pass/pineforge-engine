@@ -131,10 +131,14 @@ double BacktestEngine::open_trade_max_runup_percent(int idx) const {
 
 // ABI v4 live-runtime surface (task 9): classify why a REPORT-row closed
 // trade exited. Report-row scope (get_report_trade spans trades_ then
-// range_end_trades_), so a bad index reads as UNKNOWN (0) exactly like an
-// unrecognized close shape -- both mean "this accessor has nothing to say
-// about cause" -- while strategy_closed_trade_close_cause (c_abi.cpp)
-// layers the NULL-handle -1 on top of this. Order matters:
+// range_end_trades_). Final review F7: an out-of-range index returns -1,
+// like strategy_pending_order_fill_qty/_level_resolved/_effective_levels
+// and strategy_closed_trade_close_cause's own NULL-handle case
+// (c_abi.cpp) -- every other indexed live accessor uses -1 for "bad
+// index/handle", so 0 stays reserved purely for the documented UNKNOWN
+// "no cause" value on a VALID trade (no live derivation below currently
+// produces it -- every in-range row falls through to at worst SCRIPT).
+// Order matters for the remaining, in-range classification:
 //   1. open_at_end -- the range-end synthetic row always wins, even if the
 //      position happens to also carry a stale exit_id from an earlier
 //      partial close of the same physical lot.
@@ -149,7 +153,7 @@ double BacktestEngine::open_trade_max_runup_percent(int idx) const {
 //   6. Otherwise: a strategy.close/close_all market close or a
 //      reversal-driven close -- SCRIPT.
 int BacktestEngine::closed_trade_close_cause(int i) const {
-    if (i < 0 || i >= report_trade_count()) return 0;
+    if (i < 0 || i >= report_trade_count()) return -1;
     const Trade& t = get_report_trade(i);
     if (t.open_at_end) return 6;
     if (t.exit_id == "__margin_call__") return 3;

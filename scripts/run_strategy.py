@@ -3193,6 +3193,22 @@ def main() -> int:
                     "error: --broker-state-hash requires "
                     "strategy_set_broker_state_hash_recording (strategy.so predates "
                     "ABI v4 task 6; rebuild the engine)")
+        if args.probe_suppress_tail:
+            # Same rationale as --realtime-tail / --broker-state-hash above
+            # (final review F8): strat.run's internal call is hasattr-guarded,
+            # so a stale .so would otherwise run to completion having
+            # silently ignored the flag. Fail hard here, BEFORE strat.run().
+            if not hasattr(strat.lib, "strategy_set_probe_suppress_tail_logic"):
+                sys.exit(
+                    "error: --probe-suppress-tail requires "
+                    "strategy_set_probe_suppress_tail_logic (strategy.so predates "
+                    "ABI v4 spec section 3.2; rebuild the engine)")
+        if args.path_order is not None:
+            # Same rationale (final review F8).
+            if not hasattr(strat.lib, "strategy_set_path_order"):
+                sys.exit(
+                    "error: --path-order requires strategy_set_path_order "
+                    "(strategy.so predates ABI v4 spec section 3.3; rebuild the engine)")
         report = strat.run(ohlcv_path, params=params,
                            trace_enabled=args.trace_json is not None,
                            trade_start_time_ms=trade_start_ms,
@@ -3231,6 +3247,17 @@ def main() -> int:
         # stale .so is caught before the (possibly multi-minute) backtest
         # rather than after it.
         print(f"realtime-tail: on horizon={args.realtime_tail}")
+    if args.probe_suppress_tail:
+        # Receipt (final review F8), same rationale/style as --realtime-tail
+        # above: the strategy_set_probe_suppress_tail_logic hard-fail guard
+        # runs earlier, right after `strat = Strategy(so_path)` and before
+        # strat.run(), so a stale .so is caught before the run rather than
+        # after a silently no-op'd flag.
+        print("probe-suppress-tail: on")
+    if args.path_order is not None:
+        # Receipt (final review F8); the strategy_set_path_order hard-fail
+        # guard runs earlier, same rationale as above.
+        print(f"path-order: {args.path_order}")
     if args.broker_state_hash:
         # The strategy_set_broker_state_hash_recording hard-fail guard runs
         # earlier, right after `strat = Strategy(so_path)` and before

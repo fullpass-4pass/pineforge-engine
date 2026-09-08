@@ -41,7 +41,7 @@ runtime works by *recomputing* it (see @ref streaming for why the
 | `strategy_closed_trade_entry_id` | The entry id of the *i*-th REPORT-row closed trade (same row space as `strategy_closed_trade_entry_incarnation`: `trades_` then the range-end rows). `NULL` on a `NULL` `s` or out-of-range index. | N/A — read-only. | No |
 | `strategy_closed_trade_exit_id` | The engine's own internal exit id (not always the script's `strategy.exit`/`strategy.close` id verbatim — see [String lifetimes and id conventions](#live_surface_strings)). | N/A — read-only. | No |
 | `strategy_closed_trade_exit_comment` | The exit comment string, same row space and lifetime as `strategy_closed_trade_entry_id`. | N/A — read-only. | No |
-| `strategy_closed_trade_close_cause` | Why the *i*-th trade exited: `0` UNKNOWN (out-of-range index only), `1` SCRIPT, `2` BRACKET, `3` MARGIN_CALL, `4` INTRADAY_LOSS_CAP, `5` INTRADAY_FILL_CAP, `6` RANGE_END (always wins). `-1` if `s` is `NULL`. | N/A — read-only. | No |
+| `strategy_closed_trade_close_cause` | Why the *i*-th trade exited: `0` UNKNOWN (reserved for a valid trade with no cause; no live derivation currently returns it), `1` SCRIPT, `2` BRACKET, `3` MARGIN_CALL, `4` INTRADAY_LOSS_CAP, `5` INTRADAY_FILL_CAP, `6` RANGE_END (always wins). `-1` if `s` is `NULL` or `trade_index` is out of range, matching every other indexed accessor's bad-index convention. | N/A — read-only. | No |
 | `strategy_position_size` | The script-facing signed position size (`strategy.position_size`; KI-64 freeze-aware). `NaN` if `s` is `NULL`. | N/A — read-only. | No |
 | `strategy_current_equity` | `initial_capital + netprofit` — **not** Pine's `strategy.equity`, which also adds open profit. `NaN` if `s` is `NULL`. | N/A — read-only. | No |
 | `strategy_script_bars_processed` | Total script bars dispatched by the most recent `run()`, mirroring `pf_report_t::script_bars_processed`; includes a stream's warmup leg plus every realtime tick-driven bar. `-1` if `s` is `NULL`. | N/A — read-only. | No |
@@ -73,6 +73,17 @@ configuration**, not one-shot: it stays in effect until a caller passes
    row); the final equity point keeps `open_profit`, and the drawdown/runup
    scalars are folded without the range-end row.
 5. Interior bars (every bar before the last) are unaffected.
+
+Dispatch-path scope: effects 1, 3, and 4 above are honoured on every
+dispatch path. Effect 2 (`session.islastbar` from the bucket calendar) is
+honoured only on the standard `dispatch_bar` path (the single-timeframe run
+loop and the `input_tf == script_tf` simple bar loop). On the non-magnifier
+aggregation path (`input_tf < script_tf`) effect 2 is UNDEFINED: the tail
+bar's `session.islastbar` reads the ordinary `in_session && barstate.islast`
+expression instead of the calendar lookahead (false there, since this flag
+also forces `barstate.islast` false). Callers must feed an
+`input_tf == script_tf` array until that gap closes, matching
+`strategy_set_probe_suppress_tail_logic`'s dispatch-path-scope caveat below.
 
 Default off (`on == 0`): every historical run stays byte-identical to
 before this flag existed.

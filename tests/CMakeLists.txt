@@ -311,6 +311,16 @@ add_test(
             ${PROJECT_SOURCE_DIR}/scripts/gen_pending_order_mirror.py --check
 )
 
+# Spec §3.4's reflection gate: every hashed-region struct member must be
+# either hashed by engine_state_hash.cpp or explicitly waived. Previously
+# CI-only (.github/workflows/ci.yml); registering it here means a local
+# `ctest` run (the plan's stated workflow) also catches an unhashed member.
+add_test(
+    NAME test_broker_state_hash_coverage
+    COMMAND ${Python3_EXECUTABLE}
+            ${PROJECT_SOURCE_DIR}/scripts/check_broker_state_hash_coverage.py
+)
+
 # When PINEFORGE_ENABLE_COVERAGE is ON we also instrument the test
 # binaries — header-only code (Series, na, color, log, math::pine_random)
 # is otherwise reported as 0% because it's only inlined into test TUs.

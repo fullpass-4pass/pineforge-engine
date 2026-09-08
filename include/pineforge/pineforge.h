@@ -645,6 +645,17 @@ PF_API int  strategy_last_run_status(pf_strategy_t s);
  *    4. The range-end synthetic close row/trade is skipped (no
  *       `open_at_end` row); the final equity point keeps `open_profit`.
  *    5. Interior bars (every bar before the last) are unaffected.
+ *  Dispatch-path scope: effects 1, 3, and 4 above are honoured on every
+ *  dispatch path. Effect 2 (`session.islastbar` from the bucket calendar)
+ *  is honoured only on the standard `dispatch_bar` path -- the
+ *  single-timeframe run loop and the input_tf == script_tf simple bar
+ *  loop. On the non-magnifier aggregation path (input_tf < script_tf)
+ *  effect 2 is UNDEFINED: the tail bar's `session.islastbar` reads the
+ *  ordinary `in_session && barstate.islast` expression instead of the
+ *  calendar lookahead (false there, since this flag also forces
+ *  `barstate.islast` false). Callers must feed an input_tf == script_tf
+ *  array until that gap closes, matching
+ *  #strategy_set_probe_suppress_tail_logic's dispatch-path-scope caveat.
  *  Default off (@p on == 0): every historical run stays byte-identical to
  *  before this flag existed. */
 PF_API void strategy_set_realtime_tail(pf_strategy_t s, int on, int horizon_bars);
@@ -925,10 +936,11 @@ PF_API const char* strategy_closed_trade_exit_id(pf_strategy_t s, int trade_inde
 PF_API const char* strategy_closed_trade_exit_comment(pf_strategy_t s, int trade_index);
 /** Task 9: why the @p trade_index-th REPORT-row closed trade exited.
  *  Values:
- *    - `0` UNKNOWN -- ONLY for an out-of-range @p trade_index. Every
- *      in-range row falls through the derivation below to at worst `1`
- *      SCRIPT, so `0` never means "an unrecognised close shape" on a live
- *      handle.
+ *    - `0` UNKNOWN -- reserved for the documented "no cause" value on a
+ *      VALID trade. Every in-range row currently falls through the
+ *      derivation below to at worst `1` SCRIPT, so no live derivation
+ *      today actually returns `0`; it is not used for a bad index (see
+ *      `-1` below, final review F7).
  *    - `1` SCRIPT -- a `strategy.close` / `strategy.close_all` market close,
  *      or a reversal-driven close.
  *    - `2` BRACKET -- a `strategy.exit` stop/limit/trail/profit/loss leg.
@@ -950,11 +962,15 @@ PF_API const char* strategy_closed_trade_exit_comment(pf_strategy_t s, int trade
  *  bracket revived and fired at the margin-call event price
  *  (`revive_position_brackets_after_margin_call_partial`) -- -> 2;
  *  otherwise 1.
- *  `-1` when @p s is NULL (the pf_live int-return convention). An
- *  out-of-range @p trade_index also reads as `0` -- the ONLY way to get
- *  `0` on a live handle -- so a caller that must tell "bad index" apart
- *  from "row 0 exists" bounds-checks against
- *  #strategy_closed_trade_entry_incarnation's `report_trade_count` first. */
+ *  `-1` when @p s is NULL, or when @p trade_index is out of range (final
+ *  review F7: matches every sibling indexed live accessor's -1-on-bad-index
+ *  convention -- #strategy_pending_order_fill_qty,
+ *  #strategy_pending_order_level_resolved,
+ *  #strategy_pending_order_effective_levels). `0` therefore never
+ *  ambiguously means "bad index"; a caller can tell "row exists but reads
+ *  UNKNOWN" apart from "bad index" without a separate
+ *  #strategy_closed_trade_entry_incarnation `report_trade_count` bounds
+ *  check first, though doing that check is still good practice. */
 PF_API int strategy_closed_trade_close_cause(pf_strategy_t s, int trade_index);
 /** Task 9: the script-facing signed position size (`strategy.position_size`;
  *  KI-64 freeze-aware -- while a same-bar `process_orders_on_close` close is

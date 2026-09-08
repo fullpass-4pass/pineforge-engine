@@ -571,6 +571,16 @@ def main() -> int:
         + (f": {', '.join(sorted(no_lib))}" if no_lib else "")
     )
 
+    # A run with zero enumerated probes (no libraries compiled, or an
+    # --only filter matching nothing) would otherwise fall through to a
+    # summary of {"probes": 0, "positives": 0, "errors": 0} and exit 0 --
+    # vacuously "passing" while measuring nothing. Refuse it.
+    if not cases:
+        sys.exit(
+            "error: live_flags_lane: 0 probes enumerated"
+            + (f" (--only={args.only!r} matched nothing)" if args.only else " (no compiled libraries found)")
+            + " -- refusing a vacuous run")
+
     out_path = resolve_out_path(args.out, args.only)
     if out_path.exists() and not args.force:
         existing_probes = _existing_probe_count(out_path)

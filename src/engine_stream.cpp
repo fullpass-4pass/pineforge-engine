@@ -358,6 +358,14 @@ void BacktestEngine::stream_feed_input_bar(const Bar& bar, bool had_tick) {
 }
 
 void BacktestEngine::stream_dispatch_script_bar(const Bar& bar, bool had_tick) {
+    // ABI v4 task 4 fix (final review F6): stream mode calls
+    // process_pending_orders() directly and never goes through
+    // dispatch_bar() (engine_run.cpp), so dispatch_bar()'s own per-bar
+    // reset of last_bar_dual_entry_decision_ never runs here. Without this,
+    // a stream bar that arbitrates no dual-entry-stop pass would leave the
+    // PREVIOUS bar's decision readable -- and hashed, since
+    // engine_state_hash.cpp includes it in the per-bar broker-state hash.
+    last_bar_dual_entry_decision_ = internal::DualEntryStopPathWinner::None;
     const int this_bar_index = stream_next_script_bar_index_++;
     bar_index_ = this_bar_index;
     last_bar_index_ = this_bar_index;

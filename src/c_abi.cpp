@@ -236,13 +236,17 @@ PF_API const char* strategy_closed_trade_exit_comment(pf_strategy_t s, int trade
 
 /* ABI v4 live-runtime surface (task 9): why a REPORT-row closed trade
  * exited (BacktestEngine::closed_trade_close_cause, engine_trade_
- * accessors.cpp, has the full derivation order). 0 UNKNOWN, 1 SCRIPT
- * (strategy.close/close_all or a reversal-driven close), 2 BRACKET (a
- * strategy.exit stop/limit/trail/profit/loss leg), 3 MARGIN_CALL, 4
- * INTRADAY_LOSS_CAP, 5 INTRADAY_FILL_CAP, 6 RANGE_END (the still-open
- * position closed at the end of a flag-off run). -1 on a NULL handle, per
- * the pf_live int-return convention; an out-of-range trade_index reads as
- * 0 (delegated to the engine method, same as every other bad-index case). */
+ * accessors.cpp, has the full derivation order). 0 UNKNOWN (reserved for
+ * the documented "no cause" value on a VALID trade -- no live derivation
+ * currently produces it), 1 SCRIPT (strategy.close/close_all or a
+ * reversal-driven close), 2 BRACKET (a strategy.exit stop/limit/trail/
+ * profit/loss leg), 3 MARGIN_CALL, 4 INTRADAY_LOSS_CAP, 5
+ * INTRADAY_FILL_CAP, 6 RANGE_END (the still-open position closed at the
+ * end of a flag-off run). -1 (final review F7) on a NULL handle OR an
+ * out-of-range trade_index -- delegated to the engine method for the
+ * latter, matching every sibling indexed accessor's -1-on-bad-index
+ * convention (strategy_pending_order_fill_qty/_level_resolved/
+ * _effective_levels). */
 PF_API int strategy_closed_trade_close_cause(pf_strategy_t s, int trade_index) {
     if (!s) return -1;
     return static_cast<const pineforge::BacktestEngine*>(s)->closed_trade_close_cause(trade_index);

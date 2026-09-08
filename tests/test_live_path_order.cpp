@@ -117,6 +117,22 @@ int dual_entry_winner_pooc_no_tail_suppression() {
     s.run(bars.data(), (int)bars.size());
     return s.last_bar_dual_entry_path();
 }
+// F6 pin (final review): a rerun that dispatches ZERO script bars never
+// reaches dispatch_bar()'s own per-bar reset of last_bar_dual_entry_decision_
+// (the per-bar loop bodies never execute), so reset_run_state() must clear
+// it itself -- otherwise a reused handle's last_bar_dual_entry_path() would
+// still read the PRIOR run's decision instead of the documented "no
+// decision" value (0 / None).
+int dual_entry_winner_after_empty_rerun() {
+    const std::vector<Bar> bars = {bar(100, 100, 100, 100, 0), kDualEntryTouchBar};
+    DualEntryPair s;
+    s.set_path_order(1);
+    s.set_probe_suppress_tail_logic(true);
+    s.run(bars.data(), (int)bars.size());
+    if (s.last_bar_dual_entry_path() != 1) return -99;  // sanity: fixture still decides LongFirst
+    s.run(bars.data(), 0);  // zero script bars -- dispatch_bar() never runs this call
+    return s.last_bar_dual_entry_path();
+}
 }
 int main() {
     CHECK(near(exit_price_under(kHighFirstTouchBar, 0), 101.0));  // AUTO: limit first
@@ -136,6 +152,7 @@ int main() {
     CHECK(dual_entry_winner_probe(2) == 2);      // LOW_FIRST -> ShortFirst
     CHECK(dual_entry_winner_after_pairless_bar() == 0);
     CHECK(dual_entry_winner_pooc_no_tail_suppression() == 1);
+    CHECK(dual_entry_winner_after_empty_rerun() == 0);
 
     return failures == 0 ? 0 : 1;
 }

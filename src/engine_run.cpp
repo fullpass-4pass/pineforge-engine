@@ -784,6 +784,12 @@ void BacktestEngine::reset_run_state() {
 
     // Per-bar cursor + session-predicate state.
     bar_index_ = 0;
+    // ABI v4 task 4 fix (final review F6): a run that dispatches zero
+    // script bars never reaches dispatch_bar()'s own per-bar reset (top of
+    // dispatch_bar(), engine_run.cpp), which would otherwise leave a reused
+    // handle's last_bar_dual_entry_decision_ (also hashed by
+    // engine_state_hash.cpp) reading the PREVIOUS run's value.
+    last_bar_dual_entry_decision_ = internal::DualEntryStopPathWinner::None;
     trail_close_restart_bar_ = -1;
     prev_bar_timestamp_ = 0;
     // The chart's native daily partition is rebuilt per run by the
@@ -933,12 +939,25 @@ void BacktestEngine::run(const Bar* bars, int n) {
 // run, freeze pine_last_bar_index()/last_bar_time_ at the horizon bar
 // instead of the fed array's actual last index/timestamp. No-op unless
 // realtime_tail_ is on and a positive horizon was configured.
+//
+// last_bar_time_ is the EXACT timestamp of bars[horizon_bars - 1] when that
+// bar exists in the fed array (horizon_bars <= n); otherwise it is
+// extrapolated from the array's actual final bar (bars[n - 1]), not the
+// first one -- a feed with any gap (session/weekend boundary, a missing
+// bar, a calendar TF) makes an extrapolation from bars[0] wrong even when
+// the exact timestamp was available.
 void BacktestEngine::apply_realtime_tail_horizon(const Bar* bars, int n) {
     if (!realtime_tail_ || realtime_tail_horizon_bars_ <= 0 || n <= 0 || bars == nullptr) return;
-    last_bar_index_ = realtime_tail_horizon_bars_ - 1;
-    last_bar_time_ = bars[0].timestamp
-        + static_cast<int64_t>(realtime_tail_horizon_bars_ - 1)
-          * static_cast<int64_t>(script_tf_seconds_ > 0 ? script_tf_seconds_ : 0) * 1000;
+    const int horizon = realtime_tail_horizon_bars_;
+    last_bar_index_ = horizon - 1;
+    if (horizon <= n) {
+        last_bar_time_ = bars[horizon - 1].timestamp;
+    } else {
+        const int64_t script_tf_ms =
+            static_cast<int64_t>(script_tf_seconds_ > 0 ? script_tf_seconds_ : 0) * 1000;
+        last_bar_time_ = bars[n - 1].timestamp
+            + static_cast<int64_t>(horizon - n) * script_tf_ms;
+    }
 }
 
 

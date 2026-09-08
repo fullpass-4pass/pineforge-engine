@@ -210,11 +210,16 @@ int main() {
     CHECK(strategy_closed_trade_close_cause(h, 1) == 1);                 // SCRIPT
     CHECK(s.closed_trade_close_cause(1) == 1);
 
-    // Bad index: out-of-range trade_index -> NULL / UNKNOWN, not a crash.
+    // Bad index: out-of-range trade_index -> NULL / -1, not a crash. Final
+    // review F7: close_cause returns -1 for an out-of-range index (matching
+    // every sibling indexed live accessor), not 0 -- 0 is reserved for the
+    // documented "no cause" value on a VALID trade.
     CHECK(strategy_closed_trade_entry_id(h, 5) == nullptr);
     CHECK(strategy_closed_trade_exit_id(h, -1) == nullptr);
     CHECK(strategy_closed_trade_exit_comment(h, 5) == nullptr);
-    CHECK(s.closed_trade_close_cause(5) == 0);                           // UNKNOWN
+    CHECK(s.closed_trade_close_cause(5) == -1);
+    CHECK(strategy_closed_trade_close_cause(h, 5) == -1);
+    CHECK(s.closed_trade_close_cause(-1) == -1);
 
     // NULL handle: -1 for the int accessor, NULL for the string ones.
     CHECK(strategy_closed_trade_close_cause(nullptr, 0) == -1);
