@@ -785,8 +785,10 @@ PF_API int strategy_pending_orders_len(pf_strategy_t s);
  *  read past pf_pending_order_v1_t::size. Strings are NUL-terminated
  *  char[64] copies with a `_truncated` flag and a `_hash64` (FNV-1a 64 of
  *  the full string); enums are int32 values; NaN sentinels are copied
- *  verbatim. Returns 0 on success, -1 when @p s or @p out is NULL or
- *  @p index is out of range (nothing is written). The layout is
+ *  verbatim. Returns 0 on success, -1 -- with nothing written -- when
+ *  @p s or @p out is NULL, @p index is out of range, or @p size_in < 8
+ *  (too small to hold even the `struct_version` + `size` header; every
+ *  larger @p size_in is honoured as a prefix copy). The layout is
  *  self-described by #strategy_pending_order_layout. */
 PF_API int strategy_pending_order_get(pf_strategy_t s, int index, void* out, size_t size_in);
 /** The field table of pf_pending_order_v1_t as THIS runtime compiled it --

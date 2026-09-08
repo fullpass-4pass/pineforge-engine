@@ -92,13 +92,19 @@ def _pending_order_loop_body(src: str) -> str:
     """The brace-balanced body of broker_state_hash()'s resting-order loop
     (comments already stripped). Only an ``o.<name>`` inside THIS loop counts
     as hashing PendingOrder::<name>."""
-    m = PENDING_ORDER_LOOP_RE.search(src)
-    if not m:
+    matches = list(PENDING_ORDER_LOOP_RE.finditer(src))
+    if not matches:
         print("check_broker_state_hash_coverage: could not find "
               "`for (const auto& o : pending_orders_) {` in engine_state_hash.cpp",
               file=sys.stderr)
         sys.exit(2)
-    depth, start = 1, m.end()
+    if len(matches) > 1:
+        print("check_broker_state_hash_coverage: found "
+              f"{len(matches)} `for (const auto& o : pending_orders_) {{` loops in "
+              "engine_state_hash.cpp; expected exactly one (the PendingOrder coverage "
+              "rule inspects a single loop body)", file=sys.stderr)
+        sys.exit(2)
+    depth, start = 1, matches[0].end()
     for i in range(start, len(src)):
         ch = src[i]
         if ch == "{":

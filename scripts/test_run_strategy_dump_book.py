@@ -3,7 +3,8 @@
 field table (ABI v4 task 7): build_pending_order_struct turns the
 strategy_pending_order_layout rows into a ctypes.Structure and refuses any
 row it cannot place byte-exactly; pending_order_to_dict renders one record
-JSON-ready (strings up to the NUL, NaN -> None, *_hash64 -> hex).
+JSON-ready (strings up to the NUL, NaN -> None, every uint64_t -> hex);
+Strategy.read_pending_orders drives the len/get loop against a stub lib.
 
 Pure-Python: no .so is loaded. The C++ side of the contract (the layout
 table's offsets/sizes, strategy_pending_order_get's prefix-copy rule) is
@@ -114,7 +115,11 @@ class ToDict(unittest.TestCase):
         self.assertEqual(d["is_long"], 0)
         self.assertEqual(d["stop_price"], 95.0)
         self.assertEqual(d["created_seq"], -3)
-        self.assertEqual(d["incarnation"], 2 ** 63 + 5)
+        # EVERY uint64_t field is hex (not only the *_hash64 digests): an
+        # incarnation above 2**53 would otherwise be silently rounded by a
+        # JS consumer.
+        self.assertEqual(d["incarnation"], format(2 ** 63 + 5, "016x"))
+        self.assertEqual(d["incarnation"], "8000000000000005")
 
     def test_nan_sentinel_becomes_none(self):
         rec = self._record()
@@ -136,6 +141,107 @@ class ToDict(unittest.TestCase):
         for ch in b"Long":
             h = ((h ^ ch) * 1099511628211) & 0xFFFFFFFFFFFFFFFF
         self.assertEqual(format(h, "016x"), "6540a31a8547b3bd")
+
+
+class _StubLib:
+    """Stand-in for the loaded .so: serves `records` (prepared PendingOrderV1
+    instances) through the two book accessors exactly as c_abi.cpp does --
+    min(size_in, sizeof) prefix copy, -1 on a bad index -- so
+    Strategy.read_pending_orders' real loop (rc / struct_version / size
+    checks, dict rendering) runs without a compiled strategy."""
+
+    def __init__(self, records):
+        self.records = records
+        self.calls: list[tuple[int, int]] = []
+
+    def strategy_pending_orders_len(self, state):
+        return len(self.records)
+
+    def strategy_pending_order_get(self, state, index, out, size_in):
+        self.calls.append((index, int(size_in)))
+        if index < 0 or index >= len(self.records):
+            return -1
+        rec = self.records[index]
+        ctypes.memmove(out, ctypes.byref(rec), min(int(size_in), ctypes.sizeof(rec)))
+        return 0
+
+
+def _stub_strategy(records, cls):
+    strat = run_strategy.Strategy.__new__(run_strategy.Strategy)
+    strat.PendingOrderV1 = cls
+    strat.pending_order_layout = LAYOUT
+    strat.lib = _StubLib(records)
+    return strat
+
+
+class ReadPendingOrders(unittest.TestCase):
+    """Strategy.read_pending_orders against a stub lib (Important 1)."""
+
+    def _record(self, cls, **kw):
+        rec = cls()
+        rec.struct_version = PENDING_ORDER_STRUCT_VERSION
+        rec.size = ctypes.sizeof(cls)
+        for k, v in kw.items():
+            setattr(rec, k, v)
+        return rec
+
+    def test_happy_path_reads_every_order_in_book_order(self):
+        cls = build_pending_order_struct(LAYOUT)
+        a = self._record(cls, id=b"Long", type=0, is_long=1, stop_price=math.nan,
+                         created_seq=5, incarnation=5, id_hash64=0x6540A31A8547B3BD)
+        b = self._record(cls, id=b"x" * 63, id_truncated=1, type=2, is_long=0,
+                         stop_price=95.0, created_seq=6, incarnation=2 ** 63 + 5)
+        strat = _stub_strategy([a, b], cls)
+        book = strat.read_pending_orders(object())
+        self.assertEqual(len(book), 2)
+        self.assertEqual(book[0]["id"], "Long")
+        self.assertEqual(book[0]["type"], 0)
+        self.assertEqual(book[0]["is_long"], 1)
+        self.assertIsNone(book[0]["stop_price"])
+        self.assertEqual(book[0]["created_seq"], 5)
+        self.assertEqual(book[0]["incarnation"], "0000000000000005")
+        self.assertEqual(book[0]["id_hash64"], "6540a31a8547b3bd")
+        self.assertEqual(book[1]["id"], "x" * 63)
+        self.assertEqual(book[1]["id_truncated"], 1)
+        self.assertEqual(book[1]["type"], 2)
+        self.assertEqual(book[1]["stop_price"], 95.0)
+        self.assertEqual(book[1]["incarnation"], "8000000000000005")
+        self.assertEqual(book[1]["struct_version"], PENDING_ORDER_STRUCT_VERSION)
+        self.assertEqual(book[1]["size"], ctypes.sizeof(cls))
+        # One get per order, each with the full layout-built size.
+        self.assertEqual(strat.lib.calls, [(0, ctypes.sizeof(cls)), (1, ctypes.sizeof(cls))])
+
+    def test_empty_book(self):
+        cls = build_pending_order_struct(LAYOUT)
+        strat = _stub_strategy([], cls)
+        self.assertEqual(strat.read_pending_orders(object()), [])
+        self.assertEqual(strat.lib.calls, [])
+
+    def test_struct_version_mismatch_is_refused(self):
+        cls = build_pending_order_struct(LAYOUT)
+        bad = self._record(cls, id=b"L")
+        bad.struct_version = 2
+        strat = _stub_strategy([bad], cls)
+        with self.assertRaisesRegex(RuntimeError, r"pending order 0: struct_version 2 != 1"):
+            strat.read_pending_orders(object())
+
+    def test_size_mismatch_is_refused(self):
+        cls = build_pending_order_struct(LAYOUT)
+        bad = self._record(cls, id=b"L")
+        bad.size = ctypes.sizeof(cls) + 8      # a newer producer's larger struct
+        strat = _stub_strategy([bad], cls)
+        with self.assertRaisesRegex(
+                RuntimeError,
+                rf"pending order 0: runtime size {ctypes.sizeof(cls) + 8} != layout-built sizeof {ctypes.sizeof(cls)}"):
+            strat.read_pending_orders(object())
+
+    def test_get_failure_is_refused(self):
+        # len says 2 but get refuses index 1: the loop must surface it.
+        cls = build_pending_order_struct(LAYOUT)
+        strat = _stub_strategy([self._record(cls, id=b"L")], cls)
+        strat.lib.strategy_pending_orders_len = lambda state: 2
+        with self.assertRaisesRegex(RuntimeError, r"strategy_pending_order_get\(1\) returned -1 \(len=2\)"):
+            strat.read_pending_orders(object())
 
 
 class StrategyGuard(unittest.TestCase):

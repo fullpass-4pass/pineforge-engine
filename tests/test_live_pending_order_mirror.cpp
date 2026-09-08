@@ -163,6 +163,21 @@ int main() {
         CHECK(untouched);
     }
     {
+        // size_in < 8 cannot hold struct_version + size: rejected, nothing
+        // written. size_in == 8 is the smallest honoured prefix.
+        pf_pending_order_v1_t v;
+        std::memset(&v, 0x33, sizeof v);
+        CHECK(strategy_pending_order_get(h, 0, &v, 0) == -1);
+        CHECK(strategy_pending_order_get(h, 0, &v, 7) == -1);
+        const unsigned char* p = reinterpret_cast<const unsigned char*>(&v);
+        bool untouched = true;
+        for (size_t i = 0; i < sizeof v; ++i) untouched = untouched && p[i] == 0x33;
+        CHECK(untouched);
+        CHECK(strategy_pending_order_get(h, 0, &v, 8) == 0);
+        CHECK(v.struct_version == 1 && v.size == sizeof(pf_pending_order_v1_t));
+        CHECK(p[8] == 0x33);
+    }
+    {
         // Newer-reader contract: an over-sized buffer gets sizeof(v1) bytes;
         // the tail is left to the caller.
         unsigned char big[sizeof(pf_pending_order_v1_t) + 32];

@@ -73,11 +73,18 @@ def _fail(msg: str) -> "NoReturn":  # noqa: F821
 
 
 def struct_body(text: str, name: str = STRUCT_NAME) -> str:
-    """Return the text between the braces of ``struct <name> { ... };``."""
-    m = re.search(rf"\bstruct\s+{re.escape(name)}\s*\{{", text)
-    if not m:
+    """Return the text between the braces of ``struct <name> { ... };``.
+    Comments are stripped BEFORE anchoring, so a prose mention of
+    ``struct PendingOrder {`` in a comment cannot mis-anchor the parser, and
+    the anchor must occur exactly once in what remains."""
+    text = LINE_COMMENT_RE.sub("", BLOCK_COMMENT_RE.sub("", text))
+    anchors = list(re.finditer(rf"\bstruct\s+{re.escape(name)}\s*\{{", text))
+    if not anchors:
         _fail(f"struct {name} not found in {HPP}")
-    start = m.end()
+    if len(anchors) > 1:
+        _fail(f"struct {name} {{ appears {len(anchors)} times in {HPP} (outside comments); "
+              "expected exactly one definition")
+    start = anchors[0].end()
     depth = 1
     for i in range(start, len(text)):
         ch = text[i]
@@ -98,8 +105,7 @@ def members(text: str | None = None) -> list[tuple[str, str]]:
     aborts."""
     if text is None:
         text = HPP.read_text(encoding="utf-8")
-    body = struct_body(text)
-    body = LINE_COMMENT_RE.sub("", BLOCK_COMMENT_RE.sub("", body))
+    body = struct_body(text)   # already comment-stripped
     out: list[tuple[str, str]] = []
     seen: set[str] = set()
     for raw in body.split(";"):

@@ -906,8 +906,11 @@ def build_pending_order_struct(layout: list[tuple[str, str, int, int]]) -> type:
 def pending_order_to_dict(rec, layout: list[tuple[str, str, int, int]]) -> dict:
     """One pf_pending_order_v1_t record -> JSON-ready dict, in field order.
     char[N] -> str (up to the NUL); NaN/inf doubles -> None (JSON has no
-    NaN; the engine's "not set" sentinel); *_hash64 -> 16-hex-digit string
-    (a uint64 is not a JS-safe number); everything else -> int/float."""
+    NaN; the engine's "not set" sentinel); EVERY uint64_t field (the
+    *_hash64 digests, incarnation / *_incarnation, signal_close_mc_fill_seq,
+    ...) -> 16-hex-digit string, because a uint64 is not a JS-safe number
+    and a consumer must not silently round one; everything else (uint8_t /
+    int32_t / int64_t / uint32_t / double) -> int/float."""
     out = {}
     for name, ctype, _offset, _size in layout:
         v = getattr(rec, name)
@@ -915,7 +918,7 @@ def pending_order_to_dict(rec, layout: list[tuple[str, str, int, int]]) -> dict:
             out[name] = bytes(v).decode("utf-8", "replace")
         elif ctype == "double":
             out[name] = float(v) if math.isfinite(v) else None
-        elif name.endswith("_hash64"):
+        elif ctype == "uint64_t":
             out[name] = format(int(v), "016x")
         else:
             out[name] = int(v)

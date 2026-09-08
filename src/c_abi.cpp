@@ -327,9 +327,13 @@ PF_API int strategy_pending_orders_len(pf_strategy_t s) {
 /* Copies min(size_in, sizeof(pf_pending_order_v1_t)) bytes so an older
  * (smaller) or newer (larger) caller struct both work: the first two
  * fields are always struct_version and size. -1 (nothing written) on a
- * NULL handle/out or an out-of-range index. */
+ * NULL handle/out, an out-of-range index, or a size_in too small to hold
+ * even that 8-byte header -- a buffer that cannot receive struct_version
+ * and size cannot be interpreted by any reader, so it is rejected rather
+ * than partially filled. */
 PF_API int strategy_pending_order_get(pf_strategy_t s, int index, void* out, size_t size_in) {
     if (!s || !out) return -1;
+    if (size_in < offsetof(pf_pending_order_v1_t, size) + sizeof(uint32_t)) return -1;
     const auto* engine = static_cast<const pineforge::BacktestEngine*>(s);
     if (index < 0 || index >= engine->pending_order_count()) return -1;
     pf_pending_order_v1_t tmp;
