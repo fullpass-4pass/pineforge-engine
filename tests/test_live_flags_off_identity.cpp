@@ -8,7 +8,7 @@ namespace {
 int failures = 0;
 #define CHECK(cond) do { if (!(cond)) { std::fprintf(stderr, "FAIL %s:%d  %s\n", __FILE__, __LINE__, #cond); ++failures; } } while (0)
 Bar bar(double o, double h, double l, double c, int64_t ts) { return Bar{o, h, l, c, 1.0, ts}; }
-class Sma final : public BacktestEngine {   // a small crossover with a bracket, exercises fills
+class Sma final : public BacktestEngine {   // a modulo-bar_index entry/exit schedule with a bracket, exercises fills
 public:
     void on_bar(const Bar& b) override {
         // strategy_exit's signature is (id, from_entry, limit_price, stop_price, ...) --
@@ -36,7 +36,10 @@ bool same_trades(const BacktestEngine& a, const BacktestEngine& b) {
 int main() {
     const auto bars = synth(400);
     Sma fresh; fresh.run(bars.data(), 400);
-    Sma reused; reused.run(bars.data(), 50); reused.run(bars.data(), 400);      // reused == fresh
+    CHECK(fresh.report_trade_count() > 0);
+    Sma reused; reused.run(bars.data(), 50);
+    CHECK(reused.report_trade_count() > 0);
+    reused.run(bars.data(), 400);      // reused == fresh
     CHECK(same_trades(fresh, reused));
     Sma flagged;                                                                  // every flag toggled on then off
     flagged.set_realtime_tail(true, 10); flagged.set_realtime_tail(false, 0);
