@@ -114,6 +114,10 @@ uint64_t BacktestEngine::broker_state_hash() const {
     for (const auto& e : pyramid_entries_) {
         f.d(e.price); f.i(e.time); f.d(e.qty); f.s(e.entry_id);
         f.i(static_cast<int64_t>(e.entry_bar_index));
+        // Physical-lot provenance (task-7 carried ruling): bracket
+        // ownership and same-id replacement rules match lots by the
+        // incarnation of the PendingOrder that filled them, not by entry_id.
+        f.u(e.entry_incarnation);
     }
 
     // cycle_filled_entry_ids_ is std::set<string>: already ordered.
@@ -191,6 +195,61 @@ uint64_t BacktestEngine::broker_state_hash() const {
         f.d(o.paired_flat_market_transaction_qty);
         f.i(static_cast<int64_t>(o.short_seed_collision_role));
         f.b(o.suppress_as_declined_reversal_close);
+        // --- Task-7 carried ruling (task-5 re-review): every remaining
+        // PendingOrder member that a fill/admission/eligibility path reads.
+        // Coverage is now enforced for the whole struct by
+        // scripts/check_broker_state_hash_coverage.py (reflected member list
+        // from scripts/gen_pending_order_mirror.py); `comment` is the one
+        // waiver (trade-report label only). ---
+        // Placement-side position/close provenance.
+        f.i(static_cast<int64_t>(o.created_position_side));
+        f.b(o.created_after_position_close_in_bar);
+        f.b(o.created_while_in_position);
+        // Round-14 rounded-signal-cost decline receipt + its remaining qty.
+        f.b(o.rounded_signal_cost_close_only);
+        f.d(o.signal_close_mc_remaining_qty);
+        // Same-id replacement / named-cancel recreate provenance
+        // (clean-room two-call rules fail closed on these).
+        f.b(o.created_by_same_id_replacement);
+        f.u(o.replaced_default_market_incarnation);
+        f.b(o.declined_by_replaced_short_market);
+        f.u(o.replaced_exit_order_incarnation);
+        f.u(o.recreated_after_named_cancelled_entry_incarnation);
+        f.u(o.named_cancel_surviving_exit_incarnation);
+        // calc_on_order_fills birth provenance and per-leg suppression
+        // (decide which waypoints / legs the order may fill at).
+        f.b(o.coof_suppress_stop_on_entry_bar);
+        f.b(o.coof_suppress_limit_on_entry_bar);
+        f.b(o.created_during_coof_recalc);
+        f.b(o.coof_born_at_close_recalc);
+        f.b(o.coof_born_mid_bar);
+        f.i(static_cast<int64_t>(o.coof_cascade_seg_i));
+        f.b(o.coof_cascade_inflight_fires);
+        // Deferred close_all same-id stop preservation token.
+        f.i(static_cast<int64_t>(o.same_id_stop_deferred_close_all_bar));
+        f.u(o.same_id_stop_deferred_close_all_incarnation);
+        // KI-65 dual same-bar opposite entry / gross-admission candidacy.
+        f.b(o.reverses_same_bar_market_from_flat);
+        f.b(o.default_flat_market_gross_candidate);
+        // design-market-entry-affordability placement snapshot (the fill
+        // check costs held + own against THIS equity at THIS price).
+        f.d(o.affordability_placement_equity);
+        f.d(o.affordability_signal_price);
+        f.d(o.affordability_held_qty);
+        // KI-61 exemption / explicit-qty admission snapshot.
+        f.b(o.opening_affordability_exemption_candidate);
+        f.b(o.explicit_flat_admission_candidate);
+        f.d(o.explicit_placement_equity);
+        f.d(o.explicit_slipped_signal_close);
+        // Round-7 default-percent stop placement basis.
+        f.d(o.default_stop_placement_signal_close);
+        // POOC global-full-exit relation bits.
+        f.b(o.pooc_global_full_exit_dynamic_qty);
+        f.b(o.pooc_global_full_exit_tracks_bound_adds);
+        f.b(o.pooc_global_full_exit_bound_add);
+        // Suppressed-close ledger re-credit amounts.
+        f.d(o.suppressed_close_consumed_ledger_qty);
+        f.d(o.suppressed_close_retired_ledger_qty);
     }
     f.i(last_rejected_strategy_entry_call_bar_);
     hash_int_set(f, pending_flat_market_pair_disqualified_bars_);

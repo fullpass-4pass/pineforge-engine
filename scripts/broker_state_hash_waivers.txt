@@ -141,3 +141,10 @@ broker_state_hashes_          # report-only recording of the hash itself; hashin
 # --- Per-pass dual-entry-stop working state (task brief instruction: waive
 # this one, hash the per-bar snapshot instead).
 dual_entry_path_              # per-PASS arbitration working state; last_bar_dual_entry_decision_ (hashed) is the per-bar snapshot that survives it
+
+# --- struct PendingOrder (task 7): every scalar/string member must be hashed
+# as o.<name> inside broker_state_hash()'s pending_orders_ loop or waived
+# here as pending_order.<name>. The member list is reflected from engine.hpp
+# by scripts/gen_pending_order_mirror.py, so a new member fails the check
+# until it is decided about.
+pending_order.comment         # trade-report label only: copied into the Trade row's entry/exit comment at fill and never read by any fill, admission, sizing or eligibility path -- it cannot change a future fill

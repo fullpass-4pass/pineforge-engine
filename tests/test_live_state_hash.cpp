@@ -154,6 +154,9 @@ public:
             {"pyramid_entries_[].price", [](Probe& s) {
                 if (!s.pyramid_entries_.empty()) s.pyramid_entries_[0].price += 1.0;
             }},
+            {"pyramid_entries_[].entry_incarnation", [](Probe& s) {
+                if (!s.pyramid_entries_.empty()) s.pyramid_entries_[0].entry_incarnation += 1;
+            }},
             {"cycle_filled_entry_ids_ (insert)", [](Probe& s) {
                 s.cycle_filled_entry_ids_.insert("new_id");
             }},
@@ -233,6 +236,138 @@ public:
                 if (!s.pending_orders_.empty())
                     s.pending_orders_[0].suppress_as_declined_reversal_close =
                         !s.pending_orders_[0].suppress_as_declined_reversal_close;
+            }},
+
+            // Task 7 (carried task-5 ruling): every PendingOrder member the
+            // hash gained when coverage was extended to the whole struct
+            // (scripts/check_broker_state_hash_coverage.py now reflects the
+            // member list). One pin per newly hashed field, same rules as
+            // above: bools flip, integers step, NaN-sentinel doubles ASSIGN.
+            {"pending_orders_[].created_position_side", [](Probe& s) {
+                if (!s.pending_orders_.empty())
+                    s.pending_orders_[0].created_position_side =
+                        (s.pending_orders_[0].created_position_side == PositionSide::LONG)
+                            ? PositionSide::SHORT : PositionSide::LONG;
+            }},
+            {"pending_orders_[].created_after_position_close_in_bar", [](Probe& s) {
+                if (!s.pending_orders_.empty())
+                    s.pending_orders_[0].created_after_position_close_in_bar = !s.pending_orders_[0].created_after_position_close_in_bar;
+            }},
+            {"pending_orders_[].created_while_in_position", [](Probe& s) {
+                if (!s.pending_orders_.empty())
+                    s.pending_orders_[0].created_while_in_position = !s.pending_orders_[0].created_while_in_position;
+            }},
+            {"pending_orders_[].rounded_signal_cost_close_only", [](Probe& s) {
+                if (!s.pending_orders_.empty())
+                    s.pending_orders_[0].rounded_signal_cost_close_only = !s.pending_orders_[0].rounded_signal_cost_close_only;
+            }},
+            {"pending_orders_[].created_by_same_id_replacement", [](Probe& s) {
+                if (!s.pending_orders_.empty())
+                    s.pending_orders_[0].created_by_same_id_replacement = !s.pending_orders_[0].created_by_same_id_replacement;
+            }},
+            {"pending_orders_[].declined_by_replaced_short_market", [](Probe& s) {
+                if (!s.pending_orders_.empty())
+                    s.pending_orders_[0].declined_by_replaced_short_market = !s.pending_orders_[0].declined_by_replaced_short_market;
+            }},
+            {"pending_orders_[].coof_suppress_stop_on_entry_bar", [](Probe& s) {
+                if (!s.pending_orders_.empty())
+                    s.pending_orders_[0].coof_suppress_stop_on_entry_bar = !s.pending_orders_[0].coof_suppress_stop_on_entry_bar;
+            }},
+            {"pending_orders_[].coof_suppress_limit_on_entry_bar", [](Probe& s) {
+                if (!s.pending_orders_.empty())
+                    s.pending_orders_[0].coof_suppress_limit_on_entry_bar = !s.pending_orders_[0].coof_suppress_limit_on_entry_bar;
+            }},
+            {"pending_orders_[].created_during_coof_recalc", [](Probe& s) {
+                if (!s.pending_orders_.empty())
+                    s.pending_orders_[0].created_during_coof_recalc = !s.pending_orders_[0].created_during_coof_recalc;
+            }},
+            {"pending_orders_[].coof_born_at_close_recalc", [](Probe& s) {
+                if (!s.pending_orders_.empty())
+                    s.pending_orders_[0].coof_born_at_close_recalc = !s.pending_orders_[0].coof_born_at_close_recalc;
+            }},
+            {"pending_orders_[].coof_born_mid_bar", [](Probe& s) {
+                if (!s.pending_orders_.empty())
+                    s.pending_orders_[0].coof_born_mid_bar = !s.pending_orders_[0].coof_born_mid_bar;
+            }},
+            {"pending_orders_[].coof_cascade_inflight_fires", [](Probe& s) {
+                if (!s.pending_orders_.empty())
+                    s.pending_orders_[0].coof_cascade_inflight_fires = !s.pending_orders_[0].coof_cascade_inflight_fires;
+            }},
+            {"pending_orders_[].reverses_same_bar_market_from_flat", [](Probe& s) {
+                if (!s.pending_orders_.empty())
+                    s.pending_orders_[0].reverses_same_bar_market_from_flat = !s.pending_orders_[0].reverses_same_bar_market_from_flat;
+            }},
+            {"pending_orders_[].default_flat_market_gross_candidate", [](Probe& s) {
+                if (!s.pending_orders_.empty())
+                    s.pending_orders_[0].default_flat_market_gross_candidate = !s.pending_orders_[0].default_flat_market_gross_candidate;
+            }},
+            {"pending_orders_[].opening_affordability_exemption_candidate", [](Probe& s) {
+                if (!s.pending_orders_.empty())
+                    s.pending_orders_[0].opening_affordability_exemption_candidate = !s.pending_orders_[0].opening_affordability_exemption_candidate;
+            }},
+            {"pending_orders_[].explicit_flat_admission_candidate", [](Probe& s) {
+                if (!s.pending_orders_.empty())
+                    s.pending_orders_[0].explicit_flat_admission_candidate = !s.pending_orders_[0].explicit_flat_admission_candidate;
+            }},
+            {"pending_orders_[].pooc_global_full_exit_dynamic_qty", [](Probe& s) {
+                if (!s.pending_orders_.empty())
+                    s.pending_orders_[0].pooc_global_full_exit_dynamic_qty = !s.pending_orders_[0].pooc_global_full_exit_dynamic_qty;
+            }},
+            {"pending_orders_[].pooc_global_full_exit_tracks_bound_adds", [](Probe& s) {
+                if (!s.pending_orders_.empty())
+                    s.pending_orders_[0].pooc_global_full_exit_tracks_bound_adds = !s.pending_orders_[0].pooc_global_full_exit_tracks_bound_adds;
+            }},
+            {"pending_orders_[].pooc_global_full_exit_bound_add", [](Probe& s) {
+                if (!s.pending_orders_.empty())
+                    s.pending_orders_[0].pooc_global_full_exit_bound_add = !s.pending_orders_[0].pooc_global_full_exit_bound_add;
+            }},
+            {"pending_orders_[].signal_close_mc_remaining_qty", [](Probe& s) {
+                if (!s.pending_orders_.empty()) s.pending_orders_[0].signal_close_mc_remaining_qty = 424242.5;
+            }},
+            {"pending_orders_[].affordability_placement_equity", [](Probe& s) {
+                if (!s.pending_orders_.empty()) s.pending_orders_[0].affordability_placement_equity = 424242.5;
+            }},
+            {"pending_orders_[].affordability_signal_price", [](Probe& s) {
+                if (!s.pending_orders_.empty()) s.pending_orders_[0].affordability_signal_price = 424242.5;
+            }},
+            {"pending_orders_[].affordability_held_qty", [](Probe& s) {
+                if (!s.pending_orders_.empty()) s.pending_orders_[0].affordability_held_qty = 424242.5;
+            }},
+            {"pending_orders_[].explicit_placement_equity", [](Probe& s) {
+                if (!s.pending_orders_.empty()) s.pending_orders_[0].explicit_placement_equity = 424242.5;
+            }},
+            {"pending_orders_[].explicit_slipped_signal_close", [](Probe& s) {
+                if (!s.pending_orders_.empty()) s.pending_orders_[0].explicit_slipped_signal_close = 424242.5;
+            }},
+            {"pending_orders_[].default_stop_placement_signal_close", [](Probe& s) {
+                if (!s.pending_orders_.empty()) s.pending_orders_[0].default_stop_placement_signal_close = 424242.5;
+            }},
+            {"pending_orders_[].suppressed_close_consumed_ledger_qty", [](Probe& s) {
+                if (!s.pending_orders_.empty()) s.pending_orders_[0].suppressed_close_consumed_ledger_qty = 424242.5;
+            }},
+            {"pending_orders_[].suppressed_close_retired_ledger_qty", [](Probe& s) {
+                if (!s.pending_orders_.empty()) s.pending_orders_[0].suppressed_close_retired_ledger_qty = 424242.5;
+            }},
+            {"pending_orders_[].replaced_default_market_incarnation", [](Probe& s) {
+                if (!s.pending_orders_.empty()) s.pending_orders_[0].replaced_default_market_incarnation += 1;
+            }},
+            {"pending_orders_[].replaced_exit_order_incarnation", [](Probe& s) {
+                if (!s.pending_orders_.empty()) s.pending_orders_[0].replaced_exit_order_incarnation += 1;
+            }},
+            {"pending_orders_[].recreated_after_named_cancelled_entry_incarnation", [](Probe& s) {
+                if (!s.pending_orders_.empty()) s.pending_orders_[0].recreated_after_named_cancelled_entry_incarnation += 1;
+            }},
+            {"pending_orders_[].named_cancel_surviving_exit_incarnation", [](Probe& s) {
+                if (!s.pending_orders_.empty()) s.pending_orders_[0].named_cancel_surviving_exit_incarnation += 1;
+            }},
+            {"pending_orders_[].same_id_stop_deferred_close_all_incarnation", [](Probe& s) {
+                if (!s.pending_orders_.empty()) s.pending_orders_[0].same_id_stop_deferred_close_all_incarnation += 1;
+            }},
+            {"pending_orders_[].coof_cascade_seg_i", [](Probe& s) {
+                if (!s.pending_orders_.empty()) s.pending_orders_[0].coof_cascade_seg_i += 1;
+            }},
+            {"pending_orders_[].same_id_stop_deferred_close_all_bar", [](Probe& s) {
+                if (!s.pending_orders_.empty()) s.pending_orders_[0].same_id_stop_deferred_close_all_bar += 1;
             }},
         };
     }
