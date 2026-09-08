@@ -4843,19 +4843,34 @@ public:
     // produced it -- exactly the "quantity the market / priced-entry kernel
     // would actually open with" computation of the zero-lot decline gate in
     // apply_filled_order_to_state, tagged:
-    //   0 EXPLICIT               a script-supplied qty: calc_qty_for_type at
-    //                            the slipped fill (apply_qty_step of the
-    //                            contracts for FIXED, the budget sized at the
-    //                            fill for a per-call percent/cash override).
-    //   1 FROZEN_PLACEMENT       a quantity the engine froze before the fill
-    //                            and dispatches as prequantized contracts
-    //                            (qty_type -1): frozen_default_qty (the
-    //                            default percent_of_equity / cash MARKET or
-    //                            strategy.order size at the signal close), or
-    //                            a MARKET's frozen broker transaction
-    //                            (paired_flat_market_transaction_qty /
-    //                            sbmt_tx_qty) when apply_market_order_fill
-    //                            would dispatch that instead.
+    //   0 EXPLICIT               a script-supplied qty: for strategy.entry
+    //                            calc_qty_for_type at the slipped fill
+    //                            (apply_qty_step of the contracts for FIXED,
+    //                            the budget sized at the fill for a per-call
+    //                            percent/cash override); a strategy.order
+    //                            explicit qty is dispatched VERBATIM
+    //                            (apply_raw_order_fill, no lot step).
+    //   1 FROZEN_PLACEMENT       a quantity the engine fixed before the fill,
+    //                            never re-derived from the fill price:
+    //                            frozen_default_qty (the default
+    //                            percent_of_equity / cash MARKET or
+    //                            strategy.order size at the signal close), a
+    //                            MARKET's frozen broker transaction
+    //                            (paired_flat_market_transaction_qty; a
+    //                            same-bar-market member's sbmt_tx_qty from
+    //                            FLAT or as a kept over-cap add), or what one
+    //                            of the two MARKET reversal kernels opens:
+    //                            a same-bar-market member against an
+    //                            opposite live position opens the remainder
+    //                            sbmt_tx_qty - min(sbmt_tx_qty, live qty)
+    //                            (apply_same_bar_market_tx_reversal), and the
+    //                            exact SHORT-seed collision's final short
+    //                            re-opens the residual pyramid_entries_[0].qty
+    //                            - pyramid_entries_[1].qty after closing both
+    //                            lots (short_seed_collision_final_short_is_
+    //                            live). Both kernels are modelled; each is
+    //                            reported with close_only = 1 when it opens
+    //                            nothing.
     //   2 DEFAULT_STOP_PLACEMENT default_stop_placement_qty, when
     //                            use_default_stop_placement_qty says
     //                            dispatch consumes it (round 7 family K).
@@ -4863,15 +4878,23 @@ public:
     //                            calc_qty(fill).
     // `fill_price` is slipped the way the kernel slips it
     // (apply_slippage; a LIMIT-triggered entry takes apply_limit_fill).
-    // `close_only` is 1 when the fill would close the live opposite
-    // position and open no leg of its own: the order's
+    // `close_only` is 1 when the kernel's close-only predicate fires -- the
+    // fill closes against the live opposite position and that predicate
+    // opens no leg of its own (where the order was created FLAT the branch
+    // is close_opposite_then_enter: a transaction larger than the live
+    // position still opens the remainder, so a consumer compares `qty` with
+    // the live position): the order's
     // affordability_close_only (entry leg declined at placement), the
     // priced-entry prior_cycle_close_only rule (opposite live position,
     // created_position_side != position_side_, and not a KI-65
     // reverses_same_bar_market_from_flat), the same-cycle frozen
     // explicit-FIXED transaction that the close consumes exactly, or a
-    // finalized flat MARKET pair -- each spelled as apply_entry_order_fill /
-    // apply_market_order_fill spell it. Not folded into `qty`: the
+    // finalized flat MARKET pair, or one of the two reversal kernels above
+    // opening nothing -- each spelled as apply_entry_order_fill /
+    // apply_market_order_fill spell it. A replaced default-percent short
+    // (replaced_percent_short_market_is_live) is dispatched
+    // close_opposite_then_enter with its frozen_default_qty: `qty` is that
+    // transaction, close_only 0. Not folded into `qty`: the
     // deferred-flip carry (tv_carry_qty, enter_market_from_flat's
     // tv_deferred_flip rule adds it on top of this quantity for a priced
     // entry firing from FLAT whose placement side is the opposite of the

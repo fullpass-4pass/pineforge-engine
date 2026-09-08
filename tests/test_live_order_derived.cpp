@@ -15,6 +15,8 @@
 #include <cmath>
 #include <cstdint>
 #include <cstdio>
+#include <limits>
+#include <string>
 #include <vector>
 using namespace pineforge;
 namespace {
@@ -149,7 +151,11 @@ void test_default_stop_placement() {
     CHECK(s.probe_fill_qty(0, 105.0, &qty, &close_only, &partition) == 0);
     CHECK(near(qty, 99.0) && partition == kDefaultStopPlacement);
     // use_default_stop_placement_qty requires fill_price > 0: a zero print
-    // falls back to calc_qty_for_type(slipped 0) == calc_qty(0) == 0.
+    // falls back to calc_qty_for_type(slipped 0) == calc_qty(0) == 0. This
+    // pins only the fallback; the meaningful AT_FILL quantities are pinned
+    // in test_default_market_partitions (FIXED default 3) and
+    // test_limit_route_slippage (CASH default at the slipped / unslipped
+    // basis).
     CHECK(s.probe_fill_qty(0, 0.0, &qty, &close_only, &partition) == 0);
     CHECK(near(qty, 0.0) && partition == kAtFill);
     CHECK(s.pending_order_level_resolved(0) == 1);
@@ -297,6 +303,250 @@ void test_trail_activation_short() {
     CHECK(near(limit, 97.0) && near(stop, 102.0) && near(trail, 99.5));
     CHECK(near(s.trail_best_price(), 100.0));   // short: min(fill, bar.low)
 }
+// ---------------------------------------------------------------------------
+// F. Round-8 family S same-bar MARKET transaction (PendingOrder::sbmt_member;
+// scope same_bar_market_tx_scope_is_live: close-calc, FIXED default, no
+// slippage / commission / risk, pyramiding <= 1 -- the defaults here). Rule 1
+// freezes tx = own + opposite position held (net of an earlier same-bar
+// close) + the open leg of every opposite same-bar MARKET pending at the
+// call. Kernels mirrored (apply_market_order_fill):
+//   opposite live -> apply_same_bar_market_tx_reversal: close min(tx, live),
+//                    open remainder tx - min(tx, live) iff > kQtyEpsilon;
+//   same side, kept over cap -> add sbmt_tx_qty;
+//   FLAT, tx > own -> dispatch sbmt_tx_qty (sbmt_flat_frozen_tx).
+// All four shapes are reached through the public strategy API.
+class SbmtProbe final : public BacktestEngine {
+public:
+    enum class Shape { Reversal, ReversalAfterClose, KeptOverCap, FlatPair };
+    SbmtProbe(Shape shape, double default_qty) : shape_(shape) {
+        initial_capital_ = 1'000'000.0;
+        default_qty_type_ = QtyType::FIXED;
+        default_qty_value_ = default_qty;
+    }
+    void on_bar(const Bar&) override {
+        switch (shape_) {
+            case Shape::Reversal:
+                if (bar_index_ == 0) strategy_entry("Long", true);
+                if (bar_index_ == 2) strategy_entry("Short", false);
+                break;
+            case Shape::ReversalAfterClose:
+                if (bar_index_ == 0) strategy_entry("Long", true);
+                if (bar_index_ == 2) { strategy_close("Long"); strategy_entry("Short", false); }
+                break;
+            case Shape::KeptOverCap:
+                if (bar_index_ == 0) strategy_entry("Long", true);
+                if (bar_index_ == 2) { strategy_entry("Short", false); strategy_entry("Long", true); }
+                break;
+            case Shape::FlatPair:
+                if (bar_index_ == 0) { strategy_entry("Long", true); strategy_entry("Short", false); }
+                break;
+        }
+    }
+private:
+    Shape shape_;
+};
+
+int find_market(const BacktestEngine& e, const std::string& id, bool is_long) {
+    for (int i = 0; i < e.pending_order_count(); ++i) {
+        const PendingOrder& o = e.pending_order_at(i);
+        if (o.id == id && o.is_long == is_long && o.type == OrderType::MARKET) return i;
+    }
+    return -1;
+}
+
+void test_sbmt_kernels() {
+    const std::vector<Bar> bars = {flat_bar(100, 0), flat_bar(100, 60'000), flat_bar(100, 120'000)};
+    double qty = 0; int close_only = -1, partition = -1;
+    {   // Long 1 live; Short own 1 + held 1 = tx 2 -> remainder 2 - min(2, 1) = 1.
+        SbmtProbe s(SbmtProbe::Shape::Reversal, 1.0); s.set_syminfo_mintick(0.01);
+        s.run(bars.data(), 3);
+        CHECK(s.position_cycle_seq() >= 1);
+        const int i = find_market(s, "Short", false);
+        CHECK(i >= 0);
+        if (i >= 0) {
+            const PendingOrder& o = s.pending_order_at(i);
+            CHECK(o.sbmt_member && near(o.sbmt_tx_qty, 2.0) && near(o.sbmt_own_qty, 1.0));
+            CHECK(s.probe_fill_qty(i, 100.0, &qty, &close_only, &partition) == 0);
+            CHECK(near(qty, 1.0) && partition == kFrozenPlacement && close_only == 0);
+        }
+    }
+    {   // Long 2 live; close(Long) releases 2 -> held 0 -> tx = own 2; against
+        // the still-live 2 the reversal kernel closes 2 and opens nothing.
+        SbmtProbe s(SbmtProbe::Shape::ReversalAfterClose, 2.0); s.set_syminfo_mintick(0.01);
+        s.run(bars.data(), 3);
+        const int i = find_market(s, "Short", false);
+        CHECK(i >= 0);
+        if (i >= 0) {
+            const PendingOrder& o = s.pending_order_at(i);
+            CHECK(o.sbmt_member && near(o.sbmt_tx_qty, 2.0));
+            CHECK(s.probe_fill_qty(i, 100.0, &qty, &close_only, &partition) == 0);
+            CHECK(near(qty, 0.0) && partition == kFrozenPlacement && close_only == 1);
+        }
+    }
+    {   // Long 1 live at the cap; Short pending makes the over-cap Long a kept
+        // member (rule 2): tx = own 1 + opposite pending open leg 1 = 2.
+        SbmtProbe s(SbmtProbe::Shape::KeptOverCap, 1.0); s.set_syminfo_mintick(0.01);
+        s.run(bars.data(), 3);
+        const int i = find_market(s, "Long", true);
+        CHECK(i >= 0);
+        if (i >= 0) {
+            const PendingOrder& o = s.pending_order_at(i);
+            CHECK(o.sbmt_member && o.sbmt_kept_over_cap && near(o.sbmt_tx_qty, 2.0));
+            CHECK(s.probe_fill_qty(i, 100.0, &qty, &close_only, &partition) == 0);
+            CHECK(near(qty, 2.0) && partition == kFrozenPlacement && close_only == 0);
+        }
+        // The Short: own 1 + held opposite 1 = tx 2 against live 1 -> remainder 1.
+        const int j = find_market(s, "Short", false);
+        CHECK(j >= 0);
+        if (j >= 0) {
+            CHECK(near(s.pending_order_at(j).sbmt_tx_qty, 2.0));
+            CHECK(s.probe_fill_qty(j, 100.0, &qty, &close_only, &partition) == 0);
+            CHECK(near(qty, 1.0) && partition == kFrozenPlacement && close_only == 0);
+        }
+    }
+    {   // From FLAT: Long first (tx = own 1, nothing opposite pending yet) sizes
+        // at the fill; Short second (tx = own 1 + Long's pending open leg 1 = 2
+        // > own) dispatches the frozen transaction.
+        SbmtProbe s(SbmtProbe::Shape::FlatPair, 1.0); s.set_syminfo_mintick(0.01);
+        s.run(bars.data(), 1);
+        CHECK(s.position_cycle_seq() == 0);
+        const int i = find_market(s, "Long", true);
+        const int j = find_market(s, "Short", false);
+        CHECK(i >= 0 && j >= 0);
+        if (i >= 0 && j >= 0) {
+            CHECK(near(s.pending_order_at(i).sbmt_tx_qty, 1.0));
+            CHECK(near(s.pending_order_at(j).sbmt_tx_qty, 2.0));
+            CHECK(s.probe_fill_qty(i, 100.0, &qty, &close_only, &partition) == 0);
+            CHECK(near(qty, 1.0) && partition == kAtFill && close_only == 0);
+            CHECK(s.probe_fill_qty(j, 100.0, &qty, &close_only, &partition) == 0);
+            CHECK(near(qty, 2.0) && partition == kFrozenPlacement && close_only == 0);
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// G. The exact SHORT-seed default-FIFO close collision's final short
+// (short_seed_collision_final_short_is_live, finding 272): the kernel closes
+// both physical LONG lots (entry lot L and the materialized min(S, L)) and
+// re-opens SHORT the residual L - min(S, L) iff > kQtyEpsilon. The predicate
+// is true only INSIDE the fill loop of the bar after placement -- the two
+// lots fill at that bar's open and the final short right after them, so no
+// post-run book can hold the shape. The test therefore installs the exact
+// two-lot state through the subclass's protected-member access (position,
+// pyramid lots, the three role-tagged orders the predicate re-proves) on a
+// handle that has run two bars, and pins the residual from the rule.
+PendingOrder make_order(const std::string& id, OrderType type, bool is_long, int created_bar) {
+    PendingOrder o{};
+    o.id = id; o.type = type; o.is_long = is_long;
+    o.limit_price = o.stop_price = o.trail_points = o.trail_offset = kNaN;
+    o.qty = kNaN; o.qty_type = -1; o.qty_percent = 100.0; o.oca_type = 0;
+    o.created_bar = created_bar;
+    return o;
+}
+
+class ShortSeedProbe final : public BacktestEngine {
+public:
+    ShortSeedProbe() { default_qty_type_ = QtyType::FIXED; default_qty_value_ = 1.0; }
+    void on_bar(const Bar&) override {}
+    int bar() const { return bar_index_; }
+    // Long lot L (id "Long"), materialized lot min(S, L) (id "__close__Short"),
+    // both filled on the current bar; the final short "Short" (MARKET, born
+    // last bar, seed S snapshotted in tv_carry_qty) still pending.
+    void install(double L, double S) {
+        position_side_ = PositionSide::LONG;
+        position_open_bar_ = bar_index_;
+        position_entry_count_ = 2;
+        position_cycle_seq_ = 1;
+        PyramidEntry a{};
+        a.price = 100.0; a.time = current_bar_.timestamp; a.qty = L;
+        a.entry_id = "Long"; a.entry_bar_index = bar_index_;
+        PyramidEntry b = a;
+        b.qty = std::min(S, L); b.entry_id = "__close__Short";
+        pyramid_entries_ = {a, b};
+        position_qty_ = a.qty + b.qty;
+        position_entry_price_ = 100.0;
+        PendingOrder longe = make_order("Long", OrderType::MARKET, true, bar_index_ - 1);
+        longe.short_seed_collision_role = ShortSeedCollisionRole::LONG_ENTRY;
+        PendingOrder fin = make_order("Short", OrderType::MARKET, false, bar_index_ - 1);
+        fin.short_seed_collision_role = ShortSeedCollisionRole::FINAL_SHORT;
+        fin.tv_carry_qty = S;
+        PendingOrder mat = make_order("__close__Short", OrderType::MARKET, false, bar_index_ - 1);
+        mat.short_seed_collision_role = ShortSeedCollisionRole::MATERIALIZE_LONG;
+        pending_orders_ = {longe, fin, mat};
+    }
+};
+
+void test_short_seed_final_short() {
+    const std::vector<Bar> bars = {flat_bar(100, 0), flat_bar(100, 60'000)};
+    double qty = 0; int close_only = -1, partition = -1;
+    {   // L 3, S 1: lots 3 + 1 = 4 close, residual 3 - 1 = 2 re-opens SHORT.
+        ShortSeedProbe s; s.set_syminfo_mintick(0.01); s.run(bars.data(), 2);
+        CHECK(s.bar() == 1);
+        s.install(3.0, 1.0);
+        CHECK(s.probe_fill_qty(1, 100.0, &qty, &close_only, &partition) == 0);
+        // The generic chain would say FIXED default 1 / AT_FILL: 2 / partition
+        // 1 proves the collision kernel was taken.
+        CHECK(near(qty, 2.0) && partition == kFrozenPlacement && close_only == 0);
+        CHECK(near(s.position_avg_price(), 100.0));
+    }
+    {   // L 1, S 1 (the FIXED cohort): residual 0 -> both lots close, nothing
+        // re-opens.
+        ShortSeedProbe s; s.set_syminfo_mintick(0.01); s.run(bars.data(), 2);
+        s.install(1.0, 1.0);
+        CHECK(s.probe_fill_qty(1, 100.0, &qty, &close_only, &partition) == 0);
+        CHECK(near(qty, 0.0) && partition == kFrozenPlacement && close_only == 1);
+    }
+    {   // The LONG_ENTRY-role sibling on the same book is not the final short
+        // (the predicate's is_long / FINAL_SHORT-role clauses fail), so it
+        // keeps the ordinary chain: FIXED default 1 at the fill.
+        ShortSeedProbe s; s.set_syminfo_mintick(0.01); s.run(bars.data(), 2);
+        s.install(3.0, 1.0);
+        CHECK(s.probe_fill_qty(0, 100.0, &qty, &close_only, &partition) == 0);
+        CHECK(near(qty, 1.0) && partition == kAtFill && close_only == 0);
+    }
+}
+
+// ---------------------------------------------------------------------------
+// H. The limit_route re-derivation (the one accessor branch not copied from
+// a kernel site, standing in for the FillKindGuard transient
+// current_fill_is_limit_): with slippage 2 ticks a CASH-default pure-STOP
+// entry sizes at apply_slippage(100, buy) = 100.02 and a pure-LIMIT entry at
+// apply_limit_fill(100, buy) = 100 -- calc_qty CASH = 1000 / tick(basis).
+class SlipProbe final : public BacktestEngine {
+public:
+    SlipProbe() {
+        initial_capital_ = 10000.0;
+        default_qty_type_ = QtyType::CASH;
+        default_qty_value_ = 1000.0;
+        slippage_ = 2;
+    }
+    void on_bar(const Bar&) override {
+        if (bar_index_ == 0) {
+            strategy_entry("S", true, kNaN, /*stop=*/101.0);
+            strategy_entry("L", true, /*limit=*/99.0);
+        }
+    }
+};
+
+void test_limit_route_slippage() {
+    const std::vector<Bar> bars = {flat_bar(100, 0)};
+    SlipProbe s; s.set_syminfo_mintick(0.01); s.run(bars.data(), 1);
+    CHECK(s.pending_order_count() == 2);
+    int is = -1, il = -1;
+    for (int i = 0; i < s.pending_order_count(); ++i) {
+        if (s.pending_order_at(i).id == "S") is = i;
+        if (s.pending_order_at(i).id == "L") il = i;
+    }
+    CHECK(is >= 0 && il >= 0);
+    if (is < 0 || il < 0) return;
+    double qs = 0, ql = 0; int close_only = -1, ps = -1, pl = -1;
+    CHECK(s.probe_fill_qty(is, 100.0, &qs, &close_only, &ps) == 0);
+    CHECK(s.probe_fill_qty(il, 100.0, &ql, &close_only, &pl) == 0);
+    CHECK(ps == kAtFill && pl == kAtFill);
+    CHECK(near(qs, 1000.0 / 100.02, 1e-9));
+    CHECK(near(ql, 1000.0 / 100.0, 1e-9));
+    CHECK(qs < ql);
+}
 }  // namespace
 
 int main() {
@@ -305,6 +555,9 @@ int main() {
     test_default_market_partitions();
     test_prior_cycle_close_only();
     test_trail_activation_short();
+    test_sbmt_kernels();
+    test_short_seed_final_short();
+    test_limit_route_slippage();
     if (failures) std::fprintf(stderr, "%d failure(s)\n", failures);
     return failures == 0 ? 0 : 1;
 }

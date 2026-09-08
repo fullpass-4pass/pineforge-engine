@@ -4724,33 +4724,70 @@ int BacktestEngine::probe_fill_qty(int index, double fill_price, double* qty,
         position_side_ != PositionSide::FLAT
         && requested_side != position_side_;
 
-    // Sizing partition -- the "quantity the market / priced-entry kernel
-    // would actually open with" of the zero-lot decline gate
-    // (apply_filled_order_to_state: frozen default, stop-placement snapshot,
-    // or calc_qty_for_type at the slipped fill), plus the MARKET kernel's
-    // frozen broker transactions that apply_market_order_fill dispatches in
-    // front of the frozen default (paired_flat_market_transaction_qty for a
-    // finalized flat pair; sbmt_tx_qty from FLAT when the transaction
-    // exceeds the own quantity, or for a kept over-cap same-direction add).
-    // The RAW_ORDER kernel (apply_raw_order_fill) sizes frozen -> explicit
-    // -> calc_qty(fill), the same chain.
+    // Sizing partition. MARKET orders first take the two reversal kernels
+    // apply_market_order_fill dispatches BEFORE its generic chain, in the
+    // kernel's own order:
+    //  (i)  the exact SHORT-seed collision's final short
+    //       (short_seed_collision_final_short_is_live; the kernel right after
+    //       the affordability_close_only branch of apply_market_order_fill):
+    //       execute_market_exit closes both physical LONG lots and re-opens
+    //       SHORT exactly the unconsumed residual pyramid_entries_[0].qty -
+    //       pyramid_entries_[1].qty when it exceeds kQtyEpsilon (finding 272).
+    //  (ii) a round-8 family-S member (sbmt_member, same_bar_market_tx_scope_
+    //       is_live) against an opposite live position ->
+    //       apply_same_bar_market_tx_reversal: close_qty = min(tx, live),
+    //       remainder = tx - close_qty opened when > kQtyEpsilon; a same-side
+    //       kept-over-cap member adds sbmt_tx_qty; from FLAT a transaction
+    //       larger than the own quantity dispatches sbmt_tx_qty
+    //       (sbmt_flat_frozen_tx).
+    // Then the generic chain: a finalized flat MARKET pair's
+    // paired_flat_market_transaction_qty (pending_flat_market_pair_is_live),
+    // and the zero-lot decline gate's "quantity the market / priced-entry
+    // kernel would actually open with" (apply_filled_order_to_state: frozen
+    // default -> stop-placement snapshot -> calc_qty_for_type at the slipped
+    // fill). The RAW_ORDER kernel (apply_raw_order_fill) sizes frozen ->
+    // explicit verbatim -> calc_qty(fill), the same chain. Both reversal
+    // kernels report under partition 1: the quantity is fixed by the frozen
+    // transaction / the two-lot book, never by the fill price.
+    // kernel_close_only: that kernel opens nothing (the residual / remainder
+    // is at or below kQtyEpsilon).
+    bool sized = false;
+    bool kernel_close_only = false;
+    if (o.type == OrderType::MARKET && short_seed_collision_final_short_is_live(o)) {
+        const double residual =
+            pyramid_entries_[0].qty - pyramid_entries_[1].qty;
+        *qty = residual;
+        *partition = 1;
+        kernel_close_only = !(residual > kQtyEpsilon);
+        sized = true;
+    } else if (o.type == OrderType::MARKET && o.sbmt_member
+               && std::isfinite(o.sbmt_tx_qty) && o.sbmt_tx_qty > kQtyEpsilon
+               && same_bar_market_tx_scope_is_live()) {
+        if (opposite_live_position) {
+            const double close_qty = std::min(o.sbmt_tx_qty, position_qty_);
+            const double remainder = o.sbmt_tx_qty - close_qty;
+            *qty = remainder;
+            *partition = 1;
+            kernel_close_only = !(remainder > kQtyEpsilon);
+            sized = true;
+        } else if (position_side_ == requested_side && o.sbmt_kept_over_cap) {
+            *qty = o.sbmt_tx_qty;
+            *partition = 1;
+            sized = true;
+        } else if (position_side_ == PositionSide::FLAT
+                   && std::isfinite(o.sbmt_own_qty)
+                   && o.sbmt_tx_qty > o.sbmt_own_qty + kQtyEpsilon) {
+            *qty = o.sbmt_tx_qty;
+            *partition = 1;
+            sized = true;
+        }
+    }
     const bool paired_flat_market =
         o.type == OrderType::MARKET && pending_flat_market_pair_is_live(o);
-    bool sbmt_frozen_tx = false;
-    if (o.type == OrderType::MARKET && o.sbmt_member
-        && std::isfinite(o.sbmt_tx_qty) && o.sbmt_tx_qty > kQtyEpsilon
-        && same_bar_market_tx_scope_is_live()) {
-        sbmt_frozen_tx =
-            (position_side_ == PositionSide::FLAT
-             && std::isfinite(o.sbmt_own_qty)
-             && o.sbmt_tx_qty > o.sbmt_own_qty + kQtyEpsilon)
-            || (position_side_ == requested_side && o.sbmt_kept_over_cap);
-    }
-    if (paired_flat_market) {
+    if (sized) {
+        // reversal kernels above
+    } else if (paired_flat_market) {
         *qty = o.paired_flat_market_transaction_qty;
-        *partition = 1;
-    } else if (sbmt_frozen_tx) {
-        *qty = o.sbmt_tx_qty;
         *partition = 1;
     } else if (!std::isnan(o.frozen_default_qty)) {
         *qty = o.frozen_default_qty;
@@ -4769,8 +4806,11 @@ int BacktestEngine::probe_fill_qty(int index, double fill_price, double* qty,
         *partition = std::isnan(o.qty) ? 3 : 0;
     }
 
-    // Close-only: the fill closes the live opposite position and opens no
-    // leg of its own. Each predicate is spelled as its dispatch site spells
+    // Close-only: the kernel's close-only predicate fires -- the fill closes
+    // against the live opposite position and its own leg is not opened by
+    // that predicate (where the order was created FLAT the branch is
+    // close_opposite_then_enter, which still opens a remainder above the
+    // live position). Each predicate is spelled as its dispatch site spells
     // it.
     //  - affordability_close_only: the entry leg was declined at placement;
     //    both kernels route it to the close-only branch first.
@@ -4785,6 +4825,8 @@ int BacktestEngine::probe_fill_qty(int index, double fill_price, double* qty,
     //  - a finalized flat MARKET pair (apply_market_order_fill passes
     //    close_only_opposite = paired_flat_market), effective only against
     //    an opposite live position.
+    //  - the two MARKET reversal kernels above when they open nothing
+    //    (kernel_close_only).
     bool close_only_opposite = false;
     if (o.type == OrderType::ENTRY) {
         const bool prior_cycle_close_only =
@@ -4815,7 +4857,8 @@ int BacktestEngine::probe_fill_qty(int index, double fill_price, double* qty,
         close_only_opposite =
             prior_cycle_close_only || same_cycle_frozen_tx_exact_flat;
     } else if (o.type == OrderType::MARKET) {
-        close_only_opposite = paired_flat_market && opposite_live_position;
+        close_only_opposite =
+            (paired_flat_market && opposite_live_position) || kernel_close_only;
     }
     *close_only = (o.affordability_close_only || close_only_opposite) ? 1 : 0;
     return 0;
