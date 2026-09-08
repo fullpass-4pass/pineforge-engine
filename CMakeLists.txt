@@ -201,6 +201,15 @@ endif()
 if(PINEFORGE_BUILD_TESTS)
     enable_testing()
     add_subdirectory(tests)
+
+    # L0 bar-identity lane, row 1 (spec §10.1): aggregates a 1m OHLCV CSV to
+    # a target timeframe with the engine's own TimeframeAggregator, for
+    # scripts/bar_identity_lane.py to diff against the graded derived 15m
+    # chart feed. Same FP flags as the test targets above (-ffp-contract=off)
+    # so this tool's own rounding matches the engine's bit-for-bit.
+    add_executable(aggregate_feed tools/aggregate_feed.cpp)
+    target_link_libraries(aggregate_feed PRIVATE pineforge)
+    target_compile_options(aggregate_feed PRIVATE -ffp-contract=off)
 endif()
 
 # === Tutorial strategy (opt-out) =======================================
