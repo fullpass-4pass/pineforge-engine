@@ -1848,6 +1848,15 @@ def _report_to_dict(r: ReportC) -> dict:
     # precision, so these round-trip through json.dump exactly (unlike a
     # JS/JSON-Number consumer, which loses precision above 2**53).
     broker_state_hash = [int(r.broker_state_hash[i]) for i in range(r.broker_state_hash_len)]
+    # Per-script-bar OPEN timestamps, cheap to carry alongside
+    # broker_state_hash so a consumer (e.g. --broker-state-hash's JSON
+    # output) can align each hash to a bar without a separate --trace-json
+    # / equity-curve dump. equity_curve itself stays out of this dict (see
+    # on_report's docstring); recording invariant: when
+    # broker_state_hash_recording was on, broker_state_hash_len ==
+    # equity_curve_len (both are appended once per dispatched script bar,
+    # equity_curve unconditionally and broker_state_hash right after it).
+    equity_curve_time_ms = [int(r.equity_curve[i].time_ms) for i in range(r.equity_curve_len)]
     return {
         "total_trades": int(r.total_trades),
         "net_profit": float(r.net_profit),
@@ -1860,6 +1869,7 @@ def _report_to_dict(r: ReportC) -> dict:
         "trace": trace,
         "trace_names": trace_names,
         "broker_state_hash": broker_state_hash,
+        "equity_curve_time_ms": equity_curve_time_ms,
     }
 
 
@@ -2589,6 +2599,7 @@ def _run_via_docker(strategy_dir: Path, ohlcv_path: Path, params: dict,
         "trace": [],
         "trace_names": [],
         "broker_state_hash": [],
+        "equity_curve_time_ms": [],
     }
 
 
@@ -2827,18 +2838,43 @@ def main() -> int:
                 "trace": trace_to_write,
             }, f)
     if args.broker_state_hash:
-        # Sibling of --trace-json when given (both are per-script-bar debug
-        # arrays); otherwise sibling of the trades CSV output.
-        bsh_path = ((args.trace_json.parent if args.trace_json is not None else out_path.parent)
-                    / "broker_state_hash.json")
-        bsh_path.parent.mkdir(parents=True, exist_ok=True)
-        with bsh_path.open("w", encoding="utf-8") as f:
-            json.dump({
-                "strategy": str(strategy_dir),
-                "ohlcv": str(ohlcv_path),
-                "broker_state_hash": report["broker_state_hash"],
-            }, f)
-        print(f"  broker-state-hash: wrote {len(report['broker_state_hash'])} entries to {bsh_path}")
+        # strat is None only under --runner docker, which already sys.exit's
+        # above when --broker-state-hash is set -- so reaching here means
+        # strat is the ctypes Strategy. A .so predating the export still
+        # runs (broker_state_hash_recording is hasattr-guarded in
+        # Strategy.run), but recorded nothing -- warn rather than silently
+        # write an empty/misleading file.
+        if not hasattr(strat.lib, "strategy_set_broker_state_hash_recording"):
+            print("  broker-state-hash: WARNING -- strategy.so predates "
+                  "strategy_set_broker_state_hash_recording (rebuild the engine); "
+                  "no data was recorded, skipping broker_state_hash.json",
+                  file=sys.stderr)
+        else:
+            # Sibling of --trace-json when given (both are per-script-bar
+            # debug arrays); otherwise sibling of the trades CSV output.
+            bsh_path = ((args.trace_json.parent if args.trace_json is not None else out_path.parent)
+                        / "broker_state_hash.json")
+            bsh_path.parent.mkdir(parents=True, exist_ok=True)
+            bsh_values = report["broker_state_hash"]
+            bsh_times = report["equity_curve_time_ms"]
+            # Self-describing: script_bars_processed lets a consumer verify
+            # coverage without loading the trades CSV, and each entry pairs
+            # its script-bar OPEN timestamp with the hash (hex, not a bare
+            # JSON-Number, so no consumer can silently truncate a uint64 to
+            # a JS-safe double). Invariant (Strategy.run/_report_to_dict):
+            # len(bsh_values) == len(bsh_times) whenever recording was on.
+            entries = [
+                {"time_ms": bsh_times[i], "hash": format(bsh_values[i], "016x")}
+                for i in range(len(bsh_values))
+            ]
+            with bsh_path.open("w", encoding="utf-8") as f:
+                json.dump({
+                    "strategy": str(strategy_dir),
+                    "ohlcv": str(ohlcv_path),
+                    "script_bars_processed": report["script_bars_processed"],
+                    "entries": entries,
+                }, f)
+            print(f"  broker-state-hash: wrote {len(entries)} entries to {bsh_path}")
     if args.fingerprint_json is not None:
         try:
             cpp_path = strategy_dir / "generated.cpp"

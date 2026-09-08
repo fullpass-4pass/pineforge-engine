@@ -747,6 +747,14 @@ PF_API int strategy_last_bar_dual_entry_path(pf_strategy_t s);
  *  emptied, not the flag itself) at the start of every run(); the flag is
  *  persistent configuration, like #strategy_set_realtime_tail, and stays
  *  set until a caller passes @p on == 0.
+ *  Also covers #strategy_stream_begin's warmup run() and every script bar
+ *  dispatched afterward by the realtime tick stream, so
+ *  #strategy_stream_fill_report's cumulative report satisfies the same
+ *  len == script_bars_processed invariant. Set this BEFORE
+ *  #strategy_stream_begin to also record the warmup leg -- reset_run_state()
+ *  (which stream_begin's internal run() invokes) empties the recorded
+ *  array, not the flag, but a flag flipped on only after stream_begin
+ *  returns misses the warmup bars already dispatched.
  *  Default off (@p on == 0): pf_report_t::broker_state_hash is NULL /
  *  0-length and every historical run stays byte-identical to before this
  *  flag existed. */

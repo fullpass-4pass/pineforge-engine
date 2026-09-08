@@ -135,6 +135,8 @@ bars_in_market_               # report-only accumulator; no strategy.* accessor
 first_bar_open_                # report-only (buy&hold basis); no strategy.* accessor
 equity_curve_                 # report-only per-bar equity history; the range-end finalizer re-derives max_equity_/min_equity_/max_drawdown_ from it, but those are hashed directly -- redundant, unbounded-size, and never read during in-run fill decisions
 range_end_trades_             # doc: "Report-only -- ... never enter trades_, the realized sums, or the live position"
+broker_state_hash_recording_  # recording switch, not broker state -- never read by fill/order logic
+broker_state_hashes_          # report-only recording of the hash itself; hashing it would break array[last] == broker_state_hash()
 
 # --- Per-pass dual-entry-stop working state (task brief instruction: waive
 # this one, hash the per-bar snapshot instead).

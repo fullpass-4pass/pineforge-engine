@@ -4818,16 +4818,22 @@ public:
     uint64_t broker_state_hash() const;
 
     // ABI v4 live-runtime surface (task 6): when on, every script bar's
-    // dispatch (all three run loops -- the single-TF run() loop,
-    // run_simple_bar_loop, run_aggregation_bar_loop) appends
-    // broker_state_hash() to broker_state_hashes_ immediately after that
-    // bar's record_equity_point() call, so the recorded array's length
-    // matches script_bars_processed and pf_report_t::broker_state_hash_len
-    // 1:1. Default off: broker_state_hashes_ stays empty, fill_report emits
-    // a null/zero-length array, and every historical run stays
-    // byte-identical to before this flag existed. reset_run_state() clears
-    // the recorded array on every run() regardless of this flag's value;
-    // the flag itself is persistent configuration, like set_realtime_tail.
+    // dispatch (all four script-bar dispatch sites -- the single-TF run()
+    // loop, run_simple_bar_loop, run_aggregation_bar_loop, and
+    // stream_dispatch_script_bar, engine_stream.cpp, the realtime-stream
+    // continuation of a stream_begin warmup) appends broker_state_hash()
+    // to broker_state_hashes_ immediately after that bar's
+    // record_equity_point() call, so the recorded array's length matches
+    // script_bars_processed and pf_report_t::broker_state_hash_len 1:1 --
+    // including on strategy_stream_fill_report, whose report is the
+    // cumulative warmup + realtime run. Default off: broker_state_hashes_
+    // stays empty, fill_report emits a null/zero-length array, and every
+    // historical run stays byte-identical to before this flag existed.
+    // reset_run_state() clears the recorded array on every run() (the
+    // warmup leg of stream_begin included) regardless of this flag's
+    // value; the flag itself is persistent configuration, like
+    // set_realtime_tail, so it must be set BEFORE stream_begin to also
+    // cover the warmup bars.
     void set_broker_state_hash_recording(bool on) {
         broker_state_hash_recording_ = on;
     }

@@ -414,6 +414,7 @@ void BacktestEngine::stream_dispatch_script_bar(const Bar& bar, bool had_tick) {
     prev_in_session_ = session_ismarket_;
     update_equity_extremes();
     record_equity_point(bar.timestamp);
+    if (broker_state_hash_recording_) broker_state_hashes_.push_back(broker_state_hash());
     prev_bar_timestamp_ = bar.timestamp;
 
     // Ticks belonging to the next script bar must compare pending-order
