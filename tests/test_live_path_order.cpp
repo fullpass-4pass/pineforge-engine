@@ -133,6 +133,31 @@ int dual_entry_winner_after_empty_rerun() {
     s.run(bars.data(), 0);  // zero script bars -- dispatch_bar() never runs this call
     return s.last_bar_dual_entry_path();
 }
+// final-rereview.md N4: the F6 fix also added a reset at the top of
+// stream_dispatch_script_bar (engine_stream.cpp) -- stream mode calls
+// process_pending_orders() directly and never goes through dispatch_bar(),
+// so that function's own per-bar reset (already pinned above by the
+// plain-run tests) never runs for a realtime stream bar. Drive the same
+// dual-entry fixture through stream_begin/stream_advance_time so bar k's
+// arbitration happens in the warmup run() (ordinary dispatch_bar(), ALREADY
+// reset pre-fix) and bar k+1 -- pairless -- is dispatched entirely through
+// stream_dispatch_script_bar, the one reset site this file's other cases
+// never reach.
+int dual_entry_winner_stream_after_pairless_bar() {
+    const std::vector<Bar> warmup = {bar(100, 100, 100, 100, 0), kDualEntryTouchBar};
+    DualEntryPair s;
+    s.set_path_order(1);  // HIGH_FIRST -> LongFirst, as in dual_entry_winner_probe(1)
+    if (!s.stream_begin(warmup.data(), (int)warmup.size(), "1", "1")) return -98;
+    if (s.last_bar_dual_entry_path() != 1) return -99;  // sanity: warmup's touch bar decided LongFirst
+    // No ticks for the next input bar: advance the stream clock past its
+    // boundary so stream_finalize_until synthesizes a zero-volume
+    // carry-forward bar and dispatches it via stream_dispatch_script_bar --
+    // a pairless bar (no strategy_entry calls, no fresh arbitration).
+    if (!s.stream_advance_time(180'000)) return -97;
+    const int result = s.last_bar_dual_entry_path();
+    s.stream_end(false);
+    return result;
+}
 }
 int main() {
     CHECK(near(exit_price_under(kHighFirstTouchBar, 0), 101.0));  // AUTO: limit first
@@ -153,6 +178,7 @@ int main() {
     CHECK(dual_entry_winner_after_pairless_bar() == 0);
     CHECK(dual_entry_winner_pooc_no_tail_suppression() == 1);
     CHECK(dual_entry_winner_after_empty_rerun() == 0);
+    CHECK(dual_entry_winner_stream_after_pairless_bar() == 0);
 
     return failures == 0 ? 0 : 1;
 }

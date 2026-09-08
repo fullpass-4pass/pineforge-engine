@@ -28,6 +28,22 @@ std::vector<Bar> bars_1m(int n) {
     for (int i = 0; i < n; ++i) v.push_back(flat_bar(100.0 + i, i * 60'000LL));
     return v;
 }
+// 12 one-minute bars with a 3-bar hole after bar 5 (final-rereview.md N2):
+// bars[0..5] one minute apart, then a 4-minute step (the 3-bar hole) into
+// bars[6..11], one minute apart again. Discriminates the exact/extrapolate-
+// from-last-bar rule (script_bar_geometry == true) from the pre-fix
+// extrapolate-from-bars[0] rule, which a gapless feed cannot.
+std::vector<Bar> bars_1m_gapped_after_5() {
+    std::vector<Bar> v;
+    for (int i = 0; i <= 5; ++i) v.push_back(flat_bar(100.0 + i, i * 60'000LL));
+    int64_t t = 5 * 60'000LL;
+    for (int i = 6; i < 12; ++i) {
+        t += 4 * 60'000LL;  // one normal step + the 3-bar hole, then 1-minute steps
+        v.push_back(flat_bar(100.0 + i, t));
+        t -= 3 * 60'000LL;  // subsequent bars are 1 minute apart again
+    }
+    return v;
+}
 }
 int main() {
     const auto bars = bars_1m(10);
@@ -89,6 +105,48 @@ int main() {
     tf_on.fill_report(&r_tf);
     CHECK(r_tf.trades_len == 0);                     // range-end guard on this path too
     BacktestEngine::free_report(&r_tf);
+
+    // --- final-rereview.md N2: gapped script-TF feed, H <= n (exact) -----
+    // Single-TF path: bars IS the script-bar array, so the exact rule
+    // applies. bars_1m_gapped_after_5() has a 4-minute step between bars 5
+    // and 6, so the exact bars[H-1] timestamp differs from what the pre-fix
+    // "extrapolate from bars[0]" formula would have produced -- the gapless
+    // feed above cannot discriminate the two formulas, this one does.
+    {
+        const auto gapped = bars_1m_gapped_after_5();
+        HoldStrategy exact;
+        exact.set_realtime_tail(true, 9);             // H = 9 <= n = 12
+        exact.run(gapped.data(), (int)gapped.size());
+        CHECK(exact.last_index.back() == 8);
+        CHECK(exact.last_time == gapped[8].timestamp);                    // exact
+        const int64_t pre_fix_value = gapped[0].timestamp + 8LL * 60'000LL;
+        CHECK(exact.last_time != pre_fix_value);       // discriminates old vs. new formula
+    }
+
+    // --- final-rereview.md N2: gapped script-TF feed, H > n (extrapolate) -
+    {
+        const auto gapped = bars_1m_gapped_after_5();
+        HoldStrategy extrap;
+        extrap.set_realtime_tail(true, 20);            // H = 20 > n = 12
+        extrap.run(gapped.data(), (int)gapped.size());
+        CHECK(extrap.last_index.back() == 19);
+        CHECK(extrap.last_time
+              == gapped.back().timestamp + 8LL * 60'000LL);  // extrapolated from bars[n-1]
+    }
+
+    // --- final-rereview.md N1/N2: aggregated (1m -> 5m) tail ---------------
+    // Under needs_aggregation, apply_realtime_tail_horizon's `bars` argument
+    // is the *input* array, not script bars, so it must extrapolate from
+    // the first *input* bar's timestamp rather than indexing input bars by
+    // a script-bar horizon.
+    {
+        const auto bars_agg = bars_1m(15);             // 15 one-minute input bars -> 3 5m script bars
+        HoldStrategy agg;
+        agg.set_realtime_tail(true, 10);                // H = 10, well past expected_script_bars == 3
+        agg.run(bars_agg.data(), (int)bars_agg.size(), "1", "5");
+        CHECK(agg.last_index.back() == 9);                                       // H - 1
+        CHECK(agg.last_time == bars_agg[0].timestamp + 9LL * 300'000LL);         // extrapolated from first input bar
+    }
 
     return failures == 0 ? 0 : 1;
 }

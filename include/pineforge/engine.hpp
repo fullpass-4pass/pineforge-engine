@@ -4390,7 +4390,24 @@ private:
     // this run, freeze pine_last_bar_index()/last_bar_time_ at the horizon
     // bar instead of the fed array's actual last index. No-op unless
     // realtime_tail_ is on and realtime_tail_horizon_bars_ > 0.
-    void apply_realtime_tail_horizon(const Bar* bars, int n);
+    //
+    // script_bar_geometry selects which timestamp rule applies to
+    // last_bar_time_ (last_bar_index_ = horizon - 1 either way):
+    //   true  -- `bars` IS the script-bar array (the single-TF run(bars, n)
+    //            path, and run_tf_impl's !needs_aggregation call, where
+    //            input_tf == script_tf so input bars ARE script bars):
+    //            exact bars[horizon - 1].timestamp when horizon <= n, else
+    //            extrapolated from bars[n - 1] one script-TF step per
+    //            missing bar past the array's last bar.
+    //   false -- `bars` is the *input* array under aggregation
+    //            (needs_aggregation, input_tf < script_tf): indexing it by
+    //            a script-bar horizon would land on the wrong input bar
+    //            (final-rereview.md N1), so instead extrapolate from the
+    //            first input bar's timestamp, one script-TF step per
+    //            horizon bar (the pre-fix formula, restored for this path
+    //            only).
+    void apply_realtime_tail_horizon(const Bar* bars, int n,
+                                      bool script_bar_geometry);
     // The TF-aware run()'s actual work (dispatch loop selection, the
     // try/catch, both cleanup paths). Does NOT touch last_error_,
     // last_run_status_, or abort_requested_ -- every public run() overload

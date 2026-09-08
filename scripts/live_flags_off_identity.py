@@ -127,6 +127,32 @@ def git_head(repo: Path) -> str:
     return result.stdout.strip()
 
 
+def engine_head_label(repo: Path) -> str:
+    """git_head(repo), with a `-dirty` suffix appended when src/include/
+    scripts carry uncommitted changes (final-rereview.md N6): without this,
+    a run against just-edited, not-yet-committed sources is indistinguishable
+    -- in both the printed comparison line and provenance.json -- from a run
+    against the named commit itself, so the evidence alone cannot show which
+    sources were actually measured."""
+    result = subprocess.run(
+        ["git", "-C", str(repo), "status", "--porcelain", "--", "src", "include", "scripts"],
+        capture_output=True, text=True, check=True,
+    )
+    dirty = bool(result.stdout.strip())
+    head = git_head(repo)
+    return f"{head}-dirty" if dirty else head
+
+
+def short_engine_label(head_label: str) -> str:
+    """Truncate a (possibly `-dirty`-suffixed) engine_head_label to a short,
+    printable form without slicing the `-dirty` marker away -- a plain
+    `label[:12]` would silently drop it since the full hash is 40 hex
+    characters."""
+    if head_label.endswith("-dirty"):
+        return head_label[: -len("-dirty")][:12] + "-dirty"
+    return head_label[:12]
+
+
 def emit_one(args: tuple[Path, Path, str, Path]) -> tuple[str, bool, str]:
     engine_root, strat_dir, so_name, emit_dir = args
     dest_dir = emit_dir / strat_dir.name
@@ -293,7 +319,7 @@ def main() -> int:
 
         provenance = {
             "root": str(engine_root),
-            "engine_head": git_head(engine_root),
+            "engine_head": engine_head_label(engine_root),
             "corpus_head": git_head(engine_root / "corpus"),
             "libs": {strat_dir.name: sha256_file(strat_dir / so_name) for strat_dir, so_name in cases},
         }
@@ -329,13 +355,13 @@ def main() -> int:
             return 1
         provenance = json.loads(provenance_path.read_text())
         reference_engine_head = provenance.get("engine_head", "")
-        current_engine_head = git_head(engine_root)
+        current_engine_head = engine_head_label(engine_root)
         reference_corpus_head = provenance.get("corpus_head", "")
         current_corpus_head = git_head(engine_root / "corpus")
         print(
-            f"reference engine {reference_engine_head[:12]} vs current engine "
-            f"{current_engine_head[:12]} (corpus {reference_corpus_head[:12]} vs "
-            f"{current_corpus_head[:12]})"
+            f"reference engine {short_engine_label(reference_engine_head)} vs current "
+            f"engine {short_engine_label(current_engine_head)} (corpus "
+            f"{reference_corpus_head[:12]} vs {current_corpus_head[:12]})"
         )
         if reference_corpus_head != current_corpus_head:
             print(
@@ -377,7 +403,10 @@ def main() -> int:
     diff_count = sum(1 for _, tag, _ in bad_tagged if tag == "DIFF")
     fail_count = sum(1 for _, tag, _ in bad_tagged if tag == "FAIL")
     missing_count = sum(1 for _, tag, _ in bad_tagged if tag == "MISSING")
-    ref_suffix = f" (reference engine {reference_engine_head[:12]})" if reference_engine_head else ""
+    ref_suffix = (
+        f" (reference engine {short_engine_label(reference_engine_head)})"
+        if reference_engine_head else ""
+    )
 
     print(f"live_flags_off_identity: {len(cases)} probes, {diff_count} differ{ref_suffix}")
     print(f"  {diff_count} DIFF, {fail_count} FAIL, {missing_count} MISSING")

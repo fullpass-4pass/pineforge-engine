@@ -293,9 +293,15 @@ void BacktestEngine::process_pending_orders(const Bar& bar) {
         // The per-bar snapshot ABI v4 exposes via last_bar_dual_entry_path():
         // written here, at the arbitration site, ONLY on a real (non-None)
         // decision -- never touched by the declined-admission release below
-        // -- and reset once per BAR (not per pass) by dispatch_bar() /
-        // run_aggregation_bar_loop's magnifier branch (engine_run.cpp), so
-        // it survives this pass's own dual_entry_path_ going back to None.
+        // -- and reset once per BAR (not per pass), at every dispatch site
+        // that owns a bar boundary: dispatch_bar() and
+        // run_aggregation_bar_loop's magnifier branch (engine_run.cpp),
+        // reset_run_state() (engine_run.cpp, so a rerun that dispatches zero
+        // script bars doesn't leak the prior run's decision), and
+        // stream_dispatch_script_bar() (engine_stream.cpp, which calls
+        // process_pending_orders() directly and never goes through
+        // dispatch_bar()). So it survives this pass's own dual_entry_path_
+        // going back to None.
         if (dual_entry_path_ != DualEntryStopPathWinner::None) {
             last_bar_dual_entry_decision_ = dual_entry_path_;
         }

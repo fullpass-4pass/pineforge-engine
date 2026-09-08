@@ -880,7 +880,10 @@ void BacktestEngine::run(const Bar* bars, int n) {
     input_tf_ = detected_tf;
     script_tf_ = detected_tf;
     script_tf_seconds_ = tf_to_seconds(script_tf_);
-    apply_realtime_tail_horizon(bars, n);
+    // Single-TF path: bars IS the script-bar array (input_tf == script_tf
+    // trivially, no aggregation), so the exact/extrapolate-from-last rule
+    // applies.
+    apply_realtime_tail_horizon(bars, n, /*script_bar_geometry=*/true);
 
     // Runtime diagnostics (single-timeframe path)
     diag_input_bars_processed_ = n;
@@ -940,23 +943,40 @@ void BacktestEngine::run(const Bar* bars, int n) {
 // instead of the fed array's actual last index/timestamp. No-op unless
 // realtime_tail_ is on and a positive horizon was configured.
 //
-// last_bar_time_ is the EXACT timestamp of bars[horizon_bars - 1] when that
-// bar exists in the fed array (horizon_bars <= n); otherwise it is
-// extrapolated from the array's actual final bar (bars[n - 1]), not the
-// first one -- a feed with any gap (session/weekend boundary, a missing
-// bar, a calendar TF) makes an extrapolation from bars[0] wrong even when
-// the exact timestamp was available.
-void BacktestEngine::apply_realtime_tail_horizon(const Bar* bars, int n) {
+// The `bars` array passed in is script-bar geometry only when the caller
+// says so (script_bar_geometry == true): the single-TF run(bars, n) path,
+// and run_tf_impl's !needs_aggregation call where input_tf == script_tf
+// makes input bars the same as script bars. There, last_bar_time_ is the
+// EXACT timestamp of bars[horizon_bars - 1] when that bar exists in the fed
+// array (horizon_bars <= n); otherwise it is extrapolated from the array's
+// actual final bar (bars[n - 1]), not the first one -- a feed with any gap
+// (session/weekend boundary, a missing bar, a calendar TF) makes an
+// extrapolation from bars[0] wrong even when the exact timestamp was
+// available.
+//
+// Under aggregation (input_tf < script_tf, script_bar_geometry == false)
+// `bars` is the *input* array, so a script-bar horizon does not index it
+// correctly (final-rereview.md N1): last_bar_time_ is instead extrapolated
+// from the first input bar's timestamp, one script-TF step per horizon bar
+// -- the formula this function used unconditionally before the exact/
+// extrapolate-from-last-bar fix, restored here for this path only.
+void BacktestEngine::apply_realtime_tail_horizon(const Bar* bars, int n,
+                                                  bool script_bar_geometry) {
     if (!realtime_tail_ || realtime_tail_horizon_bars_ <= 0 || n <= 0 || bars == nullptr) return;
     const int horizon = realtime_tail_horizon_bars_;
     last_bar_index_ = horizon - 1;
-    if (horizon <= n) {
-        last_bar_time_ = bars[horizon - 1].timestamp;
+    const int64_t script_tf_ms =
+        static_cast<int64_t>(script_tf_seconds_ > 0 ? script_tf_seconds_ : 0) * 1000;
+    if (script_bar_geometry) {
+        if (horizon <= n) {
+            last_bar_time_ = bars[horizon - 1].timestamp;
+        } else {
+            last_bar_time_ = bars[n - 1].timestamp
+                + static_cast<int64_t>(horizon - n) * script_tf_ms;
+        }
     } else {
-        const int64_t script_tf_ms =
-            static_cast<int64_t>(script_tf_seconds_ > 0 ? script_tf_seconds_ : 0) * 1000;
-        last_bar_time_ = bars[n - 1].timestamp
-            + static_cast<int64_t>(horizon - n) * script_tf_ms;
+        last_bar_time_ = bars[0].timestamp
+            + static_cast<int64_t>(horizon - 1) * script_tf_ms;
     }
 }
 
@@ -1499,8 +1519,13 @@ void BacktestEngine::run_tf_impl(const Bar* input_bars, int n_input,
     last_bar_index_ = expected_script_bars - 1;
     // Live-runtime tail (spec §3.1): freeze last_bar_index_/last_bar_time_ at
     // the horizon bar. Must run AFTER the expected_script_bars assignment
-    // above, which would otherwise clobber it.
-    apply_realtime_tail_horizon(input_bars, n_input);
+    // above, which would otherwise clobber it. `input_bars` is the
+    // script-bar array only when !needs_aggregation (input_tf ==
+    // script_tf); under aggregation it is the finer *input* array, so
+    // last_bar_time_ must fall back to the pre-fix first-bar extrapolation
+    // instead of indexing input bars by a script-bar horizon (N1).
+    apply_realtime_tail_horizon(input_bars, n_input,
+                                 /*script_bar_geometry=*/!needs_aggregation);
     // reset_run_state() already ran above — reserve AFTER it so the capacity
     // hint isn't wiped (clear() retains capacity but order still matters for
     // any future reset that releases).

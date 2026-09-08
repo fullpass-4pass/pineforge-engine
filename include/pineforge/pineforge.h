@@ -639,20 +639,26 @@ PF_API int  strategy_last_run_status(pf_strategy_t s);
  *    2. `session.islastbar` is computed from the bucket calendar (no next
  *       bar to peek at, so it evaluates whether the next bucket -- this
  *       bar's timestamp plus one script-TF step -- falls out of session).
- *    3. `bar_index` stays put; `last_bar_index` (and `last_bar_time`) are
- *       frozen at the horizon bar (`horizon_bars - 1`), when @p horizon_bars
- *       > 0.
+ *    3. `bar_index` stays put; `last_bar_index` is frozen at the horizon
+ *       bar (`horizon_bars - 1`), when @p horizon_bars > 0. `last_bar_time`
+ *       is exact when the horizon bar is in the script-bar array, one
+ *       script-TF step per missing bar past the array's last bar
+ *       otherwise; under aggregation (input_tf < script_tf) it is
+ *       extrapolated from the first bar instead, and the aggregation-path
+ *       caveat below applies.
  *    4. The range-end synthetic close row/trade is skipped (no
  *       `open_at_end` row); the final equity point keeps `open_profit`.
  *    5. Interior bars (every bar before the last) are unaffected.
  *  Dispatch-path scope: effects 1, 3, and 4 above are honoured on every
  *  dispatch path. Effect 2 (`session.islastbar` from the bucket calendar)
- *  is honoured only on the standard `dispatch_bar` path -- the
- *  single-timeframe run loop and the input_tf == script_tf simple bar
- *  loop. On the non-magnifier aggregation path (input_tf < script_tf)
- *  effect 2 is UNDEFINED: the tail bar's `session.islastbar` reads the
- *  ordinary `in_session && barstate.islast` expression instead of the
- *  calendar lookahead (false there, since this flag also forces
+ *  is honoured only on `run_simple_bar_loop` (the input_tf == script_tf
+ *  simple bar loop); the single-timeframe `run(bars, n)` overload never
+ *  evaluates session predicates at all (pre-existing -- `session.ismarket`/
+ *  `session.islastbar` stay at their reset-state `false` there regardless
+ *  of this flag). On the non-magnifier aggregation path (input_tf <
+ *  script_tf) effect 2 is UNDEFINED: the tail bar's `session.islastbar`
+ *  reads the ordinary `in_session && barstate.islast` expression instead of
+ *  the calendar lookahead (false there, since this flag also forces
  *  `barstate.islast` false). Callers must feed an input_tf == script_tf
  *  array until that gap closes, matching
  *  #strategy_set_probe_suppress_tail_logic's dispatch-path-scope caveat.
