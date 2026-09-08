@@ -571,6 +571,18 @@ def main() -> int:
         + (f": {', '.join(sorted(no_lib))}" if no_lib else "")
     )
 
+    # Pre-warm the feed-size cache sequentially, single-threaded, before the
+    # worker pool starts below. process_probe() (run on pool worker threads)
+    # calls feed_n_bars(probe_feed(strat_dir)) to size the two horizons, and
+    # _feed_cache is a plain dict with no lock (task-11 rereview F8): most
+    # probes share the same large default derived feed, so an unguarded
+    # concurrent first-miss would race two threads writing the same key.
+    # Populating every distinct feed's row count here, before any worker
+    # thread can touch the dict, removes the race outright instead of
+    # adding locking around a value that is idempotent per path anyway.
+    for strat_dir, _so_name in cases:
+        feed_n_bars(probe_feed(strat_dir))
+
     out_path = resolve_out_path(args.out, args.only)
     if out_path.exists() and not args.force:
         existing_probes = _existing_probe_count(out_path)

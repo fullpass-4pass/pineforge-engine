@@ -3163,6 +3163,36 @@ def main() -> int:
     else:
         so_path = find_strategy_lib(strategy_dir, args.so_name)
         strat = Strategy(so_path)
+        if args.realtime_tail is not None:
+            # Live-runtime tail (ABI v4, spec §3.1). strat is None only under
+            # --runner docker, which already sys.exit's above when
+            # --realtime-tail is set. Strategy.run's internal call is
+            # hasattr-guarded, so a .so predating the export would otherwise
+            # run to completion having silently ignored the flag -- for a
+            # lane whose whole method is "does the flagged run differ from
+            # the base run", a silently ignored flag makes every comparison
+            # vacuously pass. Fail hard here, same as --broker-state-hash
+            # below, and BEFORE strat.run() -- checking only after the run
+            # (task-11 re-review, new finding 1) let a stale .so burn a full
+            # backtest (minutes on the default feed) before exiting 1.
+            if not hasattr(strat.lib, "strategy_set_realtime_tail"):
+                sys.exit(
+                    "error: --realtime-tail requires strategy_set_realtime_tail "
+                    "(strategy.so predates ABI v4 spec section 3.1; rebuild the engine)")
+        if args.broker_state_hash:
+            # strat is None only under --runner docker, which already
+            # sys.exit's above when --broker-state-hash is set -- so
+            # reaching here means strat is the ctypes Strategy. A .so
+            # predating the export would otherwise run to completion having
+            # recorded nothing -- fail hard (like --realtime-tail above) and
+            # BEFORE strat.run(), rather than after burning the backtest
+            # time, so downstream consumers (e.g. the live-flags lane) never
+            # have to wait out a doomed run.
+            if not hasattr(strat.lib, "strategy_set_broker_state_hash_recording"):
+                sys.exit(
+                    "error: --broker-state-hash requires "
+                    "strategy_set_broker_state_hash_recording (strategy.so predates "
+                    "ABI v4 task 6; rebuild the engine)")
         report = strat.run(ohlcv_path, params=params,
                            trace_enabled=args.trace_json is not None,
                            trade_start_time_ms=trade_start_ms,
@@ -3192,38 +3222,21 @@ def main() -> int:
                 "trace": trace_to_write,
             }, f)
     if args.realtime_tail is not None:
-        # Live-runtime tail (ABI v4, spec §3.1). strat is None only under
-        # --runner docker, which already sys.exit's above when
-        # --realtime-tail is set. Strategy.run's internal call is
-        # hasattr-guarded, so a .so predating the export would otherwise run
-        # to completion having silently ignored the flag -- for a lane whose
-        # whole method is "does the flagged run differ from the base run",
-        # a silently ignored flag makes every comparison vacuously pass.
-        # Fail hard here, same as --broker-state-hash below, rather than
-        # letting the CSV/trace come out identical to a flags-off run with
-        # no signal that the flag never reached the engine.
-        if not hasattr(strat.lib, "strategy_set_realtime_tail"):
-            sys.exit(
-                "error: --realtime-tail requires strategy_set_realtime_tail "
-                "(strategy.so predates ABI v4 spec section 3.1; rebuild the engine)")
         # Receipt: a consumer (scripts/live_flags_lane.py) asserts this line
         # is present in a flagged run's stdout so a future regression that
         # silently no-ops the flag (e.g. an accidental hasattr-guard removal
-        # upstream) shows up as a missing receipt, not a quiet P=0.
+        # upstream) shows up as a missing receipt, not a quiet P=0. The
+        # strategy_set_realtime_tail hard-fail guard runs earlier, right
+        # after `strat = Strategy(so_path)` and before strat.run(), so a
+        # stale .so is caught before the (possibly multi-minute) backtest
+        # rather than after it.
         print(f"realtime-tail: on horizon={args.realtime_tail}")
     if args.broker_state_hash:
-        # strat is None only under --runner docker, which already sys.exit's
-        # above when --broker-state-hash is set -- so reaching here means
-        # strat is the ctypes Strategy. A .so predating the export would
-        # otherwise run to completion having recorded nothing -- fail hard
-        # (like --realtime-tail above) rather than silently writing no file,
-        # which downstream consumers (e.g. the live-flags lane) would
-        # otherwise have no way to distinguish from "prefix identical".
-        if not hasattr(strat.lib, "strategy_set_broker_state_hash_recording"):
-            sys.exit(
-                "error: --broker-state-hash requires "
-                "strategy_set_broker_state_hash_recording (strategy.so predates "
-                "ABI v4 task 6; rebuild the engine)")
+        # The strategy_set_broker_state_hash_recording hard-fail guard runs
+        # earlier, right after `strat = Strategy(so_path)` and before
+        # strat.run() -- see there for why. Reaching here means strat is the
+        # ctypes Strategy (--runner docker already sys.exit's above when
+        # --broker-state-hash is set) and the export is present.
         # Sibling of --trace-json when given (both are per-script-bar
         # debug arrays); otherwise sibling of the trades CSV output.
         bsh_path = ((args.trace_json.parent if args.trace_json is not None else out_path.parent)
