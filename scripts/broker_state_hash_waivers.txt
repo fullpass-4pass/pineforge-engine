@@ -1,0 +1,146 @@
+# Members declared between // @broker-state begin / end in engine.hpp that
+# scripts/check_broker_state_hash_coverage.py finds but broker_state_hash()
+# (src/engine_state_hash.cpp) does not hash, with the reason each is not a
+# broker fact that decides a future fill. One name per line; text after '#'
+# is a comment and ignored by the parser (blank lines and comment-only lines
+# are skipped too).
+
+# --- Engine configuration: set once from strategy()/metadata before any bar
+# runs, never mutated by broker/fill logic during a run. Two recomputes of
+# the same configured engine agree on these by construction.
+calc_on_order_fills_          # config: strategy(calc_on_order_fills=...)
+chart_ema_na_warmup_          # config: opt-in chart-TF ta.ema warmup selector
+close_entries_rule_any_       # config: strategy(close_entries_rule=...)
+commission_type_              # config: strategy(commission_type=...)
+commission_value_             # config: strategy(commission_value=...)
+default_qty_type_             # config: strategy(default_qty_type=...)
+default_qty_value_            # config: strategy(default_qty_value=...)
+flat_retained_child_fresh_parent_order_  # config: explicit A/B ordering override
+historical_security_lookahead_projection_  # config: opt-in request.security selector
+initial_capital_              # config: strategy(initial_capital=...)
+intraday_cap_count_pooc_full_close_fills_  # config: opt-in intraday-cap oracle candidate
+intraday_cap_defer_pooc_close_             # config: opt-in intraday-cap oracle candidate
+intraday_cap_skip_noop_market_fills_       # config: opt-in intraday-cap oracle candidate
+margin_call_enabled_          # config: set_margin_call_enabled toggle
+margin_long_                  # config: strategy(margin_long=...)
+margin_short_                 # config: strategy(margin_short=...)
+margin_zero_cover_full_liquidation_  # config: opt-in margin-call oracle candidate
+max_intraday_filled_orders_   # config: strategy(max_intraday_filled_orders=...)
+path_order_mode_              # config: set_path_order(), persistent op-set selector
+probe_suppress_tail_logic_    # config: set_probe_suppress_tail_logic(), persistent selector
+process_orders_on_close_      # config: strategy(process_orders_on_close=...)
+pyramiding_                   # config: strategy(pyramiding=...)
+qty_step_                     # config: injected per-instrument lot step
+realtime_tail_                # config: set_realtime_tail(), persistent live-runtime selector
+realtime_tail_horizon_bars_   # config: companion horizon for realtime_tail_
+risk_direction_                 # config: strategy.risk.allow_entry_in(...)
+risk_max_cons_loss_days_        # config: strategy.risk.max_cons_loss_days(...)
+risk_max_drawdown_              # config: strategy.risk.max_drawdown(...)
+risk_max_drawdown_is_pct_       # config: companion unit selector for risk_max_drawdown_
+risk_max_intraday_loss_         # config: strategy.risk.max_intraday_loss(...)
+risk_max_intraday_loss_is_pct_  # config: companion unit selector for risk_max_intraday_loss_
+risk_max_position_size_         # config: strategy.risk.max_position_size(...)
+script_has_strategy_close_    # codegen compatibility bit; doc: "Runtime behavior must not depend on it"
+security_range_start_na_warmup_  # config: opt-in HTF warmup selector
+security_range_start_ms_      # config: injected HTF warmup range-start epoch
+slippage_                     # config: strategy(slippage=...)
+syminfo_mintick_              # config: injected syminfo.mintick tick size
+syminfo_metadata_             # config: injected syminfo.* metadata map
+trade_start_time_             # config: strategy_set_trade_start_time
+account_currency_fx_          # config: injected scalar FX fallback (the broker CLOCK that consumes it is hashed)
+account_currency_fx_rates_    # config: injected timestamped FX provider series
+account_currency_fx_timestamps_  # config: injected timestamped FX provider series
+bar_index_offset_             # config: script-visible Pine bar_index cosmetic offset
+
+# --- syminfo/chart/input injection: config surface for the script, not
+# broker decision state.
+syminfo_                      # config: injected SymInfo (ticker/currency/mintick/...)
+chart_timezone_               # config: set_chart_timezone
+inputs_                       # config: injected input.* values
+
+# --- Feed/input.source backing series and chart-close tracking: script or
+# indicator computation context (ta.*, request.security bucketing), never
+# read by broker/fill logic.
+_src_series_active_           # input.source backing-series activation flag
+_src_open_                    # input.source backing series
+_src_high_                    # input.source backing series
+_src_low_                     # input.source backing series
+_src_close_                   # input.source backing series
+_src_volume_                  # input.source backing series
+_src_hl2_                     # input.source backing series
+_src_hlc3_                    # input.source backing series
+_src_ohlc4_                   # input.source backing series
+_src_hlcc4_                   # input.source backing series
+prev_chart_close_             # ta.atr/ta.tr chart-close tracking, script-visible only
+last_chart_close_             # companion to prev_chart_close_
+security_first_chart_bar_ms_  # run-start constant (first chart bar epoch), fixed once a run begins
+security_next_input_ms_       # feed/dispatch context: next input bar's timestamp, recomputed every bar from feed position
+security_calling_close_ms_    # feed/dispatch context: calling chart bar's nominal close
+historical_security_lookahead_projection_active_  # request.security bucketing context, not a broker decision
+
+# --- Run-loop / dispatch bookkeeping: recomputed from the feed position on
+# every dispatch; not accumulated broker decision state. Two recomputes
+# being compared are, by construction, at the same feed position.
+bar_index_                    # current array index being dispatched
+current_bar_                  # current input bar's OHLCV, overwritten every dispatch
+is_tail_bar_                  # true while dispatching the array's last bar; recomputed from array position
+last_bar_index_               # feed metadata: total bar count (script-visible last_bar_index)
+last_bar_time_                # feed metadata: last bar's timestamp (script-visible time == last_bar_time)
+
+# --- Explicitly-documented transient/scratch: the source comments say so
+# directly, and each is always resolved (cleared) within the same call that
+# set it, before any other code -- let alone a later bar's dispatch -- reads
+# it again.
+current_fill_is_limit_        # doc: "Transient: true only while dispatching a LIMIT-triggered fill"
+fold_exit_path_extremes_      # doc: "Transient: true only while applying a priced ... fill"
+fold_exit_trail_peak_         # doc: "Transient companion for TRAIL exits"; NaN outside a trail fill
+last_exit_fill_was_trail_     # set by evaluate_fill_price, consumed same call chain by apply_filled_order_to_state
+intraday_loss_evaluating_     # transient evaluation flag: reentrancy guard, true only inside evaluate_max_intraday_loss, always false on return
+scratch_skip_ids_             # doc: "Not state -- must be empty across calls"
+scratch_filled_indices_       # doc: "Always cleared before use"
+named_entry_cancelled_incarnation_in_current_eval_  # doc: "invoke_chart_on_bar clears the map before each script execution"
+
+# --- Per-source-bar same-bar strategy.close batching scratch: the code's
+# own comment on the sibling cross-bar maps ("Per-source-bar only") applies
+# to these; the only thing ever read back is "== bar_index_", which is false
+# for every later bar regardless of the stale payload -- the decision logic
+# takes the identical fresh-batch branch either way. The cross-bar
+# reservation/provenance ledgers these feed (close_reserved_qty_,
+# close_two_call_first_qty_, callsite_close_reserved_qty_,
+# callsite_close_two_call_first_qty_) ARE hashed.
+sb_close_active_              # per-source-bar batching scratch
+sb_close_bar_                 # per-source-bar batching scratch
+sb_close_calls_                # per-source-bar batching scratch
+sb_close_first_id_            # per-source-bar batching scratch
+sb_close_first_target_        # per-source-bar batching scratch
+sb_close_first_carry_valid_   # per-source-bar batching scratch
+sb_close_first_carry_qty_     # per-source-bar batching scratch
+sb_close_id_                  # per-source-bar batching scratch
+sb_close_comment_             # per-source-bar batching scratch
+callsite_close_bar_           # per-source-bar scratch, same "== bar_index_" dead-once-advanced pattern
+callsite_close_callsites_     # doc: "Per-source-bar only"
+callsite_close_queue_seq_     # monotonic counter only compared within the same source bar's discarded batch
+callsite_close_admitted_total_  # doc: "claimed by the currently surviving nonzero-site instructions on this source bar"
+
+# --- Report/diagnostic accumulators: written every closed trade, read only
+# by engine_report.cpp / engine_metrics.cpp to assemble pf_report_t, never
+# consulted by any fill/order/risk decision (verified by grep: no read site
+# outside the write-and-reset pair and the report assembly).
+gross_profit_sum_             # report-only accumulator
+gross_loss_sum_               # report-only accumulator
+win_trades_count_             # report-only accumulator
+loss_trades_count_            # report-only accumulator
+eventrades_count_             # report-only accumulator (strategy.eventrades)
+max_runup_                    # report-only metric; only max_drawdown_ (hashed) gates risk_halted_
+bars_in_market_               # report-only accumulator
+first_bar_open_                # report-only (buy&hold basis)
+max_contracts_held_all_       # report-only extreme (strategy.max_contracts_held_all)
+max_contracts_held_long_      # report-only extreme
+max_contracts_held_short_     # report-only extreme
+equity_curve_                 # report-only per-bar equity history; the range-end finalizer re-derives max_equity_/min_equity_/max_drawdown_ from it, but those are hashed directly -- redundant, unbounded-size, and never read during in-run fill decisions
+trades_                       # write-only completed-trade ledger (report/output); every read site only annotates rows the SAME call just appended (trades_before..trades_.size()), never a later independent decision
+range_end_trades_             # doc: "Report-only -- ... never enter trades_, the realized sums, or the live position"
+
+# --- Per-pass dual-entry-stop working state (task brief instruction: waive
+# this one, hash the per-bar snapshot instead).
+dual_entry_path_              # per-PASS arbitration working state; last_bar_dual_entry_decision_ (hashed) is the per-bar snapshot that survives it

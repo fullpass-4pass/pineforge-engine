@@ -1044,6 +1044,7 @@ struct StrategyOverrides {
 class BacktestEngine {
 protected:
     // --- Position state ---
+    // @broker-state begin
     PositionSide position_side_ = PositionSide::FLAT;
     double position_entry_price_ = 0.0;   // volume-weighted average (for strategy calculations)
     // One-shot post-fill affordability event. Every 100%-margin LONG opening /
@@ -1896,6 +1897,7 @@ protected:
     // loop's safe point (finish_intraday_loss_cancel); the loop itself
     // removes every order it has not yet applied.
     bool intraday_loss_cancel_pending_ = false;
+    // @broker-state end
     int intraday_loss_day_key() const;
     void intraday_loss_begin_bar(const Bar& bar);
     bool intraday_loss_orders_blocked() const;
@@ -4787,6 +4789,17 @@ public:
     int last_bar_dual_entry_path() const {
         return static_cast<int>(last_bar_dual_entry_decision_);
     }
+
+    // Live runtime G1 (spec §3.4): a deterministic, order-independent
+    // FNV-1a 64 hash over every piece of broker state that decides the next
+    // bar's fills (position, book, pyramid lots, trail scalars, cycle/
+    // intraday/risk latches, frozen sizing, equity sums). Two engines with
+    // equal broker state hash equally regardless of unordered-container
+    // insertion history; any difference in that state changes the hash.
+    // Implemented in engine_state_hash.cpp; coverage of the
+    // ``// @broker-state begin`` / ``// @broker-state end`` region is
+    // enforced by scripts/check_broker_state_hash_coverage.py.
+    uint64_t broker_state_hash() const;
 
     // Toggle volume-weighted per-sub-bar sampling inside run_magnified_bar.
     // Has no effect unless bar magnifier is enabled.
