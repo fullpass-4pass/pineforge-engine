@@ -224,6 +224,7 @@ set(TEST_SOURCES
     test_live_pending_order_mirror
     test_live_order_derived
     test_live_trade_accessors
+    test_live_flags_off_identity
 )
 
 find_package(Threads REQUIRED)
