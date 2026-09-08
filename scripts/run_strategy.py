@@ -1943,17 +1943,29 @@ class Strategy:
                     int(incarnation_accessor(state, i))
                     if incarnation_accessor is not None else 0
                 )
+                # Default like entry_incarnation above: an older .so predating
+                # these exports still gets the key, just with the same value
+                # an unrecognised/absent close would report (empty string /
+                # UNKNOWN), so callers need not special-case a missing key.
                 if entry_id_accessor is not None:
                     ptr = entry_id_accessor(state, i)
                     trade["entry_id"] = ptr.decode("utf-8", "replace") if ptr else ""
+                else:
+                    trade["entry_id"] = ""
                 if exit_id_accessor is not None:
                     ptr = exit_id_accessor(state, i)
                     trade["exit_id"] = ptr.decode("utf-8", "replace") if ptr else ""
+                else:
+                    trade["exit_id"] = ""
                 if exit_comment_accessor is not None:
                     ptr = exit_comment_accessor(state, i)
                     trade["exit_comment"] = ptr.decode("utf-8", "replace") if ptr else ""
-                if close_cause_accessor is not None:
-                    trade["close_cause"] = int(close_cause_accessor(state, i))
+                else:
+                    trade["exit_comment"] = ""
+                trade["close_cause"] = (
+                    int(close_cause_accessor(state, i))
+                    if close_cause_accessor is not None else 0
+                )
             if dump_book and self.PendingOrderV1 is not None:
                 last_close = float(bars[n - 1].close) if n else None
                 result["pending_orders"] = self.read_pending_orders(state, last_close)

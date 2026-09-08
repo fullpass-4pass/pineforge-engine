@@ -249,9 +249,11 @@ PF_API int strategy_closed_trade_close_cause(pf_strategy_t s, int trade_index) {
 }
 
 /* ABI v4 live-runtime surface (task 9): the script-facing position size
- * (strategy.position_size -- signed, KI-64 freeze-aware) and equity
- * (strategy.equity -- initial capital + realized net profit, NOT including
- * open profit) after the most recent run(). NaN on a NULL handle. */
+ * (strategy.position_size -- signed, KI-64 freeze-aware) and equity after
+ * the most recent run(). strategy_current_equity is initial capital plus
+ * realized net profit (strategy.initial_capital + strategy.netprofit) --
+ * NOT Pine's strategy.equity, which adds open profit on top of this. NaN
+ * on a NULL handle. */
 PF_API double strategy_position_size(pf_strategy_t s) {
     if (!s) return std::numeric_limits<double>::quiet_NaN();
     return static_cast<const pineforge::BacktestEngine*>(s)->live_position_size();

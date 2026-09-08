@@ -2101,6 +2101,7 @@ void BacktestEngine::revive_position_brackets_after_margin_call_partial(
         for (size_t ti = trades_before; ti < trades_.size(); ++ti) {
             trades_[ti].exit_comment = exit_comment;
             trades_[ti].exit_id = exit_id;
+            trades_[ti].exit_from_bracket = true;   // a genuine strategy.exit leg (see :2039-2041)
         }
         // The bracket filled: consume the pending order object.
         pending_orders_.erase(
@@ -6775,16 +6776,19 @@ void BacktestEngine::apply_filled_order_to_state(
     // enough to tell one from a deferred strategy.close/close_all: queue_
     // deferred_close_order (engine_strategy_commands.cpp) also materializes
     // its synthetic close as an OrderType::EXIT PendingOrder (reusing the
-    // exit-fill qty/level machinery), tagged with the "__close__" id prefix
-    // it and execute_immediate_close both use (see the "__close__" id/
-    // exit_id sites throughout this file). Exclude that prefix so a script
-    // close is never misclassified as a bracket.
+    // exit-fill qty/level machinery), tagged with the kClosePrefix id prefix
+    // it and execute_immediate_close both use -- the same structural marker
+    // revive_position_brackets_after_margin_call_partial's own candidate
+    // loop excludes for exactly this reason (engine_internal.hpp:59-64).
+    // Exclude that prefix so a script close is never misclassified as a
+    // bracket.
     for (size_t ti = trades_before; ti < trades_.size(); ++ti) {
         trades_[ti].exit_comment = order.comment;
         trades_[ti].exit_id = order.id;
         trades_[ti].exit_from_bracket =
             order.type == OrderType::EXIT
-            && order.id.rfind("__close__", 0) != 0;
+            && !(order.id.size() >= kClosePrefix.size()
+                 && order.id.compare(0, kClosePrefix.size(), kClosePrefix) == 0);
     }
 
     // Handle OCA groups: cancel (type 1) cancels all siblings; reduce

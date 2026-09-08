@@ -908,14 +908,27 @@ PF_API int64_t strategy_position_cycle_seq(pf_strategy_t s);
  *  #strategy_get_last_error. NULL on a NULL @p s or an out-of-range
  *  @p trade_index. */
 PF_API const char* strategy_closed_trade_entry_id(pf_strategy_t s, int trade_index);
-/** See #strategy_closed_trade_entry_id. */
+/** See #strategy_closed_trade_entry_id for the row-space/lifetime/NULL
+ *  contract. The returned string is the engine's own INTERNAL exit id, not
+ *  always the script's `strategy.exit`/`strategy.close` id verbatim:
+ *    - a real `strategy.exit` bracket leg -- the user's own id, unchanged.
+ *    - a `strategy.close(id, ...)` close -- `"__close__" + id`.
+ *    - `strategy.close_all()` / a bare-id `strategy.close()` -- the literal
+ *      `"__close__"` (empty target id appended).
+ *    - a margin-call forced liquidation -- the sentinel `"__margin_call__"`.
+ *    - an intraday-cap close (`risk.max_intraday_loss`, or the
+ *      max-filled-orders cap) -- empty (`""`).
+ *  A caller matching exit ids back to its own `strategy.close` calls should
+ *  strip the `"__close__"` prefix rather than compare verbatim. */
 PF_API const char* strategy_closed_trade_exit_id(pf_strategy_t s, int trade_index);
 /** See #strategy_closed_trade_entry_id. */
 PF_API const char* strategy_closed_trade_exit_comment(pf_strategy_t s, int trade_index);
 /** Task 9: why the @p trade_index-th REPORT-row closed trade exited.
  *  Values:
- *    - `0` UNKNOWN -- an out-of-range @p trade_index, or (on a live handle)
- *      a close shape this classifier does not recognise.
+ *    - `0` UNKNOWN -- ONLY for an out-of-range @p trade_index. Every
+ *      in-range row falls through the derivation below to at worst `1`
+ *      SCRIPT, so `0` never means "an unrecognised close shape" on a live
+ *      handle.
  *    - `1` SCRIPT -- a `strategy.close` / `strategy.close_all` market close,
  *      or a reversal-driven close.
  *    - `2` BRACKET -- a `strategy.exit` stop/limit/trail/profit/loss leg.
@@ -930,13 +943,17 @@ PF_API const char* strategy_closed_trade_exit_comment(pf_strategy_t s, int trade
  *  "__margin_call__"` -> 3; an empty `exit_id` with `exit_comment` starting
  *  `"Close Position (Max number of filled orders"` -> 5, or `"Close
  *  Position (Max intraday Loss)"` -> 4; the row's `exit_from_bracket` flag
- *  (true only for a REAL `strategy.exit` leg -- an `OrderType::EXIT` fill
- *  whose id does NOT carry the internal `"__close__"` prefix that a
- *  deferred `strategy.close`/`close_all` order is also given, since that
- *  path reuses the same `OrderType::EXIT` fill machinery) -> 2; otherwise 1.
- *  `-1` when @p s is NULL (the pf_live int-return convention); an
- *  out-of-range @p trade_index reads as `0`, identical to a genuine UNKNOWN
- *  row -- a caller that must tell the two apart bounds-checks against
+ *  -- true only for a REAL `strategy.exit` leg, either an `OrderType::EXIT`
+ *  fill whose id does NOT carry the internal `"__close__"` prefix that a
+ *  deferred `strategy.close`/`close_all` order is also given (that path
+ *  reuses the same `OrderType::EXIT` fill machinery), or a whole-position
+ *  bracket revived and fired at the margin-call event price
+ *  (`revive_position_brackets_after_margin_call_partial`) -- -> 2;
+ *  otherwise 1.
+ *  `-1` when @p s is NULL (the pf_live int-return convention). An
+ *  out-of-range @p trade_index also reads as `0` -- the ONLY way to get
+ *  `0` on a live handle -- so a caller that must tell "bad index" apart
+ *  from "row 0 exists" bounds-checks against
  *  #strategy_closed_trade_entry_incarnation's `report_trade_count` first. */
 PF_API int strategy_closed_trade_close_cause(pf_strategy_t s, int trade_index);
 /** Task 9: the script-facing signed position size (`strategy.position_size`;
@@ -944,9 +961,11 @@ PF_API int strategy_closed_trade_close_cause(pf_strategy_t s, int trade_index);
  *  frozen for the current bar, this reads the PRE-close position, matching
  *  what the script itself observes). NaN when @p s is NULL. */
 PF_API double strategy_position_size(pf_strategy_t s);
-/** Task 9: `strategy.equity` -- initial capital plus realized net profit.
- *  Deliberately does NOT include open profit (unlike the last point of
- *  `pf_report_t::equity_curve`). NaN when @p s is NULL. */
+/** Task 9: initial capital plus realized net profit
+ *  (`strategy.initial_capital + strategy.netprofit`). NOT Pine's
+ *  `strategy.equity`, which adds open profit on top of this (unlike the
+ *  last point of `pf_report_t::equity_curve`, which does). NaN when @p s is
+ *  NULL. */
 PF_API double strategy_current_equity(pf_strategy_t s);
 /** Task 9: total SCRIPT bars dispatched by the most recent run() (mirrors
  *  `pf_report_t::script_bars_processed`, engine_report.cpp) -- includes a

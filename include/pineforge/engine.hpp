@@ -240,17 +240,26 @@ struct Trade {
     // True when this trade's exit fill came from a REAL strategy.exit
     // bracket leg (stop/limit/trail/profit/loss), as opposed to a
     // strategy.close/close_all market close, a reversal-driven close, a
-    // margin-call slice, or an intraday-cap close. Set at the shared
-    // exit-fill site (apply_filled_order_to_state, engine_fills.cpp) from
-    // the filling order: OrderType::EXIT AND its id does NOT carry the
-    // internal "__close__" prefix -- queue_deferred_close_order
-    // (engine_strategy_commands.cpp) also materializes a deferred
-    // strategy.close as an OrderType::EXIT PendingOrder (it reuses the same
-    // exit-fill qty/level machinery), tagged with that prefix precisely so
-    // this flag can tell the two apart. ABI v4 task 9:
-    // closed_trade_close_cause() reads this to distinguish BRACKET (2) from
-    // SCRIPT (1); it is never set on a margin-call / intraday-cap row (those
-    // stay false and are classified from exit_id / exit_comment instead).
+    // margin-call slice, or an intraday-cap close. Set at two sites:
+    //   1. The shared exit-fill site (apply_filled_order_to_state,
+    //      engine_fills.cpp) from the filling order: OrderType::EXIT AND
+    //      its id does NOT carry the internal kClosePrefix ("__close__")
+    //      marker (engine_internal.hpp) -- queue_deferred_close_order
+    //      (engine_strategy_commands.cpp) also materializes a deferred
+    //      strategy.close as an OrderType::EXIT PendingOrder (it reuses the
+    //      same exit-fill qty/level machinery), tagged with that prefix
+    //      precisely so this flag can tell the two apart.
+    //   2. revive_position_brackets_after_margin_call_partial
+    //      (engine_fills.cpp) -- a whole-position strategy.exit leg that
+    //      fires at the margin-call event price bypasses the shared site
+    //      (it calls execute_market_exit directly) but is still a genuine
+    //      bracket fill (its own candidate loop already requires
+    //      OrderType::EXIT and excludes kClosePrefix ids), so it sets this
+    //      unconditionally true.
+    // ABI v4 task 9: closed_trade_close_cause() reads this to distinguish
+    // BRACKET (2) from SCRIPT (1); it is never set on a margin-call /
+    // intraday-cap row (those stay false and are classified from exit_id /
+    // exit_comment instead).
     bool exit_from_bracket = false;
     double max_runup = 0.0;
     double max_drawdown = 0.0;
@@ -4966,8 +4975,11 @@ public:
     // protected signed_position_size() / current_equity() above.
     // signed_position_size() is strategy.position_size (KI-64 freeze-aware:
     // reads the pre-close position while a same-bar POOC close is frozen).
-    // current_equity() is strategy.equity: initial capital + realized net
-    // profit -- it deliberately does NOT include open profit.
+    // current_equity() is initial capital plus realized net profit
+    // (strategy.initial_capital + strategy.netprofit). NOT Pine's
+    // strategy.equity, which adds open profit on top of this (see the
+    // sizing_equity formula and the equity-curve remark below, both
+    // current_equity() + open_profit(...)).
     double live_position_size() const { return signed_position_size(); }
     double live_current_equity() const { return current_equity(); }
     // ABI v4 live-runtime surface (task 9): total SCRIPT bars dispatched by
