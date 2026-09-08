@@ -848,6 +848,15 @@ _PF_FIELD_CTYPES = {
 }
 _PF_CHAR_ARRAY_RE = re.compile(r"^char\[(\d+)\]$")
 PENDING_ORDER_STRUCT_VERSION = 1
+# strategy_pending_order_fill_qty partition codes (pineforge.h, ABI v4 task 8).
+FILL_QTY_PARTITIONS = {
+    0: "EXPLICIT", 1: "FROZEN_PLACEMENT", 2: "DEFAULT_STOP_PLACEMENT", 3: "AT_FILL"}
+
+
+def _nan_to_none(x: float) -> float | None:
+    """NaN / inf sentinels -> None (JSON null); finite doubles unchanged."""
+    x = float(x)
+    return x if math.isfinite(x) else None
 
 
 def _pending_order_layout(lib: ctypes.CDLL) -> list[tuple[str, str, int, int]]:
@@ -1375,6 +1384,29 @@ class Strategy:
             L.strategy_pending_order_layout.restype = ctypes.POINTER(PfFieldDescC)
             self.pending_order_layout = _pending_order_layout(L)
             self.PendingOrderV1 = build_pending_order_struct(self.pending_order_layout)
+        # ABI v4 live-runtime surface (task 8): engine-computed derived order
+        # values (fill qty / partition / close-only, level resolution,
+        # effective levels) and the position scalars. hasattr-guarded like
+        # the rest; has_order_derived gates the --dump-book enrichment.
+        self.has_order_derived = hasattr(L, "strategy_pending_order_fill_qty")
+        if self.has_order_derived:
+            L.strategy_pending_order_fill_qty.argtypes = [
+                ctypes.c_void_p, ctypes.c_int, ctypes.c_double,
+                ctypes.POINTER(ctypes.c_double), ctypes.POINTER(ctypes.c_int),
+                ctypes.POINTER(ctypes.c_int)]
+            L.strategy_pending_order_fill_qty.restype = ctypes.c_int
+            L.strategy_pending_order_level_resolved.argtypes = [ctypes.c_void_p, ctypes.c_int]
+            L.strategy_pending_order_level_resolved.restype = ctypes.c_int
+            L.strategy_pending_order_effective_levels.argtypes = [
+                ctypes.c_void_p, ctypes.c_int, ctypes.POINTER(ctypes.c_double),
+                ctypes.POINTER(ctypes.c_double), ctypes.POINTER(ctypes.c_double)]
+            L.strategy_pending_order_effective_levels.restype = ctypes.c_int
+            L.strategy_trail_best_price.argtypes = [ctypes.c_void_p]
+            L.strategy_trail_best_price.restype = ctypes.c_double
+            L.strategy_position_avg_price.argtypes = [ctypes.c_void_p]
+            L.strategy_position_avg_price.restype = ctypes.c_double
+            L.strategy_position_cycle_seq.argtypes = [ctypes.c_void_p]
+            L.strategy_position_cycle_seq.restype = ctypes.c_int64
         # ``strategy_set_chart_timezone`` lets the harness tell the engine
         # which IANA wall-clock zone Pine's ``hour`` / ``minute`` /
         # ``dayofweek`` (and the 1-arg function overloads) should produce.
@@ -1442,13 +1474,96 @@ class Strategy:
         if hasattr(L, "pf_version_string"):
             L.pf_version_string.restype = ctypes.c_char_p
 
-    def read_pending_orders(self, state) -> list[dict]:
+    def _probe_fill_qty(self, state, index: int, price: float) -> dict | None:
+        """One strategy_pending_order_fill_qty probe -> {price, qty, close_only,
+        partition, partition_name}; None when the order has no opening size
+        (rc 1, an EXIT) or the price is not finite."""
+        if price is None or not math.isfinite(price):
+            return None
+        qty = ctypes.c_double(float("nan"))
+        close_only = ctypes.c_int(-1)
+        partition = ctypes.c_int(-1)
+        rc = self.lib.strategy_pending_order_fill_qty(
+            state, index, float(price), ctypes.byref(qty),
+            ctypes.byref(close_only), ctypes.byref(partition))
+        if rc == 1:
+            return None
+        if rc != 0:
+            raise RuntimeError(
+                f"strategy_pending_order_fill_qty({index}, {price}) returned {rc}")
+        return {
+            "price": float(price),
+            "qty": _nan_to_none(qty.value),
+            "close_only": int(close_only.value),
+            "partition": int(partition.value),
+            "partition_name": FILL_QTY_PARTITIONS.get(int(partition.value), "?"),
+        }
+
+    def read_order_derived(self, state, index: int,
+                           last_close: float | None = None) -> dict | None:
+        """ABI v4 task 8: the engine-computed derived values of one resting
+        order. ``level_resolved`` and ``effective_levels`` are the engine's
+        reads verbatim (NaN -> None). ``fill_qty`` reports the engine-sized
+        opening quantity at every finite effective STOP / LIMIT level the
+        order itself carries (the prices a priced entry can fill at) and at
+        ``last_close`` (the MARKET / gap-through proxy: the next open is
+        unknown after a run, the last close is its best stand-in); None for
+        an EXIT, which has no opening size. None when the .so predates the
+        exports."""
+        if not getattr(self, "has_order_derived", False):
+            return None
+        resolved = int(self.lib.strategy_pending_order_level_resolved(state, index))
+        stop = ctypes.c_double(float("nan"))
+        limit = ctypes.c_double(float("nan"))
+        trail = ctypes.c_double(float("nan"))
+        rc = self.lib.strategy_pending_order_effective_levels(
+            state, index, ctypes.byref(stop), ctypes.byref(limit), ctypes.byref(trail))
+        if rc != 0:
+            raise RuntimeError(
+                f"strategy_pending_order_effective_levels({index}) returned {rc}")
+        levels = {
+            "stop": _nan_to_none(stop.value),
+            "limit": _nan_to_none(limit.value),
+            "trail_activation": _nan_to_none(trail.value),
+        }
+        fill_qty: dict[str, dict] | None = {}
+        for key, price in (("at_stop", levels["stop"]), ("at_limit", levels["limit"]),
+                           ("at_last_close", last_close)):
+            if price is None:
+                continue
+            probe = self._probe_fill_qty(state, index, price)
+            if probe is None:      # rc 1: an EXIT -- no opening size at all
+                fill_qty = None
+                break
+            fill_qty[key] = probe
+        return {
+            "level_resolved": resolved,
+            "effective_levels": levels,
+            "fill_qty": fill_qty,
+        }
+
+    def read_position_scalars(self, state) -> dict | None:
+        """ABI v4 task 8: strategy_position_avg_price (None when flat),
+        strategy_position_cycle_seq (0 when flat), strategy_trail_best_price
+        (None until a position filled). None when the .so predates them."""
+        if not getattr(self, "has_order_derived", False):
+            return None
+        return {
+            "avg_price": _nan_to_none(self.lib.strategy_position_avg_price(state)),
+            "cycle_seq": int(self.lib.strategy_position_cycle_seq(state)),
+            "trail_best_price": _nan_to_none(self.lib.strategy_trail_best_price(state)),
+        }
+
+    def read_pending_orders(self, state, last_close: float | None = None) -> list[dict]:
         """Snapshot the live handle's resting-order book (ABI v4 task 7):
         strategy_pending_orders_len + one strategy_pending_order_get per
         order, each decoded through the layout-built PendingOrderV1. Must be
         called while ``state`` is alive (run() does so before strategy_free).
         Empty list when the .so predates the exports (PendingOrderV1 is
-        None) -- callers that need to distinguish check that attribute."""
+        None) -- callers that need to distinguish check that attribute.
+        When the .so also exports the task-8 derived accessors each dict
+        gains a ``derived`` sub-dict (read_order_derived; ``last_close`` is
+        the fill-qty probe price for the MARKET / gap-through case)."""
         if self.PendingOrderV1 is None or self.pending_order_layout is None:
             return []
         n = int(self.lib.strategy_pending_orders_len(state))
@@ -1467,7 +1582,11 @@ class Strategy:
                 raise RuntimeError(
                     f"pending order {i}: runtime size {int(rec.size)} != "
                     f"layout-built sizeof {ctypes.sizeof(rec)}")
-            book.append(pending_order_to_dict(rec, self.pending_order_layout))
+            entry = pending_order_to_dict(rec, self.pending_order_layout)
+            derived = self.read_order_derived(state, i, last_close)
+            if derived is not None:
+                entry["derived"] = derived
+            book.append(entry)
         return book
 
     def run(self, bars_csv: Path, params: dict | None = None,
@@ -1534,9 +1653,14 @@ class Strategy:
         (``metrics.equity``, the raw ``equity_curve``, ...).
 
         ``dump_book`` adds ``pending_orders`` -- the post-run resting-order
-        book as a list of dicts (read_pending_orders, ABI v4 task 7) -- to
-        the returned dict. Read-only: the run itself is unchanged. Omitted
-        (not an empty list) when the .so predates the exports.
+        book as a list of dicts (read_pending_orders, ABI v4 task 7), each
+        carrying a ``derived`` sub-dict (fill qty / partition / close-only
+        at every finite effective level and at the last close, level
+        resolution, effective levels; ABI v4 task 8) -- and ``position``
+        (avg_price, cycle_seq, trail_best_price) to the returned dict.
+        Read-only: the run itself is unchanged. Omitted (not an empty list)
+        when the .so predates the exports; ``derived`` / ``position`` are
+        omitted when it predates only the task-8 accessors.
         """
         source_feed_sha256 = None
         if preloaded_bars is not None:
@@ -1784,7 +1908,11 @@ class Strategy:
                     if incarnation_accessor is not None else 0
                 )
             if dump_book and self.PendingOrderV1 is not None:
-                result["pending_orders"] = self.read_pending_orders(state)
+                last_close = float(bars[n - 1].close) if n else None
+                result["pending_orders"] = self.read_pending_orders(state, last_close)
+                position = self.read_position_scalars(state)
+                if position is not None:
+                    result["position"] = position
             if source_feed_sha256 is not None:
                 result["source_feed_sha256"] = source_feed_sha256
             if aux_requested:
@@ -2815,8 +2943,13 @@ def main() -> int:
                     help="ABI v4 live-runtime surface (task 7): after the run, write the "
                          "engine's resting-order book -- every pf_pending_order_v1_t read "
                          "through strategy_pending_orders_len/strategy_pending_order_get -- "
-                         "as JSON to PATH ({struct_version, layout, count, orders[]}). "
-                         "Read-only; the run is unchanged. --runner ctypes only.")
+                         "as JSON to PATH ({struct_version, layout, count, orders[], "
+                         "position}). Each order carries a 'derived' sub-dict (task 8): "
+                         "level_resolved, effective_levels {stop, limit, trail_activation} "
+                         "and fill_qty -- the engine-sized opening qty / partition / "
+                         "close_only probed at each finite effective stop/limit level and "
+                         "at the last close (null for an EXIT). Read-only; the run is "
+                         "unchanged. --runner ctypes only.")
     ap.add_argument("--inputs-json", type=Path, default=None,
                     help="Use this inputs.json instead of strategy_dir/inputs.json. "
                          "Lets ad-hoc validation runs override strategy properties "
@@ -3062,6 +3195,10 @@ def main() -> int:
                     ],
                     "count": len(book),
                     "orders": book,
+                    # ABI v4 task 8: the position scalars the derived
+                    # values were resolved against (None on a .so that
+                    # predates strategy_position_avg_price & co.).
+                    "position": report.get("position"),
                 }, f)
             print(f"  dump-book: wrote {len(book)} resting order(s) to {args.dump_book}")
     if args.fingerprint_json is not None:

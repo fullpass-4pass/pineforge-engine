@@ -256,5 +256,122 @@ class StrategyGuard(unittest.TestCase):
         self.assertEqual(strat.read_pending_orders(object()), [])
 
 
+class _DerivedStubLib(_StubLib):
+    """_StubLib plus the six ABI v4 task-8 exports, served from a per-index
+    table so Strategy.read_order_derived / read_position_scalars /
+    read_pending_orders' enrichment run their real ctypes out-pointer
+    plumbing. `derived[i]` = (level_resolved, (stop, limit, trail),
+    fill_rc, qty, close_only, partition); fill probes are logged."""
+
+    def __init__(self, records, derived, position):
+        super().__init__(records)
+        self.derived = derived
+        self.position = position
+        self.fill_calls: list[tuple[int, float]] = []
+
+    def strategy_pending_order_level_resolved(self, state, index):
+        return self.derived[index][0]
+
+    def strategy_pending_order_effective_levels(self, state, index, stop, limit, trail):
+        s, l, t = self.derived[index][1]
+        stop._obj.value, limit._obj.value, trail._obj.value = s, l, t
+        return 0
+
+    def strategy_pending_order_fill_qty(self, state, index, price, qty, close_only, partition):
+        self.fill_calls.append((index, float(price)))
+        rc, q, c, p = self.derived[index][2:]
+        if rc == 0:
+            qty._obj.value, close_only._obj.value, partition._obj.value = q, c, p
+        return rc
+
+    def strategy_position_avg_price(self, state):
+        return self.position[0]
+
+    def strategy_position_cycle_seq(self, state):
+        return self.position[1]
+
+    def strategy_trail_best_price(self, state):
+        return self.position[2]
+
+
+class ReadOrderDerived(unittest.TestCase):
+    """Task 8: the derived sub-dict and the position scalars."""
+
+    def _strat(self, derived, position=(100.0, 3, 101.5)):
+        cls = build_pending_order_struct(LAYOUT)
+        recs = []
+        for i in range(len(derived)):
+            rec = cls()
+            rec.struct_version = PENDING_ORDER_STRUCT_VERSION
+            rec.size = ctypes.sizeof(cls)
+            rec.id = f"o{i}".encode()
+            recs.append(rec)
+        strat = _stub_strategy(recs, cls)
+        strat.has_order_derived = True
+        strat.lib = _DerivedStubLib(recs, derived, position)
+        return strat
+
+    def test_entry_probes_each_finite_level_and_the_last_close(self):
+        # A stop-limit entry: probed at its stop, its limit and the last close.
+        strat = self._strat([(1, (98.0, 103.0, math.nan), 0, 2.0, 0, 0)])
+        book = strat.read_pending_orders(object(), last_close=100.25)
+        d = book[0]["derived"]
+        self.assertEqual(d["level_resolved"], 1)
+        self.assertEqual(d["effective_levels"],
+                         {"stop": 98.0, "limit": 103.0, "trail_activation": None})
+        self.assertEqual(sorted(d["fill_qty"]), ["at_last_close", "at_limit", "at_stop"])
+        self.assertEqual(d["fill_qty"]["at_stop"],
+                         {"price": 98.0, "qty": 2.0, "close_only": 0,
+                          "partition": 0, "partition_name": "EXPLICIT"})
+        self.assertEqual(d["fill_qty"]["at_last_close"]["price"], 100.25)
+        self.assertEqual(strat.lib.fill_calls, [(0, 98.0), (0, 103.0), (0, 100.25)])
+
+    def test_market_without_levels_probes_only_the_last_close(self):
+        strat = self._strat([(1, (math.nan, math.nan, math.nan), 0, 100.0, 1, 1)])
+        d = strat.read_pending_orders(object(), last_close=99.0)[0]["derived"]
+        self.assertEqual(list(d["fill_qty"]), ["at_last_close"])
+        self.assertEqual(d["fill_qty"]["at_last_close"]["partition_name"], "FROZEN_PLACEMENT")
+        self.assertEqual(d["fill_qty"]["at_last_close"]["close_only"], 1)
+        # No last close known (empty feed): nothing to probe, still a dict.
+        strat2 = self._strat([(1, (math.nan, math.nan, math.nan), 0, 100.0, 0, 1)])
+        d2 = strat2.read_pending_orders(object())[0]["derived"]
+        self.assertEqual(d2["fill_qty"], {})
+        self.assertEqual(strat2.lib.fill_calls, [])
+
+    def test_exit_has_no_opening_size(self):
+        # rc 1 from the first probe: fill_qty is null, no further probes.
+        strat = self._strat([(0, (98.0, 103.0, 99.5), 1, math.nan, 0, -1)])
+        d = strat.read_pending_orders(object(), last_close=100.0)[0]["derived"]
+        self.assertEqual(d["level_resolved"], 0)
+        self.assertEqual(d["effective_levels"]["trail_activation"], 99.5)
+        self.assertIsNone(d["fill_qty"])
+        self.assertEqual(strat.lib.fill_calls, [(0, 98.0)])
+
+    def test_probe_failure_is_refused(self):
+        strat = self._strat([(1, (98.0, math.nan, math.nan), -1, math.nan, 0, -1)])
+        with self.assertRaisesRegex(RuntimeError,
+                                    r"strategy_pending_order_fill_qty\(0, 98.0\) returned -1"):
+            strat.read_pending_orders(object(), last_close=100.0)
+
+    def test_position_scalars(self):
+        strat = self._strat([], position=(100.0, 3, 101.5))
+        self.assertEqual(strat.read_position_scalars(object()),
+                         {"avg_price": 100.0, "cycle_seq": 3, "trail_best_price": 101.5})
+        flat = self._strat([], position=(math.nan, 0, math.nan))
+        self.assertEqual(flat.read_position_scalars(object()),
+                         {"avg_price": None, "cycle_seq": 0, "trail_best_price": None})
+
+    def test_older_so_without_task8_exports(self):
+        # PendingOrderV1 present (task 7) but no task-8 accessors: the book
+        # is read without a 'derived' key and the scalars are None.
+        cls = build_pending_order_struct(LAYOUT)
+        rec = cls(); rec.struct_version = PENDING_ORDER_STRUCT_VERSION; rec.size = ctypes.sizeof(cls)
+        strat = _stub_strategy([rec], cls)
+        strat.has_order_derived = False
+        book = strat.read_pending_orders(object(), last_close=100.0)
+        self.assertNotIn("derived", book[0])
+        self.assertIsNone(strat.read_position_scalars(object()))
+
+
 if __name__ == "__main__":
     unittest.main()

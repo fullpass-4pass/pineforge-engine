@@ -4830,6 +4830,89 @@ public:
         return pending_orders_[static_cast<size_t>(i)];
     }
 
+    // ABI v4 live-runtime surface (task 8, spec 3.6): engine-computed
+    // derived values of a resting order and the position scalars the live
+    // runtime would otherwise have to re-derive. Pure const reads of the
+    // engine's own sizing / admission / level-resolution predicates; none
+    // of them mutates the engine, so a historical run is byte-identical
+    // whether or not a caller reads them. Implemented in engine_fills.cpp
+    // next to use_default_stop_placement_qty, the rules they mirror.
+    //
+    // probe_fill_qty: the quantity the entry kernel would open if the
+    // order at `index` filled at `fill_price`, and which sizing partition
+    // produced it -- exactly the "quantity the market / priced-entry kernel
+    // would actually open with" computation of the zero-lot decline gate in
+    // apply_filled_order_to_state, tagged:
+    //   0 EXPLICIT               a script-supplied qty: calc_qty_for_type at
+    //                            the slipped fill (apply_qty_step of the
+    //                            contracts for FIXED, the budget sized at the
+    //                            fill for a per-call percent/cash override).
+    //   1 FROZEN_PLACEMENT       a quantity the engine froze before the fill
+    //                            and dispatches as prequantized contracts
+    //                            (qty_type -1): frozen_default_qty (the
+    //                            default percent_of_equity / cash MARKET or
+    //                            strategy.order size at the signal close), or
+    //                            a MARKET's frozen broker transaction
+    //                            (paired_flat_market_transaction_qty /
+    //                            sbmt_tx_qty) when apply_market_order_fill
+    //                            would dispatch that instead.
+    //   2 DEFAULT_STOP_PLACEMENT default_stop_placement_qty, when
+    //                            use_default_stop_placement_qty says
+    //                            dispatch consumes it (round 7 family K).
+    //   3 AT_FILL                default sizing at the slipped fill,
+    //                            calc_qty(fill).
+    // `fill_price` is slipped the way the kernel slips it
+    // (apply_slippage; a LIMIT-triggered entry takes apply_limit_fill).
+    // `close_only` is 1 when the fill would close the live opposite
+    // position and open no leg of its own: the order's
+    // affordability_close_only (entry leg declined at placement), the
+    // priced-entry prior_cycle_close_only rule (opposite live position,
+    // created_position_side != position_side_, and not a KI-65
+    // reverses_same_bar_market_from_flat), the same-cycle frozen
+    // explicit-FIXED transaction that the close consumes exactly, or a
+    // finalized flat MARKET pair -- each spelled as apply_entry_order_fill /
+    // apply_market_order_fill spell it. Not folded into `qty`: the
+    // deferred-flip carry (tv_carry_qty, enter_market_from_flat's
+    // tv_deferred_flip rule adds it on top of this quantity for a priced
+    // entry firing from FLAT whose placement side is the opposite of the
+    // requested side) -- the mirror exposes tv_carry_qty and
+    // created_position_side verbatim. Returns 0 on success; 1 (qty NaN,
+    // close_only 0, partition -1) when the order is an EXIT, whose fill
+    // quantity is decided against the live position at the fill, not by a
+    // sizing partition; -1 on a bad index or a null out-pointer.
+    int probe_fill_qty(int index, double fill_price, double* qty,
+                       int* close_only, int* partition) const;
+    // 1 when the order's entry-relative offsets (profit_ticks / loss_ticks /
+    // trail_points) resolve NOW: entries, plain orders and exits with an
+    // empty from_entry always; an exit bound to from_entry only once that
+    // id has filled in the CURRENT position cycle (cycle_filled_entry_ids_,
+    // the gate materialize_relative_exit_prices_for_live_position and the
+    // eligibility pass share). 0 otherwise, -1 on a bad index.
+    int pending_order_level_resolved(int index) const;
+    // The price levels the order would fire at, as the fill path resolves
+    // them: a set stop_price / limit_price / trail_price verbatim (they are
+    // already on the price grid); an unset leg from its tick offset against
+    // position_entry_price_ when pending_order_level_resolved() == 1 and a
+    // position is live, with the position side's sign exactly as
+    // materialize_relative_exit_prices_for_live_position (limit = entry +
+    // dir * profit_ticks * mintick, stop = entry - dir * loss_ticks *
+    // mintick, dir = +1 long / -1 short, level_on_price_grid) and
+    // resolve_exit_path_fill (activation = snap_trail_level_to_tick_grid(
+    // entry +/- ceil(trail_points - 5e-5) * mintick); trail_points wins
+    // over trail_price when both are set). NaN for a leg that is unset or
+    // unresolvable. Returns 0, or -1 on a bad index / null out-pointer.
+    int pending_order_effective_levels(int index, double* stop, double* limit,
+                                       double* trail_activation) const;
+    // The live position's volume-weighted average entry price
+    // (position_entry_price_; 0 when flat -- the engine keeps 0 there, the
+    // C ABI reports NaN when flat), its cycle id (position_cycle_seq_; 0
+    // when flat, a fresh nonzero id per open/reversal, kept across
+    // same-direction adds) and the trail extreme the exit trail legs ride
+    // (trail_best_price_; NaN until a position fills).
+    double position_avg_price() const { return position_entry_price_; }
+    int64_t position_cycle_seq() const { return position_cycle_seq_; }
+    double trail_best_price() const { return trail_best_price_; }
+
     // ABI v4 live-runtime surface (task 6): when on, every script bar's
     // dispatch (all four script-bar dispatch sites -- the single-TF run()
     // loop, run_simple_bar_loop, run_aggregation_bar_loop, and

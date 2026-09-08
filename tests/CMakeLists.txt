@@ -222,6 +222,7 @@ set(TEST_SOURCES
     test_live_state_hash
     test_live_state_hash_recording
     test_live_pending_order_mirror
+    test_live_order_derived
 )
 
 find_package(Threads REQUIRED)

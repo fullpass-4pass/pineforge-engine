@@ -16,7 +16,10 @@
  *     strategy_last_bar_dual_entry_path,
  *     strategy_set_broker_state_hash_recording, strategy_broker_state_hash,
  *     strategy_pending_orders_len, strategy_pending_order_get,
- *     strategy_pending_order_layout),
+ *     strategy_pending_order_layout, strategy_pending_order_fill_qty,
+ *     strategy_pending_order_level_resolved,
+ *     strategy_pending_order_effective_levels, strategy_trail_best_price,
+ *     strategy_position_avg_price, strategy_position_cycle_seq),
  *     pf_version_get/pf_version_string,
  *     pf_abi_version — the authoritative list is EXPECTED_RUNTIME in
  *     scripts/check_c_abi_runtime.py, enforced by CI). The other
@@ -33,6 +36,7 @@
 #include <pineforge/bar.hpp>
 #include <pineforge/magnifier.hpp>
 #include <cstddef>
+#include <limits>
 #include <cstring>
 
 namespace pineforge {
@@ -344,6 +348,54 @@ PF_API int strategy_pending_order_get(pf_strategy_t s, int index, void* out, siz
 
 PF_API const pf_field_desc_t* strategy_pending_order_layout(int* count) {
     return pineforge::pending_order_layout(count);
+}
+
+/* ABI v4 live-runtime surface (task 8, spec 3.6): engine-computed derived
+ * order values and position scalars -- pure const reads of the engine's own
+ * sizing / admission / level-resolution predicates
+ * (BacktestEngine::probe_fill_qty & co., src/engine_fills.cpp). NULL-handle
+ * convention of the pf_live group: -1 for an int return, NaN for a double,
+ * with nothing written through the out-pointers. */
+PF_API int strategy_pending_order_fill_qty(pf_strategy_t s, int index, double fill_price,
+                                           double* qty, int* close_only, int* partition) {
+    if (!s) return -1;
+    return static_cast<const pineforge::BacktestEngine*>(s)->probe_fill_qty(
+        index, fill_price, qty, close_only, partition);
+}
+
+PF_API int strategy_pending_order_level_resolved(pf_strategy_t s, int index) {
+    if (!s) return -1;
+    return static_cast<const pineforge::BacktestEngine*>(s)->pending_order_level_resolved(index);
+}
+
+PF_API int strategy_pending_order_effective_levels(pf_strategy_t s, int index, double* stop,
+                                                   double* limit, double* trail_activation) {
+    if (!s) return -1;
+    return static_cast<const pineforge::BacktestEngine*>(s)->pending_order_effective_levels(
+        index, stop, limit, trail_activation);
+}
+
+/* NaN when @p s is NULL; otherwise the engine's trail extreme (itself NaN
+ * until a position has filled). */
+PF_API double strategy_trail_best_price(pf_strategy_t s) {
+    if (!s) return std::numeric_limits<double>::quiet_NaN();
+    return static_cast<const pineforge::BacktestEngine*>(s)->trail_best_price();
+}
+
+/* NaN when @p s is NULL or the position is flat (the engine keeps
+ * position_entry_price_ at 0 there; a live reader must not mistake that for
+ * a price), otherwise the volume-weighted average entry price. */
+PF_API double strategy_position_avg_price(pf_strategy_t s) {
+    if (!s) return std::numeric_limits<double>::quiet_NaN();
+    const auto* engine = static_cast<const pineforge::BacktestEngine*>(s);
+    if (engine->position_cycle_seq() == 0) return std::numeric_limits<double>::quiet_NaN();
+    return engine->position_avg_price();
+}
+
+/* -1 when @p s is NULL; 0 when flat; otherwise the live position cycle id. */
+PF_API int64_t strategy_position_cycle_seq(pf_strategy_t s) {
+    if (!s) return -1;
+    return static_cast<const pineforge::BacktestEngine*>(s)->position_cycle_seq();
 }
 
 PF_API int strategy_stream_begin(pf_strategy_t s,

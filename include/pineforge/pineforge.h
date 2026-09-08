@@ -799,6 +799,90 @@ PF_API int strategy_pending_order_get(pf_strategy_t s, int index, void* out, siz
  *  its struct from this table rather than from a hand-typed copy, so the
  *  mirror can grow (append-only) without breaking it. */
 PF_API const pf_field_desc_t* strategy_pending_order_layout(int* count);
+/** Engine-computed fill quantity of the @p index-th resting order (ABI v4
+ *  live-runtime surface, task 8, spec 3.6): the contracts the entry kernel
+ *  would OPEN if that order filled at @p fill_price, sized by the engine's
+ *  own rules so a live runtime never re-implements them. @p fill_price is
+ *  slipped the way the kernel slips it (`apply_slippage`; an entry with a
+ *  limit leg takes the unslipped limit-or-better route). @p partition
+ *  receives which sizing rule produced the value:
+ *    - `0` EXPLICIT -- a script-supplied qty: the lot-floored contracts
+ *      (`apply_qty_step`) for a fixed qty, or the explicit percent/cash
+ *      budget sized at the fill for a per-call qty_type override.
+ *    - `1` FROZEN_PLACEMENT -- a quantity frozen before the fill and
+ *      dispatched as prequantized contracts: the default percent_of_equity /
+ *      cash MARKET (or strategy.order) size frozen at the signal close
+ *      (`frozen_default_qty`), or a MARKET's frozen broker transaction
+ *      (a finalized flat pair's `paired_flat_market_transaction_qty`, a
+ *      same-bar-market `sbmt_tx_qty`) when the kernel dispatches that.
+ *    - `2` DEFAULT_STOP_PLACEMENT -- the DEFAULT percent_of_equity <= 100
+ *      pure STOP entry's placement size (`default_stop_placement_qty`,
+ *      round-7 family K), when `use_default_stop_placement_qty` says the
+ *      fill consumes it: created flat, filling from flat, positive fill.
+ *    - `3` AT_FILL -- default sizing at the slipped fill (`calc_qty`).
+ *  @p close_only receives 1 when the fill would only CLOSE the live
+ *  opposite position and open no leg of its own: the order's
+ *  `affordability_close_only` (entry leg declined at placement), the
+ *  priced-entry `prior_cycle_close_only` rule (opposite live position whose
+ *  cycle the order was not placed in -- `created_position_side !=` the
+ *  live side -- and not a KI-65 `reverses_same_bar_market_from_flat`), the
+ *  same-cycle frozen explicit-FIXED transaction the close consumes exactly,
+ *  or a finalized flat MARKET pair against an opposite position. Where the
+ *  order was created FLAT the engine's close-only branch is
+ *  `close_opposite_then_enter`: a transaction larger than the live position
+ *  still opens the remainder. NOT folded into @p qty: the deferred-flip
+ *  carry (`tv_carry_qty`, added by `enter_market_from_flat` for a priced
+ *  entry firing from FLAT whose placement side is the opposite of the
+ *  requested side) -- read `tv_carry_qty` / `created_position_side` from
+ *  the mirror. Returns 0 on success; 1 -- with @p qty NaN, @p close_only 0,
+ *  @p partition -1 -- when the order is an EXIT (its fill quantity is
+ *  decided against the live position at the fill, not by a partition); -1
+ *  with nothing written when @p s is NULL, @p index is out of range, or any
+ *  out-pointer is NULL. Read-only: no historical run changes because a
+ *  caller probed it. */
+PF_API int strategy_pending_order_fill_qty(pf_strategy_t s, int index, double fill_price,
+                                           double* qty, int* close_only, int* partition);
+/** 1 when the @p index-th resting order's entry-relative offsets
+ *  (`profit_ticks` / `loss_ticks` / `trail_points`) resolve now (ABI v4,
+ *  task 8): entries, plain orders and exits with an empty `from_entry`
+ *  always; an exit bound to a `from_entry` only once that id has filled in
+ *  the CURRENT position cycle -- the gate the engine's own
+ *  `materialize_relative_exit_prices_for_live_position` and eligibility
+ *  pass share. 0 otherwise; -1 when @p s is NULL or @p index is out of
+ *  range. */
+PF_API int strategy_pending_order_level_resolved(pf_strategy_t s, int index);
+/** The price levels the @p index-th resting order would fire at, as the
+ *  engine's fill path resolves them (ABI v4, task 8). A leg the order
+ *  carries as a price (`stop_price`, `limit_price`, `trail_price`) is
+ *  reported verbatim -- it is already on the price grid. A leg carried as
+ *  a tick offset is resolved against the live position's average entry
+ *  price only when #strategy_pending_order_level_resolved is 1 AND a
+ *  position is live, with the POSITION side's sign exactly as the fill
+ *  path: `limit = entry + dir * profit_ticks * mintick`, `stop = entry -
+ *  dir * loss_ticks * mintick` (dir = +1 long, -1 short; both
+ *  `level_on_price_grid`), and `trail_activation = entry +/- ceil(
+ *  trail_points - 5e-5) * mintick` snapped to the tick grid
+ *  (`trail_points` wins over `trail_price` when both are set, as in
+ *  `resolve_exit_path_fill`). NaN for a leg that is unset or not yet
+ *  resolvable. Returns 0; -1 with nothing written when @p s is NULL,
+ *  @p index is out of range, or any out-pointer is NULL. */
+PF_API int strategy_pending_order_effective_levels(pf_strategy_t s, int index, double* stop,
+                                                   double* limit, double* trail_activation);
+/** The trail extreme the exit trail legs ride (`trail_best_price_`: the
+ *  running high of a long / low of a short since the position filled,
+ *  bar extremes folded in as the fill path folds them). NaN when @p s is
+ *  NULL and NaN until a position has filled. */
+PF_API double strategy_trail_best_price(pf_strategy_t s);
+/** The live position's volume-weighted average entry price
+ *  (`position_entry_price_`). NaN when @p s is NULL and NaN when the
+ *  position is flat (the engine keeps 0 there; a live reader must not
+ *  mistake it for a price). */
+PF_API double strategy_position_avg_price(pf_strategy_t s);
+/** The live position's cycle id (`position_cycle_seq_`): 0 when flat, a
+ *  fresh nonzero id per open or reversal, unchanged across same-direction
+ *  adds -- the id `created_position_cycle_seq` on a mirrored order refers
+ *  to. -1 when @p s is NULL. */
+PF_API int64_t strategy_position_cycle_seq(pf_strategy_t s);
 /** @} */
 
 /** @addtogroup pf_config
