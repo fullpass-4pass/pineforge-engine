@@ -33,7 +33,6 @@ ROOT = Path(__file__).resolve().parents[1]
 ONE_M = ROOT / "corpus/data/ohlcv_ETH-USDT-USDT_1m.csv"
 DERIVED = ROOT / "corpus/data/derived/ohlcv_ETH-USDT-USDT_15m.csv"
 AGG = ROOT / "build/bin/aggregate_feed"
-OUT_CSV = ROOT / "build/aggregate_15m.csv"
 OUT = ROOT / "build/bar_identity_row1.json"
 
 TF = "15"
@@ -55,6 +54,10 @@ def build_arg_parser() -> argparse.ArgumentParser:
                           "aggregate_feed (default: %(default)s)")
     ap.add_argument("--out", type=Path, default=OUT,
                      help="output JSON path (default: %(default)s)")
+    ap.add_argument("--out-csv", type=Path, default=None,
+                     help="aggregate_feed's intermediate CSV output path "
+                          "(default: build/aggregate_<tf>m.csv, derived from --tf so "
+                          "concurrent --tf runs don't clobber each other's scratch file)")
     ap.add_argument("--aggregate-bin", type=Path, default=AGG,
                      help="path to the built aggregate_feed binary (default: %(default)s)")
     return ap
@@ -66,11 +69,28 @@ def _parse_kv_line(line: str) -> dict[str, str]:
     return dict(tok.split("=", 1) for tok in line.split() if "=" in tok)
 
 
+REQUIRED_COLUMNS = ("timestamp", "open", "high", "low", "close", "volume")
+
+
+def _require_header(p: Path, reader: csv.DictReader) -> None:
+    """N3: both CSV loaders share one header contract with the tool side
+    (aggregate_feed now requires the same six columns, finding 1/N1) -- a
+    header-less or malformed feed dies with a clear message here instead of
+    a raw `KeyError: 'timestamp'` traceback (task-12-rereview finding 3)."""
+    fieldnames = set(reader.fieldnames or ())
+    missing = [c for c in REQUIRED_COLUMNS if c not in fieldnames]
+    if missing:
+        sys.exit(f"error: {p} has no {','.join(REQUIRED_COLUMNS)} header "
+                  f"(missing: {','.join(missing)})")
+
+
 def load(p: Path) -> dict[int, dict]:
     with p.open(newline="", encoding="utf-8") as f:
+        reader = csv.DictReader(f)
+        _require_header(p, reader)
         return {
             int(r["timestamp"]): {k: float(r[k]) for k in ("open", "high", "low", "close", "volume")}
-            for r in csv.DictReader(f)
+            for r in reader
         }
 
 
@@ -85,7 +105,9 @@ def load_1m_row_count_and_divergent_buckets(
     n = 0
     buckets: dict[int, list[dict]] = {ts: [] for ts in divergent_ts}
     with p.open(newline="", encoding="utf-8") as f:
-        for r in csv.DictReader(f):
+        reader = csv.DictReader(f)
+        _require_header(p, reader)
+        for r in reader:
             n += 1
             if not divergent_ts:
                 continue
@@ -161,13 +183,19 @@ def main() -> int:
     except ValueError:
         sys.exit(f"error: --tf {args.tf!r} must be an integer number of minutes")
 
+    # N4: per-tf default so a --tf 60 run doesn't write into a file named
+    # 15m, and two scratch runs at different --tf don't clobber each other's
+    # intermediate (task-12-rereview finding 4).
+    out_csv = args.out_csv if args.out_csv is not None else ROOT / f"build/aggregate_{args.tf}m.csv"
+
     proc = subprocess.run(
-        [str(args.aggregate_bin), str(args.one_m), args.tf, str(OUT_CSV)],
+        [str(args.aggregate_bin), str(args.one_m), args.tf, str(out_csv)],
         capture_output=True, text=True,
     )
     trailing_partial = 0
     rows_parsed: int | None = None
     rows_skipped: int | None = None
+    first_skipped_line: int | None = None
     aggregator_info: dict[str, str] = {}
     for line in proc.stderr.splitlines():
         if line.startswith("rows_parsed="):
@@ -175,13 +203,29 @@ def main() -> int:
             rows_parsed = int(kv.get("rows_parsed", "0"))
             rows_skipped = int(kv.get("rows_skipped", "0"))
             trailing_partial = int(kv.get("trailing_partial", "0"))
+            if "first_skipped_line" in kv:
+                first_skipped_line = int(kv["first_skipped_line"])
         elif line.startswith("aggregator:"):
             aggregator_info = _parse_kv_line(line)
     if proc.returncode != 0:
-        sys.exit(f"error: {args.aggregate_bin} exited {proc.returncode}\n"
+        # N5: relay the tool's first_skipped_line (1-based) receipt, when it
+        # reported one, so a caller doesn't have to re-scan the source file
+        # to find the one bad row (task-12-rereview finding 5).
+        line_note = f" (first_skipped_line={first_skipped_line})" if first_skipped_line else ""
+        sys.exit(f"error: {args.aggregate_bin} exited {proc.returncode}{line_note}\n"
                   f"stdout:\n{proc.stdout}\nstderr:\n{proc.stderr}")
 
-    a, d = load(OUT_CSV), load(args.derived)
+    # N1: the tool's aggregator provenance line is a hard requirement, not a
+    # soft fallback -- an absent (or malformed) line means a stale/pre-
+    # provenance binary and this lane must not silently assert the
+    # aggregator config from an unrelated constant (task-12-rereview new
+    # finding 1). rows_parsed is checked the same way below (pre-existing).
+    _missing_agg_keys = [k for k in ("tf", "input_tf", "tz", "session") if k not in aggregator_info]
+    if _missing_agg_keys:
+        sys.exit(f"error: {args.aggregate_bin} did not report aggregator provenance on stderr "
+                  f"(missing: {','.join(_missing_agg_keys)})")
+
+    a, d = load(out_csv), load(args.derived)
 
     bars_compared = len(set(a) & set(d))
     agg_row_count = len(a)
@@ -280,14 +324,10 @@ def main() -> int:
                 unexplained_examples["volume_unexplained"].append(
                     {"ts": ts, "aggregate": av["volume"], "derived": dv["volume"]})
 
-    # Provenance (finding 5): relay what the tool actually constructed the
-    # aggregator with, rather than asserting it from an unrelated constant.
-    aggregator = {
-        "tf": aggregator_info.get("tf", args.tf),
-        "input_tf": aggregator_info.get("input_tf", "1"),
-        "tz": aggregator_info.get("tz", "UTC"),
-        "session": aggregator_info.get("session", "24x7"),
-    }
+    # Provenance (finding 5, tightened by N1): relay exactly what the tool
+    # reported constructing the aggregator with -- no constant fallback; the
+    # hard-fail above already guarantees these four keys are present.
+    aggregator = {k: aggregator_info[k] for k in ("tf", "input_tf", "tz", "session")}
 
     result = {
         "bars_compared": bars_compared,
@@ -296,6 +336,7 @@ def main() -> int:
         "derived_rows": derived_row_count,
         "rows_parsed": rows_parsed,
         "rows_skipped": rows_skipped,
+        "first_skipped_line": first_skipped_line,
         "trailing_partial": trailing_partial,
         "aggregator": aggregator,
         "divergence": counts,

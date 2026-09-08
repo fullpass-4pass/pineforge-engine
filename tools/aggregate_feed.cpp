@@ -91,8 +91,11 @@ int main(int argc, char** argv) {
     // a header-less feed's first data row is no longer eaten.
     long rows_parsed = 0;
     long rows_skipped = 0;
+    long line_no = 0;
+    long first_skipped_line = 0;  // 0 = none skipped; else 1-based (finding 5/N5)
     bool first_line = true;
     while (std::fgets(line, sizeof line, in)) {
+        ++line_no;
         if (first_line) {
             first_line = false;
             if (std::string(line).rfind("timestamp", 0) == 0) {
@@ -109,6 +112,13 @@ int main(int argc, char** argv) {
             ++rows_parsed;
         } else {
             ++rows_skipped;
+            // N5: record the FIRST skipped line (1-based) so a caller's
+            // "rows_skipped=1" receipt doesn't require re-scanning the
+            // source file to find which row was bad (task-12-rereview
+            // new finding 5).
+            if (first_skipped_line == 0) {
+                first_skipped_line = line_no;
+            }
         }
     }
     std::fclose(in);
@@ -117,14 +127,24 @@ int main(int argc, char** argv) {
         return 2;
     }
 
+    // N2: hoisted so the ctor call and the provenance print below can never
+    // drift from each other (task-12-rereview new finding 2) --
+    // TimeframeAggregator exposes no getters for these, so without a single
+    // shared source the print could silently describe a different
+    // aggregator than the one actually constructed.
+    static constexpr const char* kInputTf = "1";
+    static constexpr const char* kTz = "UTC";
+    static constexpr const char* kSession = "24x7";
+
     // Engine construction site (src/engine_run.cpp:1472-1474) + SymInfo
     // defaults (include/pineforge/engine.hpp:1043-1044). input_tf is always
     // "1" -- this tool's whole job is aggregating a 1-minute feed.
-    TimeframeAggregator agg(std::string(argv[2]), "1", "UTC", "24x7");
+    TimeframeAggregator agg(std::string(argv[2]), kInputTf, kTz, kSession);
     // Provenance (finding 5): record what the aggregator was actually
     // constructed with, so the lane can relay it into the JSON instead of
     // asserting it from an unrelated constant.
-    std::fprintf(stderr, "aggregator: tf=%s input_tf=1 tz=UTC session=24x7\n", argv[2]);
+    std::fprintf(stderr, "aggregator: tf=%s input_tf=%s tz=%s session=%s\n",
+                 argv[2], kInputTf, kTz, kSession);
 
     std::FILE* out = std::fopen(argv[3], "w");
     if (!out) {
@@ -176,8 +196,10 @@ int main(int argc, char** argv) {
     //
     // Row receipt (finding 1): the lane parses this line and asserts
     // rows_parsed against its own independent 1m row count, so any silent
-    // drop upstream of this print is now visible on both sides.
-    std::fprintf(stderr, "rows_parsed=%ld rows_skipped=%ld trailing_partial=%d\n",
-                 rows_parsed, rows_skipped, last_bucket_completed ? 0 : 1);
+    // drop upstream of this print is now visible on both sides. N5 appends
+    // first_skipped_line (1-based; 0 = none skipped) so a "rows_skipped=1"
+    // receipt names the row, not just the count.
+    std::fprintf(stderr, "rows_parsed=%ld rows_skipped=%ld trailing_partial=%d first_skipped_line=%ld\n",
+                 rows_parsed, rows_skipped, last_bucket_completed ? 0 : 1, first_skipped_line);
     return rows_skipped > 0 ? 1 : 0;
 }
