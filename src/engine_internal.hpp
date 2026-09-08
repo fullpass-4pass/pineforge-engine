@@ -310,6 +310,12 @@ bool bar_path_uses_high_first(const Bar& bar);
 // BacktestEngine::set_path_order (engine.hpp).
 void set_path_order_override(int mode);
 
+// Current thread-local override value (see above). PathOrderScope reads this
+// before installing its own mode so it can restore the prior value on scope
+// exit, rather than hardcoding AUTO -- correct even if a future caller ever
+// nests two overridden runs on the same thread.
+int path_order_override();
+
 
 // Returns: -1 = stop hit first, +1 = limit hit first, 0 = neither
 // Walks a 4-waypoint intra-bar price path to determine fill priority.

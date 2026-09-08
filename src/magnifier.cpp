@@ -55,7 +55,11 @@ OhlcPathLegs compute_ohlc_path_legs(const Bar& bar) {
     legs.p0 = bar.open;
     legs.p3 = bar.close;
 
-    bool high_first = std::fabs(bar.high - bar.open) < std::fabs(bar.open - bar.low);
+    // ABI v4 live-runtime surface (task 4): route through the single AUTO
+    // rule (identical expression under AUTO, mode 0 -- no historical drift)
+    // so a forced strategy_set_path_order also steers magnifier sampling,
+    // not just fill-path resolution, when the bar magnifier is enabled.
+    bool high_first = internal::bar_path_uses_high_first(bar);
     if (high_first) {
         // Open nearer high: O -> H -> L -> C
         legs.p1 = bar.high;

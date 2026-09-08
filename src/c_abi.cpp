@@ -255,23 +255,30 @@ PF_API void strategy_set_probe_suppress_tail_logic(pf_strategy_t s, int on) {
 
 /* ABI v4 live-runtime surface (task 4): force the intrabar path order used
  * by every subsequent run() -- 0 AUTO (the unchanged TV-emulator rule), 1
- * HIGH_FIRST (O -> H -> L -> C), 2 LOW_FIRST (O -> L -> H -> C). A live
- * probe runs the SAME forming bar under both forced orders and keeps only
- * the fills that agree between the two. Persistent configuration, like
- * strategy_set_realtime_tail. Default AUTO (mode=0): every historical run
- * stays byte-identical to before this flag existed. */
+ * HIGH_FIRST (O -> H -> L -> C), 2 LOW_FIRST (O -> L -> H -> C); any other
+ * @p mode is clamped to AUTO. A live probe runs the SAME forming bar under
+ * both forced orders and keeps only the fills that agree between the two.
+ * Persistent configuration, like strategy_set_realtime_tail -- applies to
+ * run() only, a stream continued via strategy_stream_begin always sees
+ * AUTO. Default AUTO (mode=0): every historical run stays byte-identical to
+ * before this flag existed. */
 PF_API void strategy_set_path_order(pf_strategy_t s, int mode) {
     if (!s) return;
     static_cast<pineforge::BacktestEngine*>(s)->set_path_order(mode);
 }
 
-/* ABI v4 live-runtime surface (task 4): the winner of the most recent run()'s
- * LAST bar's dual-entry-stop arbitration -- a flat position resting one long
- * stop-only ENTRY and one short stop-only ENTRY, both touched on that bar.
- * 0 = None (no such pair, or @p s is NULL), 1 = LongFirst, 2 = ShortFirst.
- * Only the standard (non-calc_on_order_fills) dispatch path updates this. */
+/* ABI v4 live-runtime surface (task 4): the dual-entry-stop arbitration
+ * decided on the LAST bar the most recent run() dispatched -- a flat
+ * position resting one long stop-only ENTRY and one short stop-only ENTRY,
+ * both touched on that bar. 0 = None (no such pair was arbitrated on that
+ * bar), 1 = LongFirst, 2 = ShortFirst; -1 when @p s is NULL. This is a
+ * per-bar snapshot: it survives a later fill or a declined stop-entry
+ * admission on the same bar (both of which move the engine's own working
+ * arbitration state back to None), so it reports the real decision even for
+ * an ordinary process_orders_on_close run with no tail suppression. Only
+ * the standard (non-calc_on_order_fills) dispatch path updates this. */
 PF_API int strategy_last_bar_dual_entry_path(pf_strategy_t s) {
-    if (!s) return 0;
+    if (!s) return -1;
     return static_cast<const pineforge::BacktestEngine*>(s)->last_bar_dual_entry_path();
 }
 

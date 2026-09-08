@@ -1410,11 +1410,15 @@ protected:
     // realtime_tail_ (do not couple them).
     bool probe_suppress_tail_logic_ = false;
     // Forced intrabar path order (ABI v4 live-runtime surface, task 4): 0
-    // AUTO, 1 HIGH_FIRST, 2 LOW_FIRST. Persistent configuration, like
-    // realtime_tail_ / probe_suppress_tail_logic_ above -- reset_run_state()
-    // does not touch it. See set_path_order() and the PathOrderScope guard
-    // in engine_run.cpp that installs it as internal::set_path_order_override
-    // for exactly the duration of one run().
+    // AUTO, 1 HIGH_FIRST, 2 LOW_FIRST. Any other value is clamped to AUTO by
+    // set_path_order() -- this member is always one of {0,1,2}. Persistent
+    // configuration, like realtime_tail_ / probe_suppress_tail_logic_ above
+    // -- reset_run_state() does not touch it. See set_path_order() and the
+    // PathOrderScope guard in engine_run.cpp that installs it as
+    // internal::set_path_order_override for exactly the duration of one
+    // run(). Applies to run() only: streaming ticks dispatched after
+    // strategy_stream_begin (engine_stream.cpp) never go through a
+    // PathOrderScope and always see AUTO regardless of this setting.
     int path_order_mode_ = 0;
     // True while dispatching the last array bar (the three run loops set
     // this right after bar_index_ = i). Read by dispatch_bar() to decide
@@ -1684,20 +1688,39 @@ protected:
     // calls, mirroring scratch_skip_ids_). Always cleared before use.
     std::vector<size_t> scratch_filled_indices_;
 
-    // Per-bar dual-entry-stop arbitration winner (a flat position resting
+    // Per-PASS dual-entry-stop arbitration winner (a flat position resting
     // one long stop-only ENTRY + one short stop-only ENTRY, both touched
     // this bar -- dual_entry_stop_path_winner, engine_path_resolve.cpp).
-    // Reset to None at the top of every process_pending_orders call (a
+    // Reset to None at the top of every process_pending_orders CALL (a
     // process_orders_on_close_ script bar calls it twice per bar -- old-
     // order settlement, then new-order fills -- and each pass re-derives
     // its own flat-position winner) and written where that arbitration is
-    // decided. ABI v4 live-runtime surface (task 4): exposed read-only via
-    // last_bar_dual_entry_path() so a live probe can read the engine's own
-    // tie-break after a forming-bar run. Only the standard (non-
-    // calc_on_order_fills) dispatch path updates this; the COOF scheduler's
-    // process_next_pending_order keeps its own unrelated local of the same
-    // computation and does not persist it here.
+    // decided. This is working state, NOT the public accessor's value --
+    // it goes back to None the moment the winning side fills (position no
+    // longer FLAT) or its admission is declined (the release at the
+    // `path_winner_stop_margin_decline` site below), even though a real
+    // arbitration happened this bar. last_bar_dual_entry_path() reads
+    // last_bar_dual_entry_decision_ (below) instead, precisely to survive
+    // that. Only the standard (non-calc_on_order_fills) dispatch path
+    // updates this; the COOF scheduler's process_next_pending_order keeps
+    // its own unrelated local of the same computation and does not persist
+    // it here.
     internal::DualEntryStopPathWinner dual_entry_path_{};
+    // Per-BAR snapshot of the above: the last non-None value
+    // dual_entry_path_ took during this bar, surviving whatever
+    // dual_entry_path_ itself does afterward (a fill, a declined admission
+    // release, or the next process_pending_orders call's reset). Reset to
+    // None once per bar -- at the top of dispatch_bar() and, for the bar
+    // magnifier (which never reaches dispatch_bar), where bar_index_
+    // advances for each emitted script bar in run_aggregation_bar_loop --
+    // and written ONLY alongside dual_entry_path_'s own arbitration write
+    // (engine_fills.cpp), never at the declined-admission release. ABI v4
+    // live-runtime surface (task 4): this is what last_bar_dual_entry_path()
+    // returns, so a live probe (or an ordinary POOC run, tail-suppressed or
+    // not) reads the bar's real arbitration even if the winning order later
+    // filled, was declined, or the working state otherwise moved on. Same
+    // calc_on_order_fills_ caveat as dual_entry_path_ above.
+    internal::DualEntryStopPathWinner last_bar_dual_entry_decision_{};
 
     // --- Trailing stop state ---
     // Best favorable price since position entry (for trailing stop computation)
@@ -4724,30 +4747,45 @@ public:
 
     // Force this run's intrabar path order (ABI v4 live-runtime surface,
     // task 4): 0 AUTO (the unchanged |H-O| vs |O-L| rule), 1 HIGH_FIRST
-    // (O -> H -> L -> C), 2 LOW_FIRST (O -> L -> H -> C). A live probe runs
-    // the SAME forming bar under both forced orders and keeps only the
-    // fills that agree between the two -- a fill that depends on which leg
-    // TradingView's own still-forming bar will resolve to is path-dependent
-    // and must be suppressed rather than guessed. See
-    // internal::bar_path_uses_high_first's thread-local override
-    // (engine_path_resolve.cpp) and the PathOrderScope guard in
+    // (O -> H -> L -> C), 2 LOW_FIRST (O -> L -> H -> C). Any other value is
+    // clamped to AUTO. A live probe runs the SAME forming bar under both
+    // forced orders and keeps only the fills that agree between the two --
+    // a fill that depends on which leg TradingView's own still-forming bar
+    // will resolve to is path-dependent and must be suppressed rather than
+    // guessed. See internal::bar_path_uses_high_first's thread-local
+    // override (engine_path_resolve.cpp) and the PathOrderScope guard in
     // engine_run.cpp that installs/clears it for exactly the duration of
     // this run's own dispatch.
     // Persistent configuration, like set_realtime_tail -- stays set until a
-    // caller passes mode=0. Default AUTO (mode=0): every historical run
-    // stays byte-identical to before this flag existed.
-    void set_path_order(int mode) { path_order_mode_ = mode; }
+    // caller passes mode=0. Applies to run() only: a stream continued via
+    // strategy_stream_begin dispatches its realtime ticks outside any
+    // PathOrderScope and always sees AUTO, regardless of this setting.
+    // Default AUTO (mode=0): every historical run stays byte-identical to
+    // before this flag existed.
+    void set_path_order(int mode) {
+        path_order_mode_ = (mode == 1 || mode == 2) ? mode : 0;
+    }
 
-    // The winner of this run's LAST bar's dual-entry-stop arbitration: 0
-    // None, 1 LongFirst, 2 ShortFirst -- internal::DualEntryStopPathWinner's
-    // own enumerator order (its Tie value never reaches here;
-    // dual_entry_stop_path_winner always resolves a tie to LongFirst). Only
-    // the standard (non-calc_on_order_fills) dispatch path updates
-    // dual_entry_path_; this is a silent no-op (stays at its last standard-
-    // path value) under the COOF scheduler, mirroring
-    // set_probe_suppress_tail_logic's dispatch-path-scope caveat.
+    // The dual-entry-stop arbitration decided on the LAST bar this run
+    // dispatched (a flat position resting one long stop-only ENTRY and one
+    // short stop-only ENTRY, both touched that bar --
+    // dual_entry_stop_path_winner, engine_path_resolve.cpp): 0 None (no
+    // such pair was arbitrated on that bar), 1 LongFirst, 2 ShortFirst --
+    // internal::DualEntryStopPathWinner's own enumerator order (its Tie
+    // value never reaches here; dual_entry_stop_path_winner always resolves
+    // a tie to LongFirst). This reads last_bar_dual_entry_decision_, a
+    // per-bar snapshot of the arbitration that survives whatever the
+    // working state (dual_entry_path_) does afterward this same bar -- a
+    // fill, a declined stop-entry admission, or (under
+    // process_orders_on_close) the bar's second process_pending_orders
+    // pass, all of which reset dual_entry_path_ to None without undoing the
+    // fact that an arbitration happened. Only the standard
+    // (non-calc_on_order_fills) dispatch path updates it; this is a silent
+    // no-op (stays at its last standard-path value) under the COOF
+    // scheduler, mirroring set_probe_suppress_tail_logic's
+    // dispatch-path-scope caveat.
     int last_bar_dual_entry_path() const {
-        return static_cast<int>(dual_entry_path_);
+        return static_cast<int>(last_bar_dual_entry_decision_);
     }
 
     // Toggle volume-weighted per-sub-bar sampling inside run_magnified_bar.

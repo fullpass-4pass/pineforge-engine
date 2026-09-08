@@ -15,6 +15,27 @@
 namespace pineforge {
 using namespace internal;
 
+namespace {
+// ABI v4 live-runtime surface (task 4): installs this run's forced path
+// order as the thread-local internal::bar_path_uses_high_first override for
+// exactly the duration of the scope, restoring whatever override value was
+// in effect before it (not unconditionally AUTO) on every exit path --
+// normal return or an exception unwinding through a `try`. Restoring the
+// PRIOR value rather than hardcoding 0 is future-proofed against a caller
+// ever nesting two overridden runs on the same thread; today there is no
+// such nesting (each public run() entrypoint reaches exactly one of the two
+// installation sites below, see the single-TF run() and run_tf_impl), so in
+// practice the prior value is always AUTO (0). One file-scope definition
+// shared by both installation sites instead of a duplicated local struct.
+struct PathOrderScope {
+    int prev;
+    explicit PathOrderScope(int mode) : prev(internal::path_order_override()) {
+        internal::set_path_order_override(mode);
+    }
+    ~PathOrderScope() { internal::set_path_order_override(prev); }
+};
+}  // namespace
+
 bool BacktestEngine::set_account_currency_fx_series(
         const int64_t* timestamps_ms, const double* rates, int n) {
     // Timestamped FX is not route-complete for the realtime scheduler. Reject
@@ -110,6 +131,13 @@ void BacktestEngine::invoke_chart_on_bar(const Bar& bar) {
 //   4. New market orders fill at bar.close; new stop/limit wait for next bar
 // When process_orders_on_close_ is false, only steps 1-3 run.
 void BacktestEngine::dispatch_bar() {
+    // ABI v4 live-runtime surface (task 4): reset the per-bar dual-entry-stop
+    // arbitration snapshot once per bar, before anything else -- including
+    // the COOF early return below, so a calc_on_order_fills_ bar (which never
+    // writes this snapshot) correctly reads None instead of a stale value
+    // left by an earlier standard-path bar. See last_bar_dual_entry_decision_
+    // (engine.hpp) and its write site (engine_fills.cpp).
+    last_bar_dual_entry_decision_ = internal::DualEntryStopPathWinner::None;
     if (calc_on_order_fills_) {
         dispatch_bar_calc_on_order_fills();
         return;
@@ -827,13 +855,9 @@ void BacktestEngine::run(const Bar* bars, int n) {
         last_bar_index_ = 0;
     }
     // ABI v4 live-runtime surface (task 4): install this run's forced path
-    // order as the thread-local internal::bar_path_uses_high_first override
-    // for exactly the duration of this call, restoring AUTO on every exit
-    // path (normal return or an exception unwinding through the try below).
-    struct PathOrderScope {
-        explicit PathOrderScope(int m) { internal::set_path_order_override(m); }
-        ~PathOrderScope() { internal::set_path_order_override(0); }
-    } path_order_scope(path_order_mode_);
+    // order for exactly the duration of this call (see the file-scope
+    // PathOrderScope above).
+    PathOrderScope path_order_scope(path_order_mode_);
     try {
     if (!account_currency_fx_timestamps_.empty() && calc_on_order_fills_) {
         throw std::runtime_error(
@@ -1368,16 +1392,13 @@ void BacktestEngine::run_tf_impl(const Bar* input_bars, int n_input,
     } else {
         last_bar_time_ = 0;
     }
-    // ABI v4 live-runtime surface (task 4): see the matching PathOrderScope
-    // in the single-TF run() above -- this is the TF-aware path's own copy
-    // of the same guard so every run's actual work (this function) installs
-    // and clears the override exactly once, however it was reached (the
-    // thin TF-aware run() wrapper, the syminfo/overrides overload, or
-    // stream_begin's warmup, which all delegate here).
-    struct PathOrderScope {
-        explicit PathOrderScope(int m) { internal::set_path_order_override(m); }
-        ~PathOrderScope() { internal::set_path_order_override(0); }
-    } path_order_scope(path_order_mode_);
+    // ABI v4 live-runtime surface (task 4): this is the TF-aware path's own
+    // installation of the same file-scope PathOrderScope guard, so every
+    // run's actual work (this function) installs and clears the override
+    // exactly once, however it was reached (the thin TF-aware run()
+    // wrapper, the syminfo/overrides overload, or stream_begin's warmup,
+    // which all delegate here).
+    PathOrderScope path_order_scope(path_order_mode_);
     try {
     if (!account_currency_fx_timestamps_.empty()
         && (calc_on_order_fills_ || bar_magnifier)) {
@@ -1960,6 +1981,12 @@ void BacktestEngine::run_aggregation_bar_loop(const Bar* input_bars, int n_input
             // bar and the on/off curves would disagree on that label.
             const int64_t script_bar_ts = ab.bar.timestamp;
             bar_index_ = script_bar_index++;
+            // ABI v4 live-runtime surface (task 4): the bar magnifier's
+            // run_magnified_bar never reaches dispatch_bar() (its own
+            // top-of-function reset), so this emitted-script-bar boundary is
+            // the per-bar reset site for it. Redundant-but-harmless on the
+            // non-magnifier branch below, which also calls dispatch_bar().
+            last_bar_dual_entry_decision_ = internal::DualEntryStopPathWinner::None;
             is_tail_bar_ = (i == n_input - 1);
             emitted_script_bars++;
             barstate_islast_ = !stream_warmup_mode_ && !realtime_tail_

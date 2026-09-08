@@ -26,6 +26,8 @@ thread_local int g_path_order_override = 0;
 
 void set_path_order_override(int mode) { g_path_order_override = mode; }
 
+int path_order_override() { return g_path_order_override; }
+
 bool bar_path_uses_high_first(const Bar& bar) {
     if (g_path_order_override == 1) return true;
     if (g_path_order_override == 2) return false;

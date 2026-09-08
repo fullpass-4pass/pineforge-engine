@@ -676,14 +676,16 @@ PF_API void strategy_set_probe_suppress_tail_logic(pf_strategy_t s, int on);
 /** Force this run's intrabar path order (ABI v4 live-runtime surface): the
  *  leg order every OHLC-path helper (`bar_path_uses_high_first` and
  *  everything built on it -- stop/limit fill priority, exit trail walking,
- *  dual-entry-stop arbitration) uses for the CURRENT and every subsequent
- *  run(), until a caller sets a different mode. Values:
+ *  dual-entry-stop arbitration, and bar-magnifier sub-bar sampling) uses for
+ *  the CURRENT and every subsequent run(), until a caller sets a different
+ *  mode. Values:
  *    - `0` AUTO (default): the unchanged TV-emulator rule -- the leg nearer
  *      `open` (by `|high-open|` vs `|open-low|`) goes first.
  *    - `1` HIGH_FIRST: force `O -> H -> L -> C` regardless of the bar's own
  *      shape.
  *    - `2` LOW_FIRST: force `O -> L -> H -> C` regardless of the bar's own
  *      shape.
+ *  Any other @p mode is clamped to AUTO.
  *  A live probe runs the SAME forming bar under BOTH forced orders and emits
  *  only the fills that agree between the two -- a fill that depends on which
  *  leg TradingView's own (unobservable, still-forming) bar will resolve to
@@ -691,20 +693,35 @@ PF_API void strategy_set_probe_suppress_tail_logic(pf_strategy_t s, int on);
  *  This is persistent configuration, like #strategy_set_realtime_tail -- it
  *  stays in effect until a caller passes @p mode == 0, so a handle reused
  *  for a later plain historical replay must be explicitly set back to AUTO.
+ *  Applies to run() only: a stream continued via #strategy_stream_begin
+ *  dispatches its realtime ticks outside any run() and always sees AUTO,
+ *  regardless of this setting.
  *  Default AUTO (@p mode == 0): every historical run stays byte-identical to
  *  before this flag existed. */
 PF_API void strategy_set_path_order(pf_strategy_t s, int mode);
-/** The winner of the most recent run()'s LAST bar's dual-entry-stop
- *  arbitration: a flat position resting exactly one long stop-only ENTRY and
- *  one short stop-only ENTRY, both touched on that bar
+/** The dual-entry-stop arbitration decided on the LAST bar the most recent
+ *  run() dispatched: a flat position resting exactly one long stop-only
+ *  ENTRY and one short stop-only ENTRY, both touched on that bar
  *  (`dual_entry_stop_path_winner`, internal). Values mirror
  *  `internal::DualEntryStopPathWinner`'s enumerator order:
- *    - `0` None -- no such pair this bar (not flat, no matching pair, or
- *      neither/only one side touched), or @p s is NULL.
+ *    - `0` None -- no such pair was arbitrated on that bar (not flat, no
+ *      matching pair, or neither/only one side touched).
  *    - `1` LongFirst -- the long stop's first-touch position on the intrabar
  *      path came first (or the two tied, which the engine always resolves
  *      in the long leg's favour).
  *    - `2` ShortFirst -- the short stop's first-touch position came first.
+ *    - `-1` -- @p s is NULL.
+ *  This is a per-BAR snapshot, not a live read of the engine's per-pass
+ *  working state: it is written once, at the arbitration itself, and then
+ *  holds for the rest of that bar even though the working state goes back
+ *  to None the moment the winning side fills (position no longer flat) or
+ *  its stop-entry admission is declined -- neither of which undoes the fact
+ *  that TradingView's broker emulator arbitrated a real pair that bar. A
+ *  caller therefore gets the right answer whether it reads this after a
+ *  `strategy_set_probe_suppress_tail_logic` forming-bar probe (a single
+ *  `process_pending_orders` pass) or after an ordinary
+ *  `process_orders_on_close` run with no tail suppression (two passes, the
+ *  winner already filled by the second).
  *  A live probe reads this after a forming-bar run to see which side the
  *  engine's own broker-emulator tie-break picked, without having to re-run
  *  and infer it from which of the two possible fills came back.
