@@ -12,7 +12,7 @@
 #include "engine_internal.hpp"
 
 #include <algorithm>
-#include <cstring>
+#include <limits>
 #include <string>
 #include <unordered_map>
 #include <unordered_set>
@@ -28,7 +28,15 @@ struct Fnv {
         const unsigned char* c = static_cast<const unsigned char*>(p);
         for (size_t i = 0; i < n; ++i) { h ^= c[i]; h *= 1099511628211ULL; }
     }
-    void d(double v) { if (v == 0.0) v = 0.0; bytes(&v, sizeof v); }   // -0.0 == 0.0
+    void d(double v) {
+        if (v == 0.0) v = 0.0;                                  // -0.0 == 0.0
+        // Canonicalise every NaN to one bit pattern: two producers of "not
+        // set" (e.g. 0.0/0.0 vs quiet_NaN(), or a sign-flipped NaN) must not
+        // hash differently when the broker-visible meaning ("not set") is
+        // identical.
+        if (v != v) v = std::numeric_limits<double>::quiet_NaN();
+        bytes(&v, sizeof v);
+    }
     void i(int64_t v) { bytes(&v, sizeof v); }
     void u(uint64_t v) { bytes(&v, sizeof v); }
     void b(bool v) { const unsigned char c = v ? 1 : 0; bytes(&c, 1); }
@@ -152,6 +160,37 @@ uint64_t BacktestEngine::broker_state_hash() const {
         f.b(o.dormant_trail_leg_dead);
         f.i(static_cast<int64_t>(o.dormant_hold_bar));
         f.i(static_cast<int64_t>(o.dormant_reversal_kill_bar));
+        // Frozen fill-time admission/sizing snapshot (design-market-entry-
+        // affordability / KI-54 / round-7 stop-entry-placement-admission).
+        f.d(o.sizing_equity); f.d(o.sizing_price); f.d(o.sizing_fx); f.d(o.sizing_mark);
+        f.d(o.default_stop_placement_equity); f.d(o.default_stop_sizing_price);
+        f.d(o.tv_carry_qty);
+        f.b(o.over_pyramiding_cap_at_placement);
+        f.b(o.affordability_close_only);
+        f.i(static_cast<int64_t>(o.created_position_cycle_seq));
+        f.b(o.requested_partial); f.b(o.full_percent_exit_request);
+        // Round-14 signal-close-margin-call receipt (cross-bar: compared
+        // against broker_fill_event_seq_ on the bar AFTER the one it was
+        // stamped on).
+        f.i(static_cast<int64_t>(o.signal_close_mc_bar));
+        f.u(o.signal_close_mc_entry_incarnation);
+        f.u(o.signal_close_mc_fill_seq);
+        // Round-8 family S same-bar MARKET transaction (sizing frozen at
+        // placement) and its strategy.close(id) companion.
+        f.b(o.sbmt_member); f.d(o.sbmt_own_qty); f.d(o.sbmt_tx_qty);
+        f.b(o.sbmt_kept_over_cap); f.d(o.sbmt_close_qty); f.b(o.sbmt_close_buy);
+        // KI-65 dual same-bar opposite-MARKET pairing candidate/finalization.
+        f.b(o.paired_flat_market_candidate);
+        f.d(o.paired_flat_market_own_qty);
+        f.d(o.paired_flat_market_signal_close);
+        f.d(o.paired_flat_market_signal_equity);
+        f.d(o.paired_flat_market_signal_margin_pct);
+        f.d(o.paired_flat_market_signal_pointvalue);
+        f.d(o.paired_flat_market_signal_fx);
+        f.i(o.paired_flat_market_peer_seq);
+        f.d(o.paired_flat_market_transaction_qty);
+        f.i(static_cast<int64_t>(o.short_seed_collision_role));
+        f.b(o.suppress_as_declined_reversal_close);
     }
     f.i(last_rejected_strategy_entry_call_bar_);
     hash_int_set(f, pending_flat_market_pair_disqualified_bars_);
@@ -217,12 +256,41 @@ uint64_t BacktestEngine::broker_state_hash() const {
     // are not in the same broker state). ---
     f.i(next_order_seq_);
     f.u(next_order_incarnation_);
+    f.u(broker_fill_event_seq_);
 
     // --- Account-currency FX broker clock (the injected rate SERIES is
     // configuration; the clock's consumption progress is runtime state). ---
     f.b(account_currency_fx_broker_epoch_initialized_);
     f.u(static_cast<uint64_t>(account_currency_fx_broker_epoch_));
     f.d(account_currency_fx_broker_rate_);
+
+    // --- Script-visible report accumulators (controller ruling): these are
+    // never read by the ENGINE's own fill/order decisions, but they ARE
+    // exposed to the script via strategy.* accessors (strategy.wintrades,
+    // strategy.grossprofit, strategy.max_contracts_held_all, ...), so a
+    // script can branch on them and place a different order. G1 must cover
+    // script-observable broker facts, not only the engine's own decisions.
+    f.d(gross_profit_sum_);
+    f.d(gross_loss_sum_);
+    f.i(win_trades_count_);
+    f.i(loss_trades_count_);
+    f.i(eventrades_count_);
+    f.d(max_runup_);
+    f.d(max_contracts_held_all_);
+    f.d(max_contracts_held_long_);
+    f.d(max_contracts_held_short_);
+
+    // Completed-trade ledger: also script-visible (strategy.closedtrades and
+    // the per-trade strategy.closedtrades.* accessors read it directly), so
+    // it is hashed for the same reason as the accumulators above. Only the
+    // fields a script can actually read back are included, in append order
+    // (chronological — not an unordered container, no sort needed).
+    f.u(trades_.size());
+    for (const auto& t : trades_) {
+        f.i(t.entry_time); f.i(t.exit_time);
+        f.d(t.entry_price); f.d(t.exit_price);
+        f.d(t.qty); f.d(t.pnl);
+    }
 
     return f.h;
 }

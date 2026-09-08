@@ -122,23 +122,18 @@ callsite_close_callsites_     # doc: "Per-source-bar only"
 callsite_close_queue_seq_     # monotonic counter only compared within the same source bar's discarded batch
 callsite_close_admitted_total_  # doc: "claimed by the currently surviving nonzero-site instructions on this source bar"
 
-# --- Report/diagnostic accumulators: written every closed trade, read only
-# by engine_report.cpp / engine_metrics.cpp to assemble pf_report_t, never
-# consulted by any fill/order/risk decision (verified by grep: no read site
-# outside the write-and-reset pair and the report assembly).
-gross_profit_sum_             # report-only accumulator
-gross_loss_sum_               # report-only accumulator
-win_trades_count_             # report-only accumulator
-loss_trades_count_            # report-only accumulator
-eventrades_count_             # report-only accumulator (strategy.eventrades)
-max_runup_                    # report-only metric; only max_drawdown_ (hashed) gates risk_halted_
-bars_in_market_               # report-only accumulator
-first_bar_open_                # report-only (buy&hold basis)
-max_contracts_held_all_       # report-only extreme (strategy.max_contracts_held_all)
-max_contracts_held_long_      # report-only extreme
-max_contracts_held_short_     # report-only extreme
+# --- Report/diagnostic accumulators that are NOT reachable through any
+# strategy.* script accessor -- pure internal report plumbing (verified by
+# grep: no read site outside the write-and-reset pair and the report
+# assembly in engine_report.cpp / engine_metrics.cpp). The sibling
+# accumulators that ARE script-visible (strategy.grossprofit/grossloss/
+# wintrades/losstrades/eventrades/max_runup/max_contracts_held_*,
+# strategy.closedtrades.*) are hashed instead -- see the controller ruling in
+# task-5-review.md fix round 1: a script can branch on those and place a
+# different order, so G1 must cover them too.
+bars_in_market_               # report-only accumulator; no strategy.* accessor
+first_bar_open_                # report-only (buy&hold basis); no strategy.* accessor
 equity_curve_                 # report-only per-bar equity history; the range-end finalizer re-derives max_equity_/min_equity_/max_drawdown_ from it, but those are hashed directly -- redundant, unbounded-size, and never read during in-run fill decisions
-trades_                       # write-only completed-trade ledger (report/output); every read site only annotates rows the SAME call just appended (trades_before..trades_.size()), never a later independent decision
 range_end_trades_             # doc: "Report-only -- ... never enter trades_, the realized sums, or the live position"
 
 # --- Per-pass dual-entry-stop working state (task brief instruction: waive

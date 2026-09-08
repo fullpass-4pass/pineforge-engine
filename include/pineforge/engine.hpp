@@ -3160,7 +3160,13 @@ protected:
     // before every speculative execution so those fills consume the same
     // finite historical/magnifier event budget as every other broker fill.
     uint64_t coof_direct_fill_events_remaining_ = 0;
+    // @broker-state begin
+    // Monotonic cross-bar fill sequence counter; compared against
+    // trail_best_before_bar_fill_seq_ (hashed above) and against
+    // PendingOrder::signal_close_mc_fill_seq (hashed per-order) by fill-time
+    // gates that cross the bar boundary (engine_fills.cpp).
     uint64_t broker_fill_event_seq_ = 0;
+    // @broker-state end
 
     // input.source histories are base-owned script state and must roll back
     // with generated state between historical fill recalculations.
@@ -4796,8 +4802,8 @@ public:
     // intraday/risk latches, frozen sizing, equity sums). Two engines with
     // equal broker state hash equally regardless of unordered-container
     // insertion history; any difference in that state changes the hash.
-    // Implemented in engine_state_hash.cpp; coverage of the
-    // ``// @broker-state begin`` / ``// @broker-state end`` region is
+    // Implemented in engine_state_hash.cpp; coverage of the marked
+    // broker-state region(s) below (grep this file for "broker-state") is
     // enforced by scripts/check_broker_state_hash_coverage.py.
     uint64_t broker_state_hash() const;
 
