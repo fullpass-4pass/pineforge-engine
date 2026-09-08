@@ -4817,6 +4817,19 @@ public:
     // enforced by scripts/check_broker_state_hash_coverage.py.
     uint64_t broker_state_hash() const;
 
+    // ABI v4 live-runtime surface (task 7, spec 3.6): read-only view of the
+    // resting-order book after the most recent run() -- the book in force
+    // for the next bar, in the vector's own (insertion) order; fill
+    // priority is decided at fill time from created_seq. The C ABI
+    // (strategy_pending_orders_len / strategy_pending_order_get) copies
+    // each order out through the generated POD mirror
+    // (pf_pending_order_v1_t, include/pineforge/pending_order_mirror.hpp),
+    // never by pointer. `i` must be in [0, pending_order_count()).
+    int pending_order_count() const { return static_cast<int>(pending_orders_.size()); }
+    const PendingOrder& pending_order_at(int i) const {
+        return pending_orders_[static_cast<size_t>(i)];
+    }
+
     // ABI v4 live-runtime surface (task 6): when on, every script bar's
     // dispatch (all four script-bar dispatch sites -- the single-TF run()
     // loop, run_simple_bar_loop, run_aggregation_bar_loop, and

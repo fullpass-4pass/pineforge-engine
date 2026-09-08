@@ -51,6 +51,11 @@
  * PINEFORGE_GIT_SHA) live in the generated <pineforge/version.h>. */
 #include <pineforge/version.h>
 
+/* pf_pending_order_v1_t / pf_field_desc_t -- the generated, C-compatible POD
+ * mirror of the engine's resting-order record (ABI v4, task 7). Regenerate
+ * with scripts/gen_pending_order_mirror.py; never edit by hand. */
+#include <pineforge/pending_order_mirror.hpp>
+
 /* ── Visibility ──────────────────────────────────────────────────── */
 
 #if defined(_WIN32) || defined(__CYGWIN__)
@@ -765,6 +770,33 @@ PF_API void strategy_set_broker_state_hash_recording(pf_strategy_t s, int on);
  *  works whether or not recording was enabled). Returns 0 when @p s is
  *  NULL. */
 PF_API uint64_t strategy_broker_state_hash(pf_strategy_t s);
+/** Number of orders resting in the engine's pending-order book after the
+ *  most recent run() (ABI v4 live-runtime surface, task 7, spec 3.6): the
+ *  book in force for the NEXT bar. 0 when @p s is NULL. Read-only; a
+ *  historical run is byte-identical whether or not a caller reads it. */
+PF_API int strategy_pending_orders_len(pf_strategy_t s);
+/** Copy the @p index-th resting order (0-based, the engine's own book
+ *  order -- insertion order; broker fill priority is decided at fill time
+ *  from `created_seq`, not from this index) into @p out as a
+ *  pf_pending_order_v1_t value snapshot. Copies
+ *  min(@p size_in, sizeof(pf_pending_order_v1_t)) bytes: an older reader
+ *  with a smaller struct receives a prefix (struct_version and size first),
+ *  a newer reader with a larger one receives the whole v1 and must not
+ *  read past pf_pending_order_v1_t::size. Strings are NUL-terminated
+ *  char[64] copies with a `_truncated` flag and a `_hash64` (FNV-1a 64 of
+ *  the full string); enums are int32 values; NaN sentinels are copied
+ *  verbatim. Returns 0 on success, -1 when @p s or @p out is NULL or
+ *  @p index is out of range (nothing is written). The layout is
+ *  self-described by #strategy_pending_order_layout. */
+PF_API int strategy_pending_order_get(pf_strategy_t s, int index, void* out, size_t size_in);
+/** The field table of pf_pending_order_v1_t as THIS runtime compiled it --
+ *  one pf_field_desc_t {name, type, offset, size} per field, in struct
+ *  order, starting with `struct_version` and `size`. Static storage: the
+ *  pointer stays valid for the life of the process and needs no handle.
+ *  @p count (may be NULL) receives the row count. An FFI consumer builds
+ *  its struct from this table rather than from a hand-typed copy, so the
+ *  mirror can grow (append-only) without breaking it. */
+PF_API const pf_field_desc_t* strategy_pending_order_layout(int* count);
 /** @} */
 
 /** @addtogroup pf_config

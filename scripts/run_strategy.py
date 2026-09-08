@@ -828,6 +828,100 @@ class PfVersionC(ctypes.Structure):
                 ("patch", ctypes.c_int), ("commit_sha", ctypes.c_char_p)]
 
 
+class PfFieldDescC(ctypes.Structure):
+    """Mirror of pf_field_desc_t (<pineforge/pending_order_mirror.hpp>): one
+    row of the self-describing pf_pending_order_v1_t field table returned by
+    strategy_pending_order_layout (ABI v4 live-runtime surface, task 7)."""
+    _fields_ = [("name", ctypes.c_char_p), ("type", ctypes.c_char_p),
+                ("offset", ctypes.c_uint32), ("size", ctypes.c_uint32)]
+
+
+# C type spelling in a pf_field_desc_t row -> ctypes scalar. `char[N]` is
+# handled separately (an N-byte c_char array).
+_PF_FIELD_CTYPES = {
+    "uint8_t": ctypes.c_uint8,
+    "uint32_t": ctypes.c_uint32,
+    "int32_t": ctypes.c_int32,
+    "int64_t": ctypes.c_int64,
+    "uint64_t": ctypes.c_uint64,
+    "double": ctypes.c_double,
+}
+_PF_CHAR_ARRAY_RE = re.compile(r"^char\[(\d+)\]$")
+PENDING_ORDER_STRUCT_VERSION = 1
+
+
+def _pending_order_layout(lib: ctypes.CDLL) -> list[tuple[str, str, int, int]]:
+    """Read strategy_pending_order_layout() into [(name, type, offset, size)]."""
+    count = ctypes.c_int(0)
+    descs = lib.strategy_pending_order_layout(ctypes.byref(count))
+    return [(descs[i].name.decode("ascii"), descs[i].type.decode("ascii"),
+             int(descs[i].offset), int(descs[i].size)) for i in range(count.value)]
+
+
+def build_pending_order_struct(layout: list[tuple[str, str, int, int]]) -> type:
+    """Build the ctypes.Structure mirroring pf_pending_order_v1_t FROM THE
+    RUNTIME'S OWN FIELD TABLE (strategy_pending_order_layout), never from a
+    hand-typed field list: the mirror is append-only and generated from
+    engine.hpp (scripts/gen_pending_order_mirror.py), so a reader typed by
+    hand would silently desynchronise the first time PendingOrder grows.
+    Every ctypes offset/size is cross-checked against the table and a
+    mismatch raises rather than mis-reading the book."""
+    if not layout:
+        raise RuntimeError("strategy_pending_order_layout returned no fields")
+    fields = []
+    for name, ctype, offset, size in layout:
+        m = _PF_CHAR_ARRAY_RE.match(ctype)
+        if m:
+            ct = ctypes.c_char * int(m.group(1))
+        elif ctype in _PF_FIELD_CTYPES:
+            ct = _PF_FIELD_CTYPES[ctype]
+        else:
+            raise RuntimeError(
+                f"strategy_pending_order_layout: field {name!r} has unknown C type "
+                f"{ctype!r}; extend _PF_FIELD_CTYPES in run_strategy.py")
+        if ctypes.sizeof(ct) != size:
+            raise RuntimeError(
+                f"strategy_pending_order_layout: field {name!r} ({ctype}) is {size} "
+                f"bytes in the runtime but {ctypes.sizeof(ct)} in ctypes")
+        fields.append((name, ct))
+    if fields[0][0] != "struct_version" or fields[1][0] != "size":
+        raise RuntimeError(
+            "strategy_pending_order_layout: table must start with struct_version, size; "
+            f"got {[f[0] for f in fields[:2]]}")
+    cls = type("PendingOrderV1", (ctypes.Structure,), {"_fields_": fields})
+    for name, _ctype, offset, _size in layout:
+        got = getattr(cls, name).offset
+        if got != offset:
+            raise RuntimeError(
+                f"strategy_pending_order_layout: field {name!r} is at byte {offset} in the "
+                f"runtime but ctypes placed it at {got} (natural alignment differs?)")
+    last_name, _, last_off, last_size = layout[-1]
+    if ctypes.sizeof(cls) < last_off + last_size:
+        raise RuntimeError(
+            f"strategy_pending_order_layout: sizeof(PendingOrderV1) {ctypes.sizeof(cls)} < "
+            f"end of {last_name!r} ({last_off + last_size})")
+    return cls
+
+
+def pending_order_to_dict(rec, layout: list[tuple[str, str, int, int]]) -> dict:
+    """One pf_pending_order_v1_t record -> JSON-ready dict, in field order.
+    char[N] -> str (up to the NUL); NaN/inf doubles -> None (JSON has no
+    NaN; the engine's "not set" sentinel); *_hash64 -> 16-hex-digit string
+    (a uint64 is not a JS-safe number); everything else -> int/float."""
+    out = {}
+    for name, ctype, _offset, _size in layout:
+        v = getattr(rec, name)
+        if ctype.startswith("char["):
+            out[name] = bytes(v).decode("utf-8", "replace")
+        elif ctype == "double":
+            out[name] = float(v) if math.isfinite(v) else None
+        elif name.endswith("_hash64"):
+            out[name] = format(int(v), "016x")
+        else:
+            out[name] = int(v)
+    return out
+
+
 def engine_version(lib: ctypes.CDLL) -> dict:
     """Read engine version+sha from the .so (whole-archive exports). The
     fields are hasattr-guarded so an older .so degrades to blanks."""
@@ -1260,6 +1354,24 @@ class Strategy:
         if hasattr(L, "strategy_broker_state_hash"):
             L.strategy_broker_state_hash.argtypes = [ctypes.c_void_p]
             L.strategy_broker_state_hash.restype = ctypes.c_uint64
+        # ABI v4 live-runtime surface (task 7): the resting-order book through
+        # the generated POD mirror (pf_pending_order_v1_t). The ctypes struct
+        # is built from the runtime's own field table -- see
+        # build_pending_order_struct -- so an appended field cannot
+        # desynchronise this reader. Older .so builds predate the exports:
+        # hasattr-guarded, PendingOrderV1 stays None and --dump-book warns.
+        self.pending_order_layout: list[tuple[str, str, int, int]] | None = None
+        self.PendingOrderV1: type | None = None
+        if hasattr(L, "strategy_pending_order_layout"):
+            L.strategy_pending_orders_len.argtypes = [ctypes.c_void_p]
+            L.strategy_pending_orders_len.restype = ctypes.c_int
+            L.strategy_pending_order_get.argtypes = [
+                ctypes.c_void_p, ctypes.c_int, ctypes.c_void_p, ctypes.c_size_t]
+            L.strategy_pending_order_get.restype = ctypes.c_int
+            L.strategy_pending_order_layout.argtypes = [ctypes.POINTER(ctypes.c_int)]
+            L.strategy_pending_order_layout.restype = ctypes.POINTER(PfFieldDescC)
+            self.pending_order_layout = _pending_order_layout(L)
+            self.PendingOrderV1 = build_pending_order_struct(self.pending_order_layout)
         # ``strategy_set_chart_timezone`` lets the harness tell the engine
         # which IANA wall-clock zone Pine's ``hour`` / ``minute`` /
         # ``dayofweek`` (and the 1-arg function overloads) should produce.
@@ -1327,12 +1439,41 @@ class Strategy:
         if hasattr(L, "pf_version_string"):
             L.pf_version_string.restype = ctypes.c_char_p
 
+    def read_pending_orders(self, state) -> list[dict]:
+        """Snapshot the live handle's resting-order book (ABI v4 task 7):
+        strategy_pending_orders_len + one strategy_pending_order_get per
+        order, each decoded through the layout-built PendingOrderV1. Must be
+        called while ``state`` is alive (run() does so before strategy_free).
+        Empty list when the .so predates the exports (PendingOrderV1 is
+        None) -- callers that need to distinguish check that attribute."""
+        if self.PendingOrderV1 is None or self.pending_order_layout is None:
+            return []
+        n = int(self.lib.strategy_pending_orders_len(state))
+        book: list[dict] = []
+        for i in range(n):
+            rec = self.PendingOrderV1()
+            rc = self.lib.strategy_pending_order_get(
+                state, i, ctypes.byref(rec), ctypes.sizeof(rec))
+            if rc != 0:
+                raise RuntimeError(f"strategy_pending_order_get({i}) returned {rc} (len={n})")
+            if int(rec.struct_version) != PENDING_ORDER_STRUCT_VERSION:
+                raise RuntimeError(
+                    f"pending order {i}: struct_version {int(rec.struct_version)} != "
+                    f"{PENDING_ORDER_STRUCT_VERSION}")
+            if int(rec.size) != ctypes.sizeof(rec):
+                raise RuntimeError(
+                    f"pending order {i}: runtime size {int(rec.size)} != "
+                    f"layout-built sizeof {ctypes.sizeof(rec)}")
+            book.append(pending_order_to_dict(rec, self.pending_order_layout))
+        return book
+
     def run(self, bars_csv: Path, params: dict | None = None,
             *, trace_enabled: bool = False, trade_start_time_ms: int | None = None,
             realtime_tail_horizon: int | None = None,
             probe_suppress_tail: bool = False,
             path_order: str | None = None,
             broker_state_hash_recording: bool = False,
+            dump_book: bool = False,
             strategy_overrides: dict | None = None,
             chart_timezone: str | None = None,
             syminfo_timezone: str | None = None,
@@ -1388,6 +1529,11 @@ class Strategy:
         after the engine-error check and BEFORE ``report_free``, so
         callers can read report fields the summary dict does not carry
         (``metrics.equity``, the raw ``equity_curve``, ...).
+
+        ``dump_book`` adds ``pending_orders`` -- the post-run resting-order
+        book as a list of dicts (read_pending_orders, ABI v4 task 7) -- to
+        the returned dict. Read-only: the run itself is unchanged. Omitted
+        (not an empty list) when the .so predates the exports.
         """
         source_feed_sha256 = None
         if preloaded_bars is not None:
@@ -1634,6 +1780,8 @@ class Strategy:
                     int(incarnation_accessor(state, i))
                     if incarnation_accessor is not None else 0
                 )
+            if dump_book and self.PendingOrderV1 is not None:
+                result["pending_orders"] = self.read_pending_orders(state)
             if source_feed_sha256 is not None:
                 result["source_feed_sha256"] = source_feed_sha256
             if aux_requested:
@@ -2660,6 +2808,12 @@ def main() -> int:
                          "and write the array as JSON. Written next to --trace-json as "
                          "'broker_state_hash.json' when that flag is given, else next to the "
                          "engine_trades.csv output. --runner ctypes only.")
+    ap.add_argument("--dump-book", type=Path, default=None, metavar="PATH",
+                    help="ABI v4 live-runtime surface (task 7): after the run, write the "
+                         "engine's resting-order book -- every pf_pending_order_v1_t read "
+                         "through strategy_pending_orders_len/strategy_pending_order_get -- "
+                         "as JSON to PATH ({struct_version, layout, count, orders[]}). "
+                         "Read-only; the run is unchanged. --runner ctypes only.")
     ap.add_argument("--inputs-json", type=Path, default=None,
                     help="Use this inputs.json instead of strategy_dir/inputs.json. "
                          "Lets ad-hoc validation runs override strategy properties "
@@ -2804,6 +2958,10 @@ def main() -> int:
             sys.exit(
                 "error: --runner docker does not support --broker-state-hash; "
                 "use --runner ctypes with a freshly built strategy library.")
+        if args.dump_book is not None:
+            sys.exit(
+                "error: --runner docker does not support --dump-book; "
+                "use --runner ctypes with a freshly built strategy library.")
         strat = None
         report = _run_via_docker(strategy_dir, ohlcv_path, params, run_kwargs,
                                  trade_start_ms, args.image)
@@ -2817,6 +2975,7 @@ def main() -> int:
                            probe_suppress_tail=args.probe_suppress_tail,
                            path_order=args.path_order,
                            broker_state_hash_recording=args.broker_state_hash,
+                           dump_book=args.dump_book is not None,
                            **run_kwargs)
     raw_trade_count = len(report["trades"])
     trades_to_write = _filter_trades_to_window(report["trades"], report_window)
@@ -2875,6 +3034,33 @@ def main() -> int:
                     "entries": entries,
                 }, f)
             print(f"  broker-state-hash: wrote {len(entries)} entries to {bsh_path}")
+    if args.dump_book is not None:
+        # strat is None only under --runner docker, which sys.exit's above
+        # when --dump-book is set. A .so predating the exports still runs
+        # (the accessors are hasattr-guarded) but has no book to read --
+        # warn rather than write an empty, misleading file.
+        if strat.PendingOrderV1 is None:
+            print("  dump-book: WARNING -- strategy.so predates "
+                  "strategy_pending_order_layout (rebuild the engine); "
+                  f"skipping {args.dump_book}", file=sys.stderr)
+        else:
+            book = report.get("pending_orders", [])
+            args.dump_book.parent.mkdir(parents=True, exist_ok=True)
+            with args.dump_book.open("w", encoding="utf-8") as f:
+                json.dump({
+                    "strategy": str(strategy_dir),
+                    "ohlcv": str(ohlcv_path),
+                    "struct_version": PENDING_ORDER_STRUCT_VERSION,
+                    # The runtime's own field table, so a consumer can tell
+                    # which fields this engine build emitted.
+                    "layout": [
+                        {"name": n, "type": t, "offset": o, "size": z}
+                        for n, t, o, z in strat.pending_order_layout
+                    ],
+                    "count": len(book),
+                    "orders": book,
+                }, f)
+            print(f"  dump-book: wrote {len(book)} resting order(s) to {args.dump_book}")
     if args.fingerprint_json is not None:
         try:
             cpp_path = strategy_dir / "generated.cpp"

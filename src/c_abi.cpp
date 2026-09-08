@@ -14,7 +14,9 @@
  *     strategy_last_run_status, strategy_set_realtime_tail,
  *     strategy_set_probe_suppress_tail_logic, strategy_set_path_order,
  *     strategy_last_bar_dual_entry_path,
- *     strategy_set_broker_state_hash_recording, strategy_broker_state_hash),
+ *     strategy_set_broker_state_hash_recording, strategy_broker_state_hash,
+ *     strategy_pending_orders_len, strategy_pending_order_get,
+ *     strategy_pending_order_layout),
  *     pf_version_get/pf_version_string,
  *     pf_abi_version — the authoritative list is EXPECTED_RUNTIME in
  *     scripts/check_c_abi_runtime.py, enforced by CI). The other
@@ -31,6 +33,13 @@
 #include <pineforge/bar.hpp>
 #include <pineforge/magnifier.hpp>
 #include <cstddef>
+#include <cstring>
+
+namespace pineforge {
+// Generated (src/pending_order_mirror.cpp, scripts/gen_pending_order_mirror.py).
+void fill_pending_order_mirror(const PendingOrder& src, pf_pending_order_v1_t* out);
+const pf_field_desc_t* pending_order_layout(int* count);
+}  // namespace pineforge
 
 /* ── Bar layout parity ──────────────────────────────────────────── */
 
@@ -302,6 +311,35 @@ PF_API void strategy_set_broker_state_hash_recording(pf_strategy_t s, int on) {
 PF_API uint64_t strategy_broker_state_hash(pf_strategy_t s) {
     if (!s) return 0;
     return static_cast<const pineforge::BacktestEngine*>(s)->broker_state_hash();
+}
+
+/* ABI v4 live-runtime surface (task 7, spec 3.6): the resting-order book
+ * after the most recent run(), read through the generated POD mirror
+ * (pf_pending_order_v1_t, include/pineforge/pending_order_mirror.hpp;
+ * fill_pending_order_mirror / pending_order_layout live in the generated
+ * src/pending_order_mirror.cpp). Read-only accessors: no historical run
+ * changes because a caller read them. */
+PF_API int strategy_pending_orders_len(pf_strategy_t s) {
+    if (!s) return 0;
+    return static_cast<const pineforge::BacktestEngine*>(s)->pending_order_count();
+}
+
+/* Copies min(size_in, sizeof(pf_pending_order_v1_t)) bytes so an older
+ * (smaller) or newer (larger) caller struct both work: the first two
+ * fields are always struct_version and size. -1 (nothing written) on a
+ * NULL handle/out or an out-of-range index. */
+PF_API int strategy_pending_order_get(pf_strategy_t s, int index, void* out, size_t size_in) {
+    if (!s || !out) return -1;
+    const auto* engine = static_cast<const pineforge::BacktestEngine*>(s);
+    if (index < 0 || index >= engine->pending_order_count()) return -1;
+    pf_pending_order_v1_t tmp;
+    pineforge::fill_pending_order_mirror(engine->pending_order_at(index), &tmp);
+    std::memcpy(out, &tmp, size_in < sizeof(tmp) ? size_in : sizeof(tmp));
+    return 0;
+}
+
+PF_API const pf_field_desc_t* strategy_pending_order_layout(int* count) {
+    return pineforge::pending_order_layout(count);
 }
 
 PF_API int strategy_stream_begin(pf_strategy_t s,
