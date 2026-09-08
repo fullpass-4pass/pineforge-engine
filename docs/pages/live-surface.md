@@ -4,7 +4,7 @@
 
 **ABI v4** (`PF_ABI_VERSION == 4`) appends 24 exports and two `pf_report_t`
 fields for `pineforge-live`, the recompute-based live runtime built on top
-of this engine (see [pineforge-live design spec §3](https://github.com/pineforge-4pass/pineforge-workflow-live)
+of this engine (see [`pineforge-workflow-live/docs/superpowers/specs/2026-09-07-pineforge-live-design.md` §3](https://github.com/pineforge-4pass/pineforge-workflow-live)
 for the full contract this surface serves). Every one of the 24 symbols is
 **default off / read-only** and **never changes a historical run**: the
 four configuration setters below default to the pre-v4 behavior, and every
@@ -21,7 +21,7 @@ runtime works by *recomputing* it (see @ref streaming for why the
 
 | Symbol | Purpose | Default | Changes history when off? |
 | --- | --- | --- | --- |
-| `strategy_request_abort` | Set a cooperative abort flag, consumed by the run in progress, checked at the top of both bar loops. | N/A — an action, not configuration; cleared at `run()` entry. | No |
+| `strategy_request_abort` | Set a cooperative abort flag, consumed by the run in progress, checked at the top of every bar loop (the single-timeframe `run()` loop, `run_simple_bar_loop`, `run_aggregation_bar_loop`). | N/A — an action, not configuration; cleared at `run()` entry. | No |
 | `strategy_last_run_status` | `0` completed, `1` `NOT_COMPLETED` (aborted), `-1` if `s` is `NULL`. | N/A — read-only. | No |
 | `strategy_set_realtime_tail` | Mark the array's last bar as a still-forming tail (§3.1 semantics below). | Off (`on == 0`). | No |
 | `strategy_set_probe_suppress_tail_logic` | Run only the broker's pre-`on_bar` steps on the last bar and stop (§3.2 below). | Off (`on == 0`). | No |
@@ -32,9 +32,9 @@ runtime works by *recomputing* it (see @ref streaming for why the
 | `strategy_pending_orders_len` | Count of orders resting in the pending-order book after the most recent `run()` — the book in force for the next bar. `0` if `s` is `NULL`. | N/A — read-only. | No |
 | `strategy_pending_order_get` | Copy the *i*-th resting order into a `pf_pending_order_v1_t` snapshot (see [The pending-order mirror](#live_surface_pending_mirror)). | N/A — read-only. | No |
 | `strategy_pending_order_layout` | The field table (`pf_field_desc_t[]`: name, type, offset, size) of `pf_pending_order_v1_t` as this runtime compiled it. Static storage, no handle needed. | N/A — static. | No |
-| `strategy_pending_order_fill_qty` | The contracts the *i*-th resting order would open if filled at a given price, and which of 4 sizing rules (`EXPLICIT`/`FROZEN_PLACEMENT`/`DEFAULT_STOP_PLACEMENT`/`AT_FILL`) produced it, plus a `close_only` flag. | N/A — read-only. | No |
+| `strategy_pending_order_fill_qty` | The contracts the *i*-th resting order would open if filled at a given price, and which of 4 sizing rules (`EXPLICIT`/`FROZEN_PLACEMENT`/`DEFAULT_STOP_PLACEMENT`/`AT_FILL`) produced it, plus a `close_only` flag. Returns `0` on success; `1` — with `qty` NaN, `close_only` 0, `partition` -1 — when the order is an EXIT (its fill qty is decided against the live position at the fill); `-1` with nothing written when `s` is `NULL`, `index` is out of range, or any out-pointer is `NULL`. | N/A — read-only. | No |
 | `strategy_pending_order_level_resolved` | `1` when the *i*-th order's `from_entry`-relative offsets resolve now (entries/plain orders/empty-`from_entry` exits: always; a bound exit: only once that entry has filled in the current cycle). `-1` if `s` is `NULL` or `index` is out of range. | N/A — read-only. | No |
-| `strategy_pending_order_effective_levels` | The *i*-th order's resolved `stop`/`limit`/`trail_activation` price levels, as the fill path resolves them. `NaN` for an unset/unresolvable leg. | N/A — read-only. | No |
+| `strategy_pending_order_effective_levels` | The *i*-th order's resolved `stop`/`limit`/`trail_activation` price levels, as the fill path resolves them. `NaN` for an unset/unresolvable leg. Returns `0`; `-1` with nothing written under the same three conditions as `strategy_pending_order_fill_qty` (`s` `NULL`, `index` out of range, or any out-pointer `NULL`). | N/A — read-only. | No |
 | `strategy_trail_best_price` | The running trail extreme (`trail_best_price_`) the exit trail legs ride: high-since-fill for a long, low-since-fill for a short. `NaN` if `s` is `NULL` or no position has filled. | N/A — read-only. | No |
 | `strategy_position_avg_price` | The live position's volume-weighted average entry price. `NaN` if `s` is `NULL` or the position is flat. | N/A — read-only. | No |
 | `strategy_position_cycle_seq` | The live position's cycle id: `0` when flat, a fresh nonzero id per open/reversal, unchanged across same-direction adds. `-1` if `s` is `NULL`. | N/A — read-only. | No |
@@ -70,7 +70,8 @@ configuration**, not one-shot: it stays in effect until a caller passes
 3. `bar_index` stays put; `last_bar_index` (and `last_bar_time`) are frozen
    at the horizon bar (`horizon_bars - 1`), when `horizon_bars > 0`.
 4. The range-end synthetic close row/trade is skipped (no `open_at_end`
-   row); the final equity point keeps `open_profit`.
+   row); the final equity point keeps `open_profit`, and the drawdown/runup
+   scalars are folded without the range-end row.
 5. Interior bars (every bar before the last) are unaffected.
 
 Default off (`on == 0`): every historical run stays byte-identical to
@@ -102,8 +103,14 @@ not coupled; set each explicitly.
 Dispatch-path scope: honoured only on the standard `dispatch_bar` path (the
 single-timeframe run loop and the `input_tf == script_tf` simple bar loop).
 Silent no-op under `calc_on_order_fills` and under the bar magnifier —
-both are gated features in v1 and a probe must not enable them. Clear this
-flag before `strategy_stream_begin`; the warmup replay is a `run()`.
+both are gated features in v1 and a probe must not enable them. On the
+non-magnifier aggregation path (`input_tf < script_tf`) the semantics are
+UNDEFINED until the partial-bucket forming-bar flag lands: callers must
+feed an `input_tf == script_tf` array until that flag exists. Under
+`process_orders_on_close`, the pre-script carried-position margin helpers
+that `process_margin_call` would otherwise run are also skipped on the
+suppressed last bar. Clear this flag before `strategy_stream_begin`; the
+warmup replay is a `run()`.
 
 Default off (`on == 0`): every historical run stays byte-identical to
 before this flag existed.
@@ -154,8 +161,10 @@ existed.
 
 `strategy_request_abort(s)` sets an atomic flag from any thread, consumed
 by the run in progress and cleared at `run()` entry (a no-op when idle),
-checked at the top of both bar loops. `strategy_last_run_status(s)` (an
-append-only status accessor) reports whether the most recent run completed
+checked at the top of every bar loop (the single-timeframe `run()` loop,
+`run_simple_bar_loop`, `run_aggregation_bar_loop`).
+`strategy_last_run_status(s)` (an append-only status accessor) reports
+whether the most recent run completed
 (`0`) or was aborted (`1`, `NOT_COMPLETED`); `-1` if `s` is `NULL`. L0 pins
 **"abort before run → run completes"**: requesting an abort before a run
 starts must not prevent that run from completing, since the flag is

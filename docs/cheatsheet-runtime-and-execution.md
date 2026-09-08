@@ -345,13 +345,15 @@ Audited gaps a forward/real-time executor must know (beyond per-order fills).
   for NaN-qty siblings.
 - **Trail caveats:** `trail_price` **is read by the fill path**, not ignored:
   when `trail_points` is unset it is used verbatim as the trail-activation
-  level (`resolve_exit_path_fill` and the dormant-bracket trail check,
-  `engine_fills.cpp:4916-4926,8006-8019` — `has_trail` tests
-  `!std::isnan(o.trail_price)` alongside `trail_points`, and
-  `*trail_activation`/`activation` default to `o.trail_price` before
-  `trail_points`, when set, overrides it); `trail_points` wins over
-  `trail_price` when both are set. `trail_points`/`trail_offset` are
-  `ceil`-ed to whole ticks before computing the activation level;
+  level (`compute_exit_trail_state`, `engine_path_resolve.cpp:683-707`,
+  called by `resolve_exit_path_fill` from the exit fill path
+  `engine_fills.cpp:8628-8635`; and the dormant-bracket trail check
+  `engine_fills.cpp:8006-8019` — `has_trail` tests
+  `!std::isnan(o.trail_price)` alongside `trail_points`, and the activation
+  defaults to `trail_price` before `trail_points`, when set, overrides it);
+  `trail_points` wins over `trail_price` when both are set.
+  `trail_points`/`trail_offset` are `ceil`-ed to whole ticks before
+  computing the activation level;
   **no-offset trail** (`exits_at_activation`) fires at the activation level
   itself; `trail_best_price_` resets to `close` on the first `strategy.exit`
   for an id (preserved on re-issue).
@@ -459,8 +461,8 @@ then `execute_partial_exit_qty` (`engine_orders.cpp:154-155`) applies it
 **again** → the bracket close-then-enter exit may be **double-slipped**. The
 public corpus is **not** uniformly `slippage=0`: 252/312 probes declare no
 slippage (where double-rounding zero is idempotent and this path is
-effectively masked), but 60/312 declare a non-zero `slippage` (`slippage=1|2`;
-62/312 also declare a non-zero `commission_value`) — for those 60 the
+effectively masked), but 60/312 declare a non-zero `slippage` (`slippage=1|2`; and,
+independently, 62/312 declare a non-zero `commission_value`) — for those 60 the
 idempotent-zero argument does not apply, and whether any of them actually
 exercises `close_opposite_then_enter` is unverified. Worth a targeted test
 before trusting slippage on that path.

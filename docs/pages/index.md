@@ -83,7 +83,7 @@ End-to-end, runnable examples that go beyond the MACD tutorial:
 
 ## API at a glance
 
-The entire public surface fits in **one header** and **28 functions**:
+The entire public surface fits in **one header** and **56 functions**:
 
 | Group | Symbols | Reference |
 | --- | --- | --- |
@@ -94,7 +94,7 @@ The entire public surface fits in **one header** and **28 functions**:
 | Version | `pf_version_get`, `pf_abi_version`, `pf_version_string` | @ref pf_version |
 | Types | `pf_bar_t`, `pf_trade_tick_t`, `pf_trade_t`, `pf_report_t`, metrics, diagnostics, trace, equity, version, and `pf_magnifier_distribution_t` | @ref pf_types |
 
-Every PineForge-generated strategy `.so` exports exactly these 28 symbols
+Every PineForge-generated strategy `.so` exports exactly these 56 symbols
 and zero internal C++ symbols — see
 **[ABI stability](@ref abi_stability)** for the full guarantee.
 

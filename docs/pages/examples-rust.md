@@ -163,12 +163,16 @@ struct PfReport {
     metrics: PfMetrics,
     equity_curve: *mut PfEquityPoint,
     equity_curve_len: i64,
+
+    // ABI v4: per-script-bar broker-state hash (NULL / 0-length unless recording is on)
+    broker_state_hash: *mut u64,
+    broker_state_hash_len: i64,
 }
 
 const PF_MAGNIFIER_ENDPOINTS: c_int = 3;
 
 // PfReport is CALLER-allocated: before any run, resolve `pf_abi_version`
-// via libloading and assert it returns 3 (PF_ABI_VERSION) — an old .so
+// via libloading and assert it returns 4 (PF_ABI_VERSION) — an old .so
 // writing into this larger struct (or vice versa) corrupts memory silently.
 
 // ── Safe wrapper ──────────────────────────────────────────────────────

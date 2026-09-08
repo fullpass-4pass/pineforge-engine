@@ -53,15 +53,22 @@ typedef struct pf_report_s {
     /* Per-script-bar equity curve (ABI v2) */
     pf_equity_point_t*  equity_curve;
     int64_t             equity_curve_len;   /* NOTE: int64, not int */
+
+    /* Per-script-bar broker-state hash (ABI v4; NULL / 0-length unless
+     * strategy_set_broker_state_hash_recording is on) */
+    uint64_t*           broker_state_hash;
+    int64_t             broker_state_hash_len;
 } pf_report_t;
 ```
 
 @note The `metrics` / `equity_curve` fields were appended in **ABI
 version 2** (`PF_ABI_VERSION`). `pf_report_t` is caller-allocated, so
-consumers must check `pf_abi_version() == 3` before running — a `.so`
+consumers must check `pf_abi_version() == 4` before running — a `.so`
 with no `pf_abi_version` symbol is ABI v1 and predates these fields.
 **ABI version 3** appends `pf_trade_t::open_at_end`, the range-end close
-flag; a v2 reader would misindex the trades array.
+flag; a v2 reader would misindex the trades array. **ABI version 4**
+appends `pf_report_t::broker_state_hash` / `broker_state_hash_len`; a v3
+reader's struct is 16 bytes too small.
 
 ## Trade fields
 
