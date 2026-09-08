@@ -209,7 +209,7 @@ TradingView ties some day-boundary logic (intraday order caps, session rollovers
 
 ## Public C ABI
 
-`<pineforge/pineforge.h>` is the single canonical consumer header. Every compiled strategy `.so` exports exactly these 32 symbols and no internal C++ symbol (`-fvisibility=hidden`, `PF_API` on the public set, checked in CI by `scripts/check_c_abi_runtime.py`):
+`<pineforge/pineforge.h>` is the single canonical consumer header. Every compiled strategy `.so` exports exactly these 56 symbols and no internal C++ symbol (`-fvisibility=hidden`, `PF_API` on the public set, checked in CI by `scripts/check_c_abi_runtime.py`):
 
 | Symbol | Role |
 |---|---|
@@ -227,9 +227,21 @@ TradingView ties some day-boundary logic (intraday order caps, session rollovers
 | `strategy_set_native_security_feed` / `strategy_set_aux_security_feed` | Feed `request.security()` from a native higher-timeframe series / an auxiliary bar-aligned feed |
 | `strategy_set_account_currency_fx_series` | Effective-time quote-to-account FX |
 | `strategy_get_last_error` | The latest runtime error |
-| `pf_version_get` / `pf_version_string` / `pf_abi_version` | Runtime version, version string, struct-layout version (`PF_ABI_VERSION == 3`) |
+| `pf_version_get` / `pf_version_string` / `pf_abi_version` | Runtime version, version string, struct-layout version (`PF_ABI_VERSION == 4`) |
+| `strategy_request_abort` / `strategy_last_run_status` | Cooperative abort of a run in progress; `0`=completed, `1`=aborted |
+| `strategy_set_realtime_tail` | Live-runtime surface (ABI v4): the array's last bar is a still-forming tail — `barstate.islast=false`, `last_bar_index`/`last_bar_time` frozen at the horizon bar, no range-end row |
+| `strategy_set_probe_suppress_tail_logic` | ABI v4: the last bar runs only the broker's pre-`on_bar` steps (pending-order settlement, intraday-cap/loss checks) and returns — no `on_bar`, no range-end/margin-call/bracket-reissue processing |
+| `strategy_set_path_order` / `strategy_last_bar_dual_entry_path` | ABI v4: force the intrabar O→H/L→C leg order (`AUTO`/`HIGH_FIRST`/`LOW_FIRST`) for path-dependent fill probing; read which side won a same-bar dual-entry-stop arbitration |
+| `strategy_set_broker_state_hash_recording` / `strategy_broker_state_hash` | ABI v4: toggle a 64-bit broker-state hash appended per script bar to `pf_report_t::broker_state_hash`; read the final state's hash |
+| `strategy_pending_orders_len` / `strategy_pending_order_get` / `strategy_pending_order_layout` | ABI v4: the resting pending-order book after the most recent run — count, a POD snapshot per order (`pf_pending_order_v1_t`), and the snapshot's self-describing field layout |
+| `strategy_pending_order_fill_qty` / `_level_resolved` / `_effective_levels` / `strategy_trail_best_price` | ABI v4: engine-computed values for a resting order — the quantity it would fill at a given price, whether its relative offsets resolve yet, its resolved stop/limit/trail-activation levels, and the live position's trail extreme |
+| `strategy_position_avg_price` / `strategy_position_cycle_seq` / `strategy_position_size` | ABI v4: the live position's volume-weighted average entry price, its cycle id, and its script-facing signed size |
+| `strategy_closed_trade_entry_id` / `_exit_id` / `_exit_comment` / `_close_cause` | ABI v4: per-closed-trade id/comment strings and a `close_cause` enum (`SCRIPT`/`BRACKET`/`MARGIN_CALL`/`INTRADAY_LOSS_CAP`/`INTRADAY_FILL_CAP`/`RANGE_END`), indexed like `strategy_closed_trade_entry_incarnation` |
+| `strategy_current_equity` / `strategy_script_bars_processed` | ABI v4: `initial_capital + netprofit` (not Pine's `strategy.equity`, which also adds open profit); total script bars dispatched by the most recent run |
 
-POD types `pf_bar_t`, `pf_trade_tick_t`, `pf_trade_t`, `pf_report_t`, `pf_security_diag_t`, `pf_trace_entry_t`, `pf_version_t`, `pf_trade_stats_t`, `pf_equity_stats_t`, `pf_metrics_t`, `pf_equity_point_t` and the `pf_magnifier_distribution_t` enum complete the surface. ABI v2 added computed trading metrics and a per-bar equity curve; ABI v3 added `pf_trade_t::open_at_end`, TradingView's range-end close of a position still open after the last bar. Check `pf_abi_version()` before running: the report struct is caller-allocated.
+POD types `pf_bar_t`, `pf_trade_tick_t`, `pf_trade_t`, `pf_report_t`, `pf_security_diag_t`, `pf_trace_entry_t`, `pf_version_t`, `pf_trade_stats_t`, `pf_equity_stats_t`, `pf_metrics_t`, `pf_equity_point_t`, `pf_pending_order_v1_t`, `pf_field_desc_t` and the `pf_magnifier_distribution_t` enum complete the surface. ABI v2 added computed trading metrics and a per-bar equity curve; ABI v3 added `pf_trade_t::open_at_end`, TradingView's range-end close of a position still open after the last bar; ABI v4 added the live-runtime accessors above plus `pf_report_t::broker_state_hash` / `broker_state_hash_len` (a per-script-bar broker-state hash array, appended after `equity_curve_len`, NULL/0-length unless `strategy_set_broker_state_hash_recording` is on) and the `pf_pending_order_v1_t` generated POD mirror of the engine's resting-order record. Check `pf_abi_version()` before running: the report struct is caller-allocated.
+
+Full flag semantics, string lifetimes and the three L0 evidence lanes behind the ABI v4 live surface: [`docs/pages/live-surface.md`](docs/pages/live-surface.md).
 
 **Stability guarantee.** Within a major version, struct layouts and `extern "C"` signatures are append-only — fields and functions are added, never reordered, removed or retyped; `static_assert`s in `src/c_abi.cpp` pin the layouts. Semantic versioning at the ABI level: PATCH never touches the ABI, MINOR appends, MAJOR breaks. A `.so` built against `0.X.Y` keeps working on any later `0.X.Z`.
 
@@ -261,6 +273,7 @@ Documentation: [C ABI reference](https://cdocs.pineforge.dev) · [Getting starte
 
 ## Releases
 
+- **v0.14.0** (2026-09-08) — ABI v4 live surface for `pineforge-live`: 24 new default-off exports (cooperative abort, realtime tail, probe-suppress tail logic, forced path order, a per-bar broker-state hash, the pending-order book as a generated POD mirror, closed-trade id/comment/close-cause, position and equity accessors). No flag changes a historical run: `scripts/live_flags_off_identity.py` (312 corpus probes, 0 differ vs the pre-v4 branch point), `scripts/live_flags_lane.py` (312 probes, 0 positives, 130 open-at-end trades subtracted), and `scripts/bar_identity_lane.py` (row 1: 222,295 bars compared, 2 explained open divergences, 0 else) all pass. 56 symbols.
 - **v0.13.0** (2026-09-05) — the parity campaign, rounds 1–11: TradingView's broker rules pinned with sensor exports and landed with replay tests — ten-significant-digit money, trailing-stop restarts, zero-offset trails, declined-reversal bracket legs, the surviving `strategy.close`, sparse `ta.atr`/`ta.tr`, pivot tick snap, same-bar entry/close transactions, early-close higher-timeframe buckets, 64-bit epoch arrays. Closed test 3,880/3,881; corpus 309/309. ABI v3, 32 symbols, 198 tests.
 - **v0.7 – v0.12** (June–August 2026) — native and auxiliary `request.security()` feeds, ABI v2 metrics + equity curve, streaming mode, range-end accounting. See [GitHub releases](https://github.com/pineforge-4pass/pineforge-engine/releases).
 - **v0.6.0** — performance sprint: cached static inputs, thread-local timestamp caching, lazy timezone caching; up to 6.7M bars/s.

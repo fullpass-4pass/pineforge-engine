@@ -343,11 +343,18 @@ Audited gaps a forward/real-time executor must know (beyond per-order fills).
   placement gate, and deferred-flip carry; closes-only into an opposite position
   (no re-entry); same pyramiding bypasses as ENTRY; OCA-cancel fires on any fill
   for NaN-qty siblings.
-- **Trail caveats:** `trail_price` param is **accepted but ignored**;
-  `trail_points`/`trail_offset` are `ceil`-ed to whole ticks before computing
-  the activation level; **no-offset trail** (`exits_at_activation`) fires at the
-  activation level itself; `trail_best_price_` resets to `close` on the first
-  `strategy.exit` for an id (preserved on re-issue).
+- **Trail caveats:** `trail_price` **is read by the fill path**, not ignored:
+  when `trail_points` is unset it is used verbatim as the trail-activation
+  level (`resolve_exit_path_fill` and the dormant-bracket trail check,
+  `engine_fills.cpp:4916-4926,8006-8019` — `has_trail` tests
+  `!std::isnan(o.trail_price)` alongside `trail_points`, and
+  `*trail_activation`/`activation` default to `o.trail_price` before
+  `trail_points`, when set, overrides it); `trail_points` wins over
+  `trail_price` when both are set. `trail_points`/`trail_offset` are
+  `ceil`-ed to whole ticks before computing the activation level;
+  **no-offset trail** (`exits_at_activation`) fires at the activation level
+  itself; `trail_best_price_` resets to `close` on the first `strategy.exit`
+  for an id (preserved on re-issue).
 - **Entry-bar wrong-side exit:** non-magnifier, an exit whose stop is on the
   wrong side of entry is **silently skipped** on the entry bar (na-stop guard);
   magnifier evaluates it (gap-fills at sub-bar open).
@@ -412,9 +419,19 @@ Audited gaps a forward/real-time executor must know (beyond per-order fills).
 ## 3.9 Report surface (C ABI)
 
 - `pf_report_t`/`pf_trade_t` expose `entry/exit time/price`, `pnl`, `pnl_pct`,
-  `is_long`, `qty`, `max_runup/drawdown` + run diagnostics. **No equity curve**
-  and **no `entry_id`/`exit_id`/comments/`bar_index`** over the C ABI — those
-  are C++-accessor-only. Derive equity/profit-factor/Sharpe from the trades.
+  `is_long`, `qty`, `max_runup/drawdown`, `entry_bar_index`/`exit_bar_index`,
+  `open_at_end` (ABI v3) + run diagnostics. **The equity curve exists since
+  ABI v2** (`pf_report_t::equity_curve`/`equity_curve_len`, per-script-bar).
+  **ABI v4 adds**: `strategy_closed_trade_entry_id`/`_exit_id`/`_exit_comment`
+  (per-trade id/comment strings, C-accessor-only — not struct fields),
+  `strategy_closed_trade_close_cause` (an enum: `SCRIPT`/`BRACKET`/
+  `MARGIN_CALL`/`INTRADAY_LOSS_CAP`/`INTRADAY_FILL_CAP`/`RANGE_END`), and
+  `strategy_script_bars_processed`. Still **not** available over the C ABI:
+  a per-trade `bar_index` beyond `entry_bar_index`/`exit_bar_index` (e.g. no
+  per-fill-leg or per-bracket-order bar index), the pending-order book's own
+  history (only the live snapshot via `strategy_pending_order_get`), and
+  per-bar Pine variable/series values outside `// @pf-trace` tracing. Derive
+  profit-factor/Sharpe from `pf_metrics_t` or the trades.
 - `pf_version_get()` / `pf_version_string()` for ABI gating.
 
 ## 3.10 Multi-run state and streams
@@ -439,6 +456,11 @@ Audited gaps a forward/real-time executor must know (beyond per-order fills).
 
 `close_opposite_then_enter` (`engine_orders.cpp:539`) calls `apply_slippage`,
 then `execute_partial_exit_qty` (`engine_orders.cpp:154-155`) applies it
-**again** → the bracket close-then-enter exit may be **double-slipped**. Masked
-in the corpus because all probes run `slippage=0` (double-rounding is
-idempotent there). Worth a targeted test before trusting slippage on that path.
+**again** → the bracket close-then-enter exit may be **double-slipped**. The
+public corpus is **not** uniformly `slippage=0`: 252/312 probes declare no
+slippage (where double-rounding zero is idempotent and this path is
+effectively masked), but 60/312 declare a non-zero `slippage` (`slippage=1|2`;
+62/312 also declare a non-zero `commission_value`) — for those 60 the
+idempotent-zero argument does not apply, and whether any of them actually
+exercises `close_opposite_then_enter` is unverified. Worth a targeted test
+before trusting slippage on that path.
