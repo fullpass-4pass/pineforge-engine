@@ -6767,10 +6767,24 @@ void BacktestEngine::apply_filled_order_to_state(
         trail_best_path_state = trail_best_price_;
     }
 
-    // Set exit_comment and exit_id on any trades created by this fill
+    // Set exit_comment and exit_id on any trades created by this fill. This
+    // is the single shared post-fill site for every order type (MARKET,
+    // ENTRY, EXIT, RAW_ORDER). exit_from_bracket (ABI v4 task 9,
+    // closed_trade_close_cause) must be true only for a REAL strategy.exit
+    // stop/limit/trail/profit/loss leg -- but OrderType::EXIT alone is not
+    // enough to tell one from a deferred strategy.close/close_all: queue_
+    // deferred_close_order (engine_strategy_commands.cpp) also materializes
+    // its synthetic close as an OrderType::EXIT PendingOrder (reusing the
+    // exit-fill qty/level machinery), tagged with the "__close__" id prefix
+    // it and execute_immediate_close both use (see the "__close__" id/
+    // exit_id sites throughout this file). Exclude that prefix so a script
+    // close is never misclassified as a bracket.
     for (size_t ti = trades_before; ti < trades_.size(); ++ti) {
         trades_[ti].exit_comment = order.comment;
         trades_[ti].exit_id = order.id;
+        trades_[ti].exit_from_bracket =
+            order.type == OrderType::EXIT
+            && order.id.rfind("__close__", 0) != 0;
     }
 
     // Handle OCA groups: cancel (type 1) cancels all siblings; reduce

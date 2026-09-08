@@ -19,7 +19,11 @@
  *     strategy_pending_order_layout, strategy_pending_order_fill_qty,
  *     strategy_pending_order_level_resolved,
  *     strategy_pending_order_effective_levels, strategy_trail_best_price,
- *     strategy_position_avg_price, strategy_position_cycle_seq),
+ *     strategy_position_avg_price, strategy_position_cycle_seq,
+ *     strategy_closed_trade_entry_id, strategy_closed_trade_exit_id,
+ *     strategy_closed_trade_exit_comment, strategy_closed_trade_close_cause,
+ *     strategy_position_size, strategy_current_equity,
+ *     strategy_script_bars_processed),
  *     pf_version_get/pf_version_string,
  *     pf_abi_version — the authoritative list is EXPECTED_RUNTIME in
  *     scripts/check_c_abi_runtime.py, enforced by CI). The other
@@ -193,6 +197,78 @@ PF_API uint64_t strategy_closed_trade_entry_incarnation(
     const auto* engine = static_cast<const pineforge::BacktestEngine*>(s);
     if (trade_index < 0 || trade_index >= engine->report_trade_count()) return 0;
     return engine->get_report_trade(trade_index).entry_incarnation;
+}
+
+/* ABI v4 live-runtime surface (task 9): closed-trade id / exit-comment
+ * string accessors, indexing the same REPORT row space as
+ * strategy_closed_trade_entry_incarnation above (trades_ then
+ * range_end_trades_). These read Trade::entry_id / exit_id / exit_comment
+ * directly rather than through the protected BacktestEngine::closed_trade_
+ * entry_id / _exit_id / _exit_comment methods -- those are a DIFFERENT,
+ * narrower accessor (strategy.closedtrades.* scope: trades_ only, no
+ * range-end rows) already declared with these exact names, so a same-name
+ * report-row overload is not possible.
+ *
+ * Returned pointers are valid until the next run() (or stream call) on this
+ * handle, like strategy_get_last_error -- the runtime's own std::string
+ * storage backing them is untouched until then. NULL on a NULL handle or an
+ * out-of-range trade_index. */
+PF_API const char* strategy_closed_trade_entry_id(pf_strategy_t s, int trade_index) {
+    if (!s) return nullptr;
+    const auto* engine = static_cast<const pineforge::BacktestEngine*>(s);
+    if (trade_index < 0 || trade_index >= engine->report_trade_count()) return nullptr;
+    return engine->get_report_trade(trade_index).entry_id.c_str();
+}
+
+PF_API const char* strategy_closed_trade_exit_id(pf_strategy_t s, int trade_index) {
+    if (!s) return nullptr;
+    const auto* engine = static_cast<const pineforge::BacktestEngine*>(s);
+    if (trade_index < 0 || trade_index >= engine->report_trade_count()) return nullptr;
+    return engine->get_report_trade(trade_index).exit_id.c_str();
+}
+
+PF_API const char* strategy_closed_trade_exit_comment(pf_strategy_t s, int trade_index) {
+    if (!s) return nullptr;
+    const auto* engine = static_cast<const pineforge::BacktestEngine*>(s);
+    if (trade_index < 0 || trade_index >= engine->report_trade_count()) return nullptr;
+    return engine->get_report_trade(trade_index).exit_comment.c_str();
+}
+
+/* ABI v4 live-runtime surface (task 9): why a REPORT-row closed trade
+ * exited (BacktestEngine::closed_trade_close_cause, engine_trade_
+ * accessors.cpp, has the full derivation order). 0 UNKNOWN, 1 SCRIPT
+ * (strategy.close/close_all or a reversal-driven close), 2 BRACKET (a
+ * strategy.exit stop/limit/trail/profit/loss leg), 3 MARGIN_CALL, 4
+ * INTRADAY_LOSS_CAP, 5 INTRADAY_FILL_CAP, 6 RANGE_END (the still-open
+ * position closed at the end of a flag-off run). -1 on a NULL handle, per
+ * the pf_live int-return convention; an out-of-range trade_index reads as
+ * 0 (delegated to the engine method, same as every other bad-index case). */
+PF_API int strategy_closed_trade_close_cause(pf_strategy_t s, int trade_index) {
+    if (!s) return -1;
+    return static_cast<const pineforge::BacktestEngine*>(s)->closed_trade_close_cause(trade_index);
+}
+
+/* ABI v4 live-runtime surface (task 9): the script-facing position size
+ * (strategy.position_size -- signed, KI-64 freeze-aware) and equity
+ * (strategy.equity -- initial capital + realized net profit, NOT including
+ * open profit) after the most recent run(). NaN on a NULL handle. */
+PF_API double strategy_position_size(pf_strategy_t s) {
+    if (!s) return std::numeric_limits<double>::quiet_NaN();
+    return static_cast<const pineforge::BacktestEngine*>(s)->live_position_size();
+}
+
+PF_API double strategy_current_equity(pf_strategy_t s) {
+    if (!s) return std::numeric_limits<double>::quiet_NaN();
+    return static_cast<const pineforge::BacktestEngine*>(s)->live_current_equity();
+}
+
+/* ABI v4 live-runtime surface (task 9): total SCRIPT bars dispatched by the
+ * most recent run() (mirrors pf_report_t::script_bars_processed, including
+ * a stream's warmup leg and every realtime tick-driven bar dispatched
+ * afterward). -1 on a NULL handle. */
+PF_API int64_t strategy_script_bars_processed(pf_strategy_t s) {
+    if (!s) return -1;
+    return static_cast<const pineforge::BacktestEngine*>(s)->script_bars_processed();
 }
 
 /* Toggle per-bar trace recording on a live strategy. Default off; the

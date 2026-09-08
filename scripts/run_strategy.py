@@ -1407,6 +1407,30 @@ class Strategy:
             L.strategy_position_avg_price.restype = ctypes.c_double
             L.strategy_position_cycle_seq.argtypes = [ctypes.c_void_p]
             L.strategy_position_cycle_seq.restype = ctypes.c_int64
+        # ABI v4 live-runtime surface (task 9): closed-trade id / exit-comment
+        # / close-cause accessors (report-row scope, spans range-end rows
+        # like strategy_closed_trade_entry_incarnation) and the position
+        # size / equity / script-bars-processed scalars. Older .so builds
+        # predate these exports -- hasattr-guarded like the rest.
+        if hasattr(L, "strategy_closed_trade_entry_id"):
+            L.strategy_closed_trade_entry_id.argtypes = [ctypes.c_void_p, ctypes.c_int]
+            L.strategy_closed_trade_entry_id.restype = ctypes.c_char_p
+            L.strategy_closed_trade_exit_id.argtypes = [ctypes.c_void_p, ctypes.c_int]
+            L.strategy_closed_trade_exit_id.restype = ctypes.c_char_p
+            L.strategy_closed_trade_exit_comment.argtypes = [ctypes.c_void_p, ctypes.c_int]
+            L.strategy_closed_trade_exit_comment.restype = ctypes.c_char_p
+        if hasattr(L, "strategy_closed_trade_close_cause"):
+            L.strategy_closed_trade_close_cause.argtypes = [ctypes.c_void_p, ctypes.c_int]
+            L.strategy_closed_trade_close_cause.restype = ctypes.c_int
+        if hasattr(L, "strategy_position_size"):
+            L.strategy_position_size.argtypes = [ctypes.c_void_p]
+            L.strategy_position_size.restype = ctypes.c_double
+        if hasattr(L, "strategy_current_equity"):
+            L.strategy_current_equity.argtypes = [ctypes.c_void_p]
+            L.strategy_current_equity.restype = ctypes.c_double
+        if hasattr(L, "strategy_script_bars_processed"):
+            L.strategy_script_bars_processed.argtypes = [ctypes.c_void_p]
+            L.strategy_script_bars_processed.restype = ctypes.c_int64
         # ``strategy_set_chart_timezone`` lets the harness tell the engine
         # which IANA wall-clock zone Pine's ``hour`` / ``minute`` /
         # ``dayofweek`` (and the 1-arg function overloads) should produce.
@@ -1902,11 +1926,34 @@ class Strategy:
             result = _report_to_dict(report)
             incarnation_accessor = getattr(
                 self.lib, "strategy_closed_trade_entry_incarnation", None)
+            # ABI v4 (task 9): entry_id / exit_id / exit_comment / close_cause
+            # are added to the JSON trade dicts ONLY -- never to
+            # write_engine_trades_csv's fixed column layout, which the
+            # corpus's engine_trades.csv is compared byte-for-byte against
+            # (verify_corpus.py). A new CSV column would change that
+            # committed byte layout for the flags-off identity task.
+            entry_id_accessor = getattr(self.lib, "strategy_closed_trade_entry_id", None)
+            exit_id_accessor = getattr(self.lib, "strategy_closed_trade_exit_id", None)
+            exit_comment_accessor = getattr(
+                self.lib, "strategy_closed_trade_exit_comment", None)
+            close_cause_accessor = getattr(
+                self.lib, "strategy_closed_trade_close_cause", None)
             for i, trade in enumerate(result["trades"]):
                 trade["entry_incarnation"] = (
                     int(incarnation_accessor(state, i))
                     if incarnation_accessor is not None else 0
                 )
+                if entry_id_accessor is not None:
+                    ptr = entry_id_accessor(state, i)
+                    trade["entry_id"] = ptr.decode("utf-8", "replace") if ptr else ""
+                if exit_id_accessor is not None:
+                    ptr = exit_id_accessor(state, i)
+                    trade["exit_id"] = ptr.decode("utf-8", "replace") if ptr else ""
+                if exit_comment_accessor is not None:
+                    ptr = exit_comment_accessor(state, i)
+                    trade["exit_comment"] = ptr.decode("utf-8", "replace") if ptr else ""
+                if close_cause_accessor is not None:
+                    trade["close_cause"] = int(close_cause_accessor(state, i))
             if dump_book and self.PendingOrderV1 is not None:
                 last_close = float(bars[n - 1].close) if n else None
                 result["pending_orders"] = self.read_pending_orders(state, last_close)

@@ -901,6 +901,59 @@ PF_API double strategy_position_avg_price(pf_strategy_t s);
  *  adds -- the id `created_position_cycle_seq` on a mirrored order refers
  *  to. -1 when @p s is NULL. */
 PF_API int64_t strategy_position_cycle_seq(pf_strategy_t s);
+/** Task 9: closed-trade id / exit-comment string accessors, indexing the
+ *  same REPORT row space as #strategy_closed_trade_entry_incarnation
+ *  (`trades_` then the range-end rows, `open_at_end`). The returned pointer
+ *  is valid until the next run() (or stream call) on this handle, like
+ *  #strategy_get_last_error. NULL on a NULL @p s or an out-of-range
+ *  @p trade_index. */
+PF_API const char* strategy_closed_trade_entry_id(pf_strategy_t s, int trade_index);
+/** See #strategy_closed_trade_entry_id. */
+PF_API const char* strategy_closed_trade_exit_id(pf_strategy_t s, int trade_index);
+/** See #strategy_closed_trade_entry_id. */
+PF_API const char* strategy_closed_trade_exit_comment(pf_strategy_t s, int trade_index);
+/** Task 9: why the @p trade_index-th REPORT-row closed trade exited.
+ *  Values:
+ *    - `0` UNKNOWN -- an out-of-range @p trade_index, or (on a live handle)
+ *      a close shape this classifier does not recognise.
+ *    - `1` SCRIPT -- a `strategy.close` / `strategy.close_all` market close,
+ *      or a reversal-driven close.
+ *    - `2` BRACKET -- a `strategy.exit` stop/limit/trail/profit/loss leg.
+ *    - `3` MARGIN_CALL -- a forced liquidation slice.
+ *    - `4` INTRADAY_LOSS_CAP -- `risk.max_intraday_loss`.
+ *    - `5` INTRADAY_FILL_CAP -- the max-filled-orders intraday cap.
+ *    - `6` RANGE_END -- the still-open position closed at the end of a
+ *      flag-off run (`open_at_end`, ABI v3) -- this always wins over every
+ *      other cause below it.
+ *  Derivation order (see `BacktestEngine::closed_trade_close_cause`,
+ *  engine_trade_accessors.cpp): `open_at_end` -> 6; `exit_id ==
+ *  "__margin_call__"` -> 3; an empty `exit_id` with `exit_comment` starting
+ *  `"Close Position (Max number of filled orders"` -> 5, or `"Close
+ *  Position (Max intraday Loss)"` -> 4; the row's `exit_from_bracket` flag
+ *  (true only for a REAL `strategy.exit` leg -- an `OrderType::EXIT` fill
+ *  whose id does NOT carry the internal `"__close__"` prefix that a
+ *  deferred `strategy.close`/`close_all` order is also given, since that
+ *  path reuses the same `OrderType::EXIT` fill machinery) -> 2; otherwise 1.
+ *  `-1` when @p s is NULL (the pf_live int-return convention); an
+ *  out-of-range @p trade_index reads as `0`, identical to a genuine UNKNOWN
+ *  row -- a caller that must tell the two apart bounds-checks against
+ *  #strategy_closed_trade_entry_incarnation's `report_trade_count` first. */
+PF_API int strategy_closed_trade_close_cause(pf_strategy_t s, int trade_index);
+/** Task 9: the script-facing signed position size (`strategy.position_size`;
+ *  KI-64 freeze-aware -- while a same-bar `process_orders_on_close` close is
+ *  frozen for the current bar, this reads the PRE-close position, matching
+ *  what the script itself observes). NaN when @p s is NULL. */
+PF_API double strategy_position_size(pf_strategy_t s);
+/** Task 9: `strategy.equity` -- initial capital plus realized net profit.
+ *  Deliberately does NOT include open profit (unlike the last point of
+ *  `pf_report_t::equity_curve`). NaN when @p s is NULL. */
+PF_API double strategy_current_equity(pf_strategy_t s);
+/** Task 9: total SCRIPT bars dispatched by the most recent run() (mirrors
+ *  `pf_report_t::script_bars_processed`, engine_report.cpp) -- includes a
+ *  stream's warmup leg and every realtime tick-driven bar dispatched
+ *  afterward by #strategy_stream_push_tick / #strategy_stream_push_ticks.
+ *  `-1` when @p s is NULL. */
+PF_API int64_t strategy_script_bars_processed(pf_strategy_t s);
 /** @} */
 
 /** @addtogroup pf_config

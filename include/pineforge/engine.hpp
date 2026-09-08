@@ -237,6 +237,21 @@ struct Trade {
     std::string entry_comment;
     std::string exit_comment;
     std::string exit_id;
+    // True when this trade's exit fill came from a REAL strategy.exit
+    // bracket leg (stop/limit/trail/profit/loss), as opposed to a
+    // strategy.close/close_all market close, a reversal-driven close, a
+    // margin-call slice, or an intraday-cap close. Set at the shared
+    // exit-fill site (apply_filled_order_to_state, engine_fills.cpp) from
+    // the filling order: OrderType::EXIT AND its id does NOT carry the
+    // internal "__close__" prefix -- queue_deferred_close_order
+    // (engine_strategy_commands.cpp) also materializes a deferred
+    // strategy.close as an OrderType::EXIT PendingOrder (it reuses the same
+    // exit-fill qty/level machinery), tagged with that prefix precisely so
+    // this flag can tell the two apart. ABI v4 task 9:
+    // closed_trade_close_cause() reads this to distinguish BRACKET (2) from
+    // SCRIPT (1); it is never set on a margin-call / intraday-cap row (those
+    // stay false and are classified from exit_id / exit_comment instead).
+    bool exit_from_bracket = false;
     double max_runup = 0.0;
     double max_drawdown = 0.0;
     double commission = 0.0;
@@ -4484,6 +4499,17 @@ public:
                             : range_end_trades_[(size_t)(i - n_closed)];
     }
 
+    // ABI v4 live-runtime surface (task 9): classify why a REPORT-row
+    // closed trade exited -- report-row scope (spans trades_ then
+    // range_end_trades_, like get_report_trade above), so this cannot reuse
+    // the existing protected closed_trade_* names below (strategy.
+    // closedtrades.* scope: trades_ only, std::string returns). 0 UNKNOWN
+    // (bad index), 1 SCRIPT, 2 BRACKET, 3 MARGIN_CALL, 4 INTRADAY_LOSS_CAP,
+    // 5 INTRADAY_FILL_CAP, 6 RANGE_END. Defined in engine_trade_accessors.cpp;
+    // see strategy_closed_trade_close_cause (pineforge.h) for the exact
+    // derivation order.
+    int closed_trade_close_cause(int i) const;
+
     // --- Position-size extremes (strategy.max_contracts_held_*) ---
     double max_contracts_held_all() const { return max_contracts_held_all_; }
     double max_contracts_held_long() const { return max_contracts_held_long_; }
@@ -4935,6 +4961,20 @@ public:
     double position_avg_price() const { return position_entry_price_; }
     int64_t position_cycle_seq() const { return position_cycle_seq_; }
     double trail_best_price() const { return trail_best_price_; }
+    // ABI v4 live-runtime surface (task 9): public forwarders for the C
+    // ABI, which -- being extern "C" free functions -- cannot reach the
+    // protected signed_position_size() / current_equity() above.
+    // signed_position_size() is strategy.position_size (KI-64 freeze-aware:
+    // reads the pre-close position while a same-bar POOC close is frozen).
+    // current_equity() is strategy.equity: initial capital + realized net
+    // profit -- it deliberately does NOT include open profit.
+    double live_position_size() const { return signed_position_size(); }
+    double live_current_equity() const { return current_equity(); }
+    // ABI v4 live-runtime surface (task 9): total SCRIPT bars dispatched by
+    // the most recent run() (mirrors pf_report_t::script_bars_processed,
+    // engine_report.cpp), including the stream warmup leg and every
+    // realtime tick-driven bar after strategy_stream_begin.
+    int64_t script_bars_processed() const { return diag_script_bars_processed_; }
 
     // ABI v4 live-runtime surface (task 6): when on, every script bar's
     // dispatch (all four script-bar dispatch sites -- the single-TF run()
