@@ -108,9 +108,11 @@ non-magnifier aggregation path (`input_tf < script_tf`) the semantics are
 UNDEFINED until the partial-bucket forming-bar flag lands: callers must
 feed an `input_tf == script_tf` array until that flag exists. Under
 `process_orders_on_close`, the pre-script carried-position margin helpers
-that `process_margin_call` would otherwise run are also skipped on the
-suppressed last bar. Clear this flag before `strategy_stream_begin`; the
-warmup replay is a `run()`.
+`dispatch_bar` runs ahead of the script (`tv_money_long_margin_call(…,
+carried_pooc_pre_close=true)` and
+`process_carried_pooc_short_margin_before_script`) are also skipped on the
+suppressed last bar, alongside `process_margin_call` itself. Clear this
+flag before `strategy_stream_begin`; the warmup replay is a `run()`.
 
 Default off (`on == 0`): every historical run stays byte-identical to
 before this flag existed.

@@ -89,6 +89,7 @@ The entire public surface fits in **one header** and **56 functions**:
 | --- | --- | --- |
 | Lifecycle | `strategy_create`, `strategy_free`, `run_backtest`, `run_backtest_full`, `report_free`, `strategy_closed_trade_entry_incarnation` | @ref pf_lifecycle |
 | Streaming | `strategy_stream_begin`, `strategy_stream_push_tick`, `strategy_stream_push_ticks`, `strategy_stream_advance_time`, `strategy_stream_end`, `strategy_stream_fill_report` | @ref pf_streaming |
+| Live runtime (ABI v4) | `strategy_request_abort`, `strategy_set_realtime_tail`, `strategy_set_probe_suppress_tail_logic`, `strategy_set_path_order`, the broker-state hash, the pending-order mirror, closed-trade id/comment/close-cause, position and equity accessors — 24 default-off exports | @ref pf_live |
 | Configuration | Inputs, strategy overrides, tracing, trade start, chart / symbol timezone, session, tick size, point value, numeric metadata, and timestamped account-currency FX | @ref pf_config |
 | Diagnostics | `strategy_get_last_error` | #strategy_get_last_error |
 | Version | `pf_version_get`, `pf_abi_version`, `pf_version_string` | @ref pf_version |
