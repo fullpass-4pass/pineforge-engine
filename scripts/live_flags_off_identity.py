@@ -89,7 +89,8 @@ def find_cases(engine_root: Path, only: str | None) -> tuple[list[tuple[Path, st
     return cases, no_lib
 
 
-def run_probe(engine_root: Path, strat_dir: Path, so_name: str, out: Path) -> subprocess.CompletedProcess:
+def run_probe(engine_root: Path, strat_dir: Path, so_name: str, out: Path,
+              extra_args: list[str] | None = None) -> subprocess.CompletedProcess:
     return subprocess.run(
         [
             sys.executable,
@@ -99,6 +100,7 @@ def run_probe(engine_root: Path, strat_dir: Path, so_name: str, out: Path) -> su
             so_name,
             "-o",
             str(out),
+            *(extra_args or []),
         ],
         capture_output=True,
         text=True,
@@ -292,7 +294,22 @@ def main() -> int:
         provenance = json.loads(provenance_path.read_text())
         reference_engine_head = provenance.get("engine_head", "")
         current_engine_head = git_head(engine_root)
-        print(f"reference engine {reference_engine_head[:12]} vs current engine {current_engine_head[:12]}")
+        reference_corpus_head = provenance.get("corpus_head", "")
+        current_corpus_head = git_head(engine_root / "corpus")
+        print(
+            f"reference engine {reference_engine_head[:12]} vs current engine "
+            f"{current_engine_head[:12]} (corpus {reference_corpus_head[:12]} vs "
+            f"{current_corpus_head[:12]})"
+        )
+        if reference_corpus_head != current_corpus_head:
+            print(
+                f"live_flags_off_identity: reference corpus {reference_corpus_head[:12]} "
+                f"!= current corpus {current_corpus_head[:12]} -- the reference was "
+                "emitted against a different corpus submodule commit; this comparison "
+                "would misattribute corpus drift to engine work (no override)",
+                file=sys.stderr,
+            )
+            return 1
         if reference_engine_head == current_engine_head and not args.allow_same_engine:
             print(
                 "live_flags_off_identity: reference engine and current engine are "
@@ -311,7 +328,11 @@ def main() -> int:
 
     if reference_dir is not None:
         run_slugs = {strat_dir.name for strat_dir, _ in cases}
-        ref_slugs = {p.parent.name for p in reference_dir.glob("*/engine_trades.csv")}
+        ref_slugs = {
+            p.parent.name
+            for p in reference_dir.glob("*/engine_trades.csv")
+            if not args.only or args.only in f"corpus/validation/{p.parent.name}"
+        }
         for slug in sorted(ref_slugs - run_slugs):
             bad_tagged.append(
                 (slug, "MISSING", "present in reference but not produced on this run (no compiled library, or filtered out by --only)")
