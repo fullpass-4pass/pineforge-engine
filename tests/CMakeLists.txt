@@ -225,6 +225,7 @@ set(TEST_SOURCES
     test_live_order_derived
     test_live_trade_accessors
     test_live_flags_off_identity
+    test_live_flags_lane_positive
 )
 
 find_package(Threads REQUIRED)

@@ -70,6 +70,23 @@ regime further trims the feed to TradingView's declared range via
 ``ohlcv_end_ms`` for almost every probe), so N+1000 and 2N remain "far"
 horizons (comfortably beyond the true last processed bar) regardless.
 
+As of this writing the corpus has no TRUE positive under this rule: a full
+run reports P=0 (312 probes, 130 open-at-end trades correctly subtracted
+by check A, 0 hash-prefix mismatches from check B). This proves the lane
+correctly rejects the harness artifact, but not that it can catch a real
+one. ``tests/test_live_flags_lane_positive.cpp`` is the seeded positive
+that proves the detection mechanism itself works: a `BacktestEngine`
+subclass that enters when ``pine_bar_index() == pine_last_bar_index() -
+5`` produces a trade under flags-off, produces none under
+``set_realtime_tail(true, 2N)`` (the trigger bar never arrives, since
+``pine_last_bar_index()`` is frozen at ``2N - 1`` for the whole run), and
+its broker-state hash array diverges from a flags-off run's starting
+exactly at the entry bar and stays diverged -- interior, not just the
+final bar -- exactly what checks A and B above are built to catch. A
+control strategy that ignores ``last_bar_index`` entirely is unaffected
+(identical trades, identical hashes on every bar but the last, under
+either mode).
+
 Usage
 -----
     python3 scripts/live_flags_lane.py [--jobs N] [--only SUBSTR]
