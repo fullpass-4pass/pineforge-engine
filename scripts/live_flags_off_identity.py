@@ -236,6 +236,15 @@ def main() -> int:
                     file=sys.stderr,
                 )
                 return 1
+            if not (emit_dir / "provenance.json").exists():
+                print(
+                    f"live_flags_off_identity: {emit_dir} is not empty and has no "
+                    f"{emit_dir / 'provenance.json'} -- it does not look like a prior "
+                    "--emit output, so --force refuses to clear it (rename/remove it "
+                    "yourself if that is really what you want)",
+                    file=sys.stderr,
+                )
+                return 1
             shutil.rmtree(emit_dir)
         emit_dir.mkdir(parents=True, exist_ok=True)
 
