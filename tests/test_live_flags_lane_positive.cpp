@@ -109,6 +109,7 @@ int main() {
     d.set_broker_state_hash_recording(true);
     d.set_realtime_tail(true, 2 * N);
     d.run(bars.data(), N);
+    CHECK(c.report_trade_count() >= 1);                 // non-vacuity: the control really does trade
     CHECK(same_trades(c, d));                           // (4) identical trades either way
     ReportC rc{};
     c.fill_report(&rc);

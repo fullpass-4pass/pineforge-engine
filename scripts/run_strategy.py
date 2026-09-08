@@ -3191,44 +3191,64 @@ def main() -> int:
                 "trace_names": report["trace_names"],
                 "trace": trace_to_write,
             }, f)
+    if args.realtime_tail is not None:
+        # Live-runtime tail (ABI v4, spec §3.1). strat is None only under
+        # --runner docker, which already sys.exit's above when
+        # --realtime-tail is set. Strategy.run's internal call is
+        # hasattr-guarded, so a .so predating the export would otherwise run
+        # to completion having silently ignored the flag -- for a lane whose
+        # whole method is "does the flagged run differ from the base run",
+        # a silently ignored flag makes every comparison vacuously pass.
+        # Fail hard here, same as --broker-state-hash below, rather than
+        # letting the CSV/trace come out identical to a flags-off run with
+        # no signal that the flag never reached the engine.
+        if not hasattr(strat.lib, "strategy_set_realtime_tail"):
+            sys.exit(
+                "error: --realtime-tail requires strategy_set_realtime_tail "
+                "(strategy.so predates ABI v4 spec section 3.1; rebuild the engine)")
+        # Receipt: a consumer (scripts/live_flags_lane.py) asserts this line
+        # is present in a flagged run's stdout so a future regression that
+        # silently no-ops the flag (e.g. an accidental hasattr-guard removal
+        # upstream) shows up as a missing receipt, not a quiet P=0.
+        print(f"realtime-tail: on horizon={args.realtime_tail}")
     if args.broker_state_hash:
         # strat is None only under --runner docker, which already sys.exit's
         # above when --broker-state-hash is set -- so reaching here means
-        # strat is the ctypes Strategy. A .so predating the export still
-        # runs (broker_state_hash_recording is hasattr-guarded in
-        # Strategy.run), but recorded nothing -- warn rather than silently
-        # write an empty/misleading file.
+        # strat is the ctypes Strategy. A .so predating the export would
+        # otherwise run to completion having recorded nothing -- fail hard
+        # (like --realtime-tail above) rather than silently writing no file,
+        # which downstream consumers (e.g. the live-flags lane) would
+        # otherwise have no way to distinguish from "prefix identical".
         if not hasattr(strat.lib, "strategy_set_broker_state_hash_recording"):
-            print("  broker-state-hash: WARNING -- strategy.so predates "
-                  "strategy_set_broker_state_hash_recording (rebuild the engine); "
-                  "no data was recorded, skipping broker_state_hash.json",
-                  file=sys.stderr)
-        else:
-            # Sibling of --trace-json when given (both are per-script-bar
-            # debug arrays); otherwise sibling of the trades CSV output.
-            bsh_path = ((args.trace_json.parent if args.trace_json is not None else out_path.parent)
-                        / "broker_state_hash.json")
-            bsh_path.parent.mkdir(parents=True, exist_ok=True)
-            bsh_values = report["broker_state_hash"]
-            bsh_times = report["equity_curve_time_ms"]
-            # Self-describing: script_bars_processed lets a consumer verify
-            # coverage without loading the trades CSV, and each entry pairs
-            # its script-bar OPEN timestamp with the hash (hex, not a bare
-            # JSON-Number, so no consumer can silently truncate a uint64 to
-            # a JS-safe double). Invariant (Strategy.run/_report_to_dict):
-            # len(bsh_values) == len(bsh_times) whenever recording was on.
-            entries = [
-                {"time_ms": bsh_times[i], "hash": format(bsh_values[i], "016x")}
-                for i in range(len(bsh_values))
-            ]
-            with bsh_path.open("w", encoding="utf-8") as f:
-                json.dump({
-                    "strategy": str(strategy_dir),
-                    "ohlcv": str(ohlcv_path),
-                    "script_bars_processed": report["script_bars_processed"],
-                    "entries": entries,
-                }, f)
-            print(f"  broker-state-hash: wrote {len(entries)} entries to {bsh_path}")
+            sys.exit(
+                "error: --broker-state-hash requires "
+                "strategy_set_broker_state_hash_recording (strategy.so predates "
+                "ABI v4 task 6; rebuild the engine)")
+        # Sibling of --trace-json when given (both are per-script-bar
+        # debug arrays); otherwise sibling of the trades CSV output.
+        bsh_path = ((args.trace_json.parent if args.trace_json is not None else out_path.parent)
+                    / "broker_state_hash.json")
+        bsh_path.parent.mkdir(parents=True, exist_ok=True)
+        bsh_values = report["broker_state_hash"]
+        bsh_times = report["equity_curve_time_ms"]
+        # Self-describing: script_bars_processed lets a consumer verify
+        # coverage without loading the trades CSV, and each entry pairs
+        # its script-bar OPEN timestamp with the hash (hex, not a bare
+        # JSON-Number, so no consumer can silently truncate a uint64 to
+        # a JS-safe double). Invariant (Strategy.run/_report_to_dict):
+        # len(bsh_values) == len(bsh_times) whenever recording was on.
+        entries = [
+            {"time_ms": bsh_times[i], "hash": format(bsh_values[i], "016x")}
+            for i in range(len(bsh_values))
+        ]
+        with bsh_path.open("w", encoding="utf-8") as f:
+            json.dump({
+                "strategy": str(strategy_dir),
+                "ohlcv": str(ohlcv_path),
+                "script_bars_processed": report["script_bars_processed"],
+                "entries": entries,
+            }, f)
+        print(f"  broker-state-hash: wrote {len(entries)} entries to {bsh_path}")
     if args.dump_book is not None:
         # strat is None only under --runner docker, which sys.exit's above
         # when --dump-book is set. A .so predating the exports still runs

@@ -291,6 +291,17 @@ add_test(
             ${PROJECT_SOURCE_DIR}/scripts/test_run_strategy_dump_book.py
 )
 
+# The live-flags lane's own pure bookkeeping (strip_open_at_end,
+# interior_diff, hash_diff_reason, fold_reasons) against synthetic
+# rows/hash arrays -- complements test_live_flags_lane_positive's engine-
+# level pin by proving the SCRIPT's comparison logic, not just the engine
+# mechanism it measures.
+add_test(
+    NAME live_flags_lane_selftest
+    COMMAND ${Python3_EXECUTABLE}
+            ${PROJECT_SOURCE_DIR}/scripts/live_flags_lane.py --self-test
+)
+
 # The committed PendingOrder POD mirror (include/pineforge/pending_order_mirror.hpp,
 # src/pending_order_mirror.cpp) must be exactly what engine.hpp generates:
 # a PendingOrder member nobody mirrored (or waived) fails here and in CI.
