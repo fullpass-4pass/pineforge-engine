@@ -743,6 +743,7 @@ void BacktestEngine::reset_run_state() {
     equity_curve_.clear();           // retain capacity (handle-reuse sweep pattern)
     bars_in_market_ = 0;
     first_bar_open_ = std::numeric_limits<double>::quiet_NaN();
+    broker_state_hashes_.clear();    // ABI v4 task 6: retain capacity like equity_curve_
 
     // Risk halt latch + day trackers (one-way halt must not survive a rerun).
     risk_halted_ = false;
@@ -908,6 +909,7 @@ void BacktestEngine::run(const Bar* bars, int n) {
         dispatch_bar();
         update_equity_extremes();
         record_equity_point(current_bar_.timestamp);  // ts not mutated on this path
+        if (broker_state_hash_recording_) broker_state_hashes_.push_back(broker_state_hash());
         prev_bar_timestamp_ = current_bar_.timestamp;
     }
     // TradingView's range-end accounting: a position still open after the
@@ -1905,6 +1907,7 @@ void BacktestEngine::run_simple_bar_loop(const Bar* input_bars, int n_input) {
         prev_in_session_ = session_ismarket_;
         update_equity_extremes();
         record_equity_point(current_bar_.timestamp);  // ts not mutated on this path
+        if (broker_state_hash_recording_) broker_state_hashes_.push_back(broker_state_hash());
         prev_bar_timestamp_ = current_bar_.timestamp;
     }
 }
@@ -2034,6 +2037,7 @@ void BacktestEngine::run_aggregation_bar_loop(const Bar* input_bars, int n_input
             }
             update_equity_extremes();
             record_equity_point(script_bar_ts);
+            if (broker_state_hash_recording_) broker_state_hashes_.push_back(broker_state_hash());
             prev_bar_timestamp_ = current_bar_.timestamp;
         }
         if (completed_on_boundary) {

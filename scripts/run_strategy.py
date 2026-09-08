@@ -788,6 +788,8 @@ class ReportC(ctypes.Structure):
         ("metrics", MetricsC),
         ("equity_curve", ctypes.POINTER(EquityPointC)),
         ("equity_curve_len", ctypes.c_int64),  # int64 in the C header, NOT c_int
+        ("broker_state_hash", ctypes.POINTER(ctypes.c_uint64)),
+        ("broker_state_hash_len", ctypes.c_int64),
     ]
 
 
@@ -795,12 +797,9 @@ class ReportC(ctypes.Structure):
 # pf_report_t is CALLER-allocated: running an old .so against the v3
 # ReportC mirror (or vice versa) silently corrupts memory, so the .so's
 # pf_abi_version() export is asserted before any run. v3 appended
-# pf_trade_t::open_at_end (TradeC above); v4 is this groundwork commit
-# (last_run_status_ etc.) — pf_report_t itself grows later on this
-# branch (a broker_state_hash array after equity_curve_len). Extend
-# ReportC above when that lands; this guard only checks the version
-# number, so it would keep passing (4 == 4) against an under-sized
-# mirror if ReportC isn't grown first.
+# pf_trade_t::open_at_end (TradeC above); v4 appended the live-runtime
+# accessors and grew pf_report_t with the broker_state_hash array after
+# equity_curve_len (ReportC above already carries both fields).
 # test_run_strategy_range_end.py pins this constant to the header's
 # macro, because the campaign's verifier runs every probe through THIS
 # harness and a stale guard here is a run-error on every slug (the
@@ -1250,6 +1249,17 @@ class Strategy:
         if hasattr(L, "strategy_last_bar_dual_entry_path"):
             L.strategy_last_bar_dual_entry_path.argtypes = [ctypes.c_void_p]
             L.strategy_last_bar_dual_entry_path.restype = ctypes.c_int
+        # ABI v4 live-runtime surface (task 6): toggle per-script-bar
+        # broker-state hash recording / read the final state's hash. Older
+        # .so builds may predate these exports -- hasattr-guarded like the
+        # other live-runtime setters above.
+        if hasattr(L, "strategy_set_broker_state_hash_recording"):
+            L.strategy_set_broker_state_hash_recording.argtypes = [
+                ctypes.c_void_p, ctypes.c_int]
+            L.strategy_set_broker_state_hash_recording.restype = None
+        if hasattr(L, "strategy_broker_state_hash"):
+            L.strategy_broker_state_hash.argtypes = [ctypes.c_void_p]
+            L.strategy_broker_state_hash.restype = ctypes.c_uint64
         # ``strategy_set_chart_timezone`` lets the harness tell the engine
         # which IANA wall-clock zone Pine's ``hour`` / ``minute`` /
         # ``dayofweek`` (and the 1-arg function overloads) should produce.
@@ -1322,6 +1332,7 @@ class Strategy:
             realtime_tail_horizon: int | None = None,
             probe_suppress_tail: bool = False,
             path_order: str | None = None,
+            broker_state_hash_recording: bool = False,
             strategy_overrides: dict | None = None,
             chart_timezone: str | None = None,
             syminfo_timezone: str | None = None,
@@ -1455,6 +1466,11 @@ class Strategy:
                         state, str(okey).encode(), str(oval).encode())
             if trace_enabled and hasattr(self.lib, "strategy_set_trace_enabled"):
                 self.lib.strategy_set_trace_enabled(state, 1)
+            # ABI v4 live-runtime surface (task 6): per-script-bar
+            # broker-state hash recording. Off by default, like trace.
+            if (broker_state_hash_recording
+                    and hasattr(self.lib, "strategy_set_broker_state_hash_recording")):
+                self.lib.strategy_set_broker_state_hash_recording(state, 1)
             if trade_start_time_ms is not None and hasattr(self.lib, "strategy_set_trade_start_time"):
                 self.lib.strategy_set_trade_start_time(state, int(trade_start_time_ms))
             # Live-runtime tail (ABI v4, spec §3.1): the last bar of this run
@@ -1827,6 +1843,11 @@ def _report_to_dict(r: ReportC) -> dict:
             "name": name,
             "value": float(e.value),
         })
+    # ABI v4 task 6: per-script-bar broker-state hash, empty unless the run
+    # enabled broker_state_hash_recording. Python ints are arbitrary
+    # precision, so these round-trip through json.dump exactly (unlike a
+    # JS/JSON-Number consumer, which loses precision above 2**53).
+    broker_state_hash = [int(r.broker_state_hash[i]) for i in range(r.broker_state_hash_len)]
     return {
         "total_trades": int(r.total_trades),
         "net_profit": float(r.net_profit),
@@ -1838,6 +1859,7 @@ def _report_to_dict(r: ReportC) -> dict:
         "trades": trades,
         "trace": trace,
         "trace_names": trace_names,
+        "broker_state_hash": broker_state_hash,
     }
 
 
@@ -2566,6 +2588,7 @@ def _run_via_docker(strategy_dir: Path, ohlcv_path: Path, params: dict,
         "input_bars_processed": int(raw.get("diagnostics", {}).get("input_bars_processed", 0)),
         "trace": [],
         "trace_names": [],
+        "broker_state_hash": [],
     }
 
 
@@ -2620,6 +2643,12 @@ def main() -> int:
                          "bar under both forced orders and keeps only the fills that agree. "
                          "Calls strategy_set_path_order before the run. Default (unset) leaves "
                          "the engine on AUTO. --runner ctypes only.")
+    ap.add_argument("--broker-state-hash", action="store_true",
+                    help="ABI v4 live-runtime surface (task 6): enable per-script-bar "
+                         "broker-state hash recording (strategy_set_broker_state_hash_recording) "
+                         "and write the array as JSON. Written next to --trace-json as "
+                         "'broker_state_hash.json' when that flag is given, else next to the "
+                         "engine_trades.csv output. --runner ctypes only.")
     ap.add_argument("--inputs-json", type=Path, default=None,
                     help="Use this inputs.json instead of strategy_dir/inputs.json. "
                          "Lets ad-hoc validation runs override strategy properties "
@@ -2760,6 +2789,10 @@ def main() -> int:
             sys.exit(
                 "error: --runner docker does not support --path-order; "
                 "use --runner ctypes with a freshly built strategy library.")
+        if args.broker_state_hash:
+            sys.exit(
+                "error: --runner docker does not support --broker-state-hash; "
+                "use --runner ctypes with a freshly built strategy library.")
         strat = None
         report = _run_via_docker(strategy_dir, ohlcv_path, params, run_kwargs,
                                  trade_start_ms, args.image)
@@ -2772,6 +2805,7 @@ def main() -> int:
                            realtime_tail_horizon=args.realtime_tail,
                            probe_suppress_tail=args.probe_suppress_tail,
                            path_order=args.path_order,
+                           broker_state_hash_recording=args.broker_state_hash,
                            **run_kwargs)
     raw_trade_count = len(report["trades"])
     trades_to_write = _filter_trades_to_window(report["trades"], report_window)
@@ -2792,6 +2826,19 @@ def main() -> int:
                 "trace_names": report["trace_names"],
                 "trace": trace_to_write,
             }, f)
+    if args.broker_state_hash:
+        # Sibling of --trace-json when given (both are per-script-bar debug
+        # arrays); otherwise sibling of the trades CSV output.
+        bsh_path = ((args.trace_json.parent if args.trace_json is not None else out_path.parent)
+                    / "broker_state_hash.json")
+        bsh_path.parent.mkdir(parents=True, exist_ok=True)
+        with bsh_path.open("w", encoding="utf-8") as f:
+            json.dump({
+                "strategy": str(strategy_dir),
+                "ohlcv": str(ohlcv_path),
+                "broker_state_hash": report["broker_state_hash"],
+            }, f)
+        print(f"  broker-state-hash: wrote {len(report['broker_state_hash'])} entries to {bsh_path}")
     if args.fingerprint_json is not None:
         try:
             cpp_path = strategy_dir / "generated.cpp"

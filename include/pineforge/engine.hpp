@@ -324,6 +324,9 @@ struct ReportC {
     pf_metrics_t metrics;
     pf_equity_point_t* equity_curve;
     int64_t equity_curve_len;
+    // ABI v4: per-script-bar broker-state hash (empty unless recording enabled).
+    uint64_t* broker_state_hash;
+    int64_t   broker_state_hash_len;
 };
 
 enum class OrderType { MARKET, ENTRY, EXIT, RAW_ORDER };
@@ -1843,6 +1846,13 @@ protected:
     std::vector<pf_equity_point_t> equity_curve_;
     int64_t bars_in_market_ = 0;     // script bars with an open position at close
     double first_bar_open_ = std::numeric_limits<double>::quiet_NaN();  // buy&hold basis
+
+    // --- Per-script-bar broker-state hash recording (ABI v4 live-runtime
+    // surface, task 6). Default off: empty vector, empty report array,
+    // every historical run byte-identical to before this flag existed. See
+    // set_broker_state_hash_recording() and broker_state_hash(). ---
+    bool broker_state_hash_recording_ = false;
+    std::vector<uint64_t> broker_state_hashes_;
 
     // --- Position-size extremes (strategy.max_contracts_held_*) ---
     double max_contracts_held_all_ = 0.0;
@@ -4806,6 +4816,21 @@ public:
     // broker-state region(s) below (grep this file for "broker-state") is
     // enforced by scripts/check_broker_state_hash_coverage.py.
     uint64_t broker_state_hash() const;
+
+    // ABI v4 live-runtime surface (task 6): when on, every script bar's
+    // dispatch (all three run loops -- the single-TF run() loop,
+    // run_simple_bar_loop, run_aggregation_bar_loop) appends
+    // broker_state_hash() to broker_state_hashes_ immediately after that
+    // bar's record_equity_point() call, so the recorded array's length
+    // matches script_bars_processed and pf_report_t::broker_state_hash_len
+    // 1:1. Default off: broker_state_hashes_ stays empty, fill_report emits
+    // a null/zero-length array, and every historical run stays
+    // byte-identical to before this flag existed. reset_run_state() clears
+    // the recorded array on every run() regardless of this flag's value;
+    // the flag itself is persistent configuration, like set_realtime_tail.
+    void set_broker_state_hash_recording(bool on) {
+        broker_state_hash_recording_ = on;
+    }
 
     // Toggle volume-weighted per-sub-bar sampling inside run_magnified_bar.
     // Has no effect unless bar magnifier is enabled.

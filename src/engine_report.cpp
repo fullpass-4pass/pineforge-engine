@@ -54,6 +54,14 @@ void BacktestEngine::fill_report(ReportC* out) const {
 
     fill_security_diag_section(out);
     fill_trace_section(out);
+
+    // ABI v4 task 6: per-script-bar broker-state hash, empty unless
+    // recording was enabled via set_broker_state_hash_recording. Owns the
+    // allocation; freed by free_report.
+    const int64_t hn = (int64_t)broker_state_hashes_.size();
+    out->broker_state_hash_len = hn;
+    out->broker_state_hash = hn > 0 ? new uint64_t[hn] : nullptr;
+    if (hn > 0) std::copy(broker_state_hashes_.begin(), broker_state_hashes_.end(), out->broker_state_hash);
 }
 
 
@@ -219,6 +227,11 @@ void BacktestEngine::free_report(ReportC* report) {
         delete[] report->equity_curve;
         report->equity_curve = nullptr;
         report->equity_curve_len = 0;
+    }
+    if (report && report->broker_state_hash) {
+        delete[] report->broker_state_hash;
+        report->broker_state_hash = nullptr;
+        report->broker_state_hash_len = 0;
     }
 }
 

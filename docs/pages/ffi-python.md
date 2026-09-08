@@ -148,6 +148,12 @@ class pf_report_t(ctypes.Structure):
         ("metrics",                      pf_metrics_t),
         ("equity_curve",                 ctypes.POINTER(pf_equity_point_t)),
         ("equity_curve_len",             ctypes.c_int64),  # int64 in the C header, NOT c_int
+
+        # ABI v4: per-script-bar broker-state hash, filled when
+        # strategy_set_broker_state_hash_recording is on; NULL/0-length
+        # (default) otherwise.
+        ("broker_state_hash",            ctypes.POINTER(ctypes.c_uint64)),
+        ("broker_state_hash_len",        ctypes.c_int64),
     ]
 
 class pf_version_t(ctypes.Structure):

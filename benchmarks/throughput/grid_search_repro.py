@@ -124,15 +124,15 @@ class pf_report_t(ctypes.Structure):
         ("metrics", pf_metrics_t),
         ("equity_curve", ctypes.POINTER(pf_equity_point_t)),
         ("equity_curve_len", ctypes.c_int64),  # int64, NOT c_int
+        ("broker_state_hash", ctypes.POINTER(ctypes.c_uint64)),
+        ("broker_state_hash_len", ctypes.c_int64),
     ]
 
 # pf_report_t is caller-allocated; a layout mismatch means the runtime
 # writes past this script's report buffer. Verify the ABI before running.
-# v4 is this groundwork commit: pf_report_t grows (a broker_state_hash
-# array after equity_curve_len) in a later commit on this branch —
-# extend this ReportC mirror when it does; the guard only checks the
-# version number, so it would keep passing (4 == 4) against an
-# under-sized mirror if ReportC isn't grown first.
+# v4 appended the live-runtime accessors and grew pf_report_t with the
+# broker_state_hash array after equity_curve_len (ReportC above already
+# carries both fields).
 EXPECTED_PF_ABI = 4
 
 def check_abi(lib):

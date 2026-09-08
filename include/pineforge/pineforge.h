@@ -329,10 +329,10 @@ typedef struct pf_trace_entry_s {
  *  ### Ownership and lifetime
  *  The struct itself is caller-owned (typically stack). The embedded
  *  arrays (`trades`, `security_diag`, `trace`, `trace_names`,
- *  `equity_curve`) are heap-allocated by the runtime; the caller must
- *  invoke #report_free exactly once on each filled report.
- *  `trace_names` string pointers remain owned by the strategy handle
- *  until #strategy_free. */
+ *  `equity_curve`, `broker_state_hash`) are heap-allocated by the
+ *  runtime; the caller must invoke #report_free exactly once on each
+ *  filled report. `trace_names` string pointers remain owned by the
+ *  strategy handle until #strategy_free. */
 
 typedef struct pf_report_s {
     /* Trades */
@@ -388,6 +388,15 @@ typedef struct pf_report_s {
      * (ctypes: c_int64). */
     pf_equity_point_t*  equity_curve;
     int64_t             equity_curve_len;
+    /* Per-script-bar broker-state hash, filled when
+     * #strategy_set_broker_state_hash_recording is on; freed by
+     * #report_free. NULL / 0-length when recording was off (default) or no
+     * script bars were dispatched. When populated, len ==
+     * script_bars_processed and the last element equals
+     * #strategy_broker_state_hash's value at the end of the run.
+     * ABI v4. */
+    uint64_t*           broker_state_hash;
+    int64_t             broker_state_hash_len;
 } pf_report_t;
 
 /** @} */ /* end of pf_types */
@@ -729,6 +738,25 @@ PF_API void strategy_set_path_order(pf_strategy_t s, int mode);
  *  value; it is a silent no-op under the COOF scheduler, mirroring
  *  #strategy_set_probe_suppress_tail_logic's dispatch-path-scope caveat. */
 PF_API int strategy_last_bar_dual_entry_path(pf_strategy_t s);
+/** Toggle per-script-bar broker-state hash recording (spec §3.4, ABI v4).
+ *
+ *  When @p on is non-zero, every subsequent run() appends
+ *  #strategy_broker_state_hash's value to pf_report_t::broker_state_hash
+ *  immediately after each script bar is dispatched, so the array's length
+ *  matches pf_report_t::script_bars_processed. Cleared (recorded array
+ *  emptied, not the flag itself) at the start of every run(); the flag is
+ *  persistent configuration, like #strategy_set_realtime_tail, and stays
+ *  set until a caller passes @p on == 0.
+ *  Default off (@p on == 0): pf_report_t::broker_state_hash is NULL /
+ *  0-length and every historical run stays byte-identical to before this
+ *  flag existed. */
+PF_API void strategy_set_broker_state_hash_recording(pf_strategy_t s, int on);
+/** Return the broker-state hash of the FINAL state after the most recent
+ *  run() (see #strategy_set_broker_state_hash_recording's doc and
+ *  pf_report_t::broker_state_hash for the per-bar recording; this accessor
+ *  works whether or not recording was enabled). Returns 0 when @p s is
+ *  NULL. */
+PF_API uint64_t strategy_broker_state_hash(pf_strategy_t s);
 /** @} */
 
 /** @addtogroup pf_config

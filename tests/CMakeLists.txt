@@ -220,6 +220,7 @@ set(TEST_SOURCES
     test_live_probe_suppress_tail
     test_live_path_order
     test_live_state_hash
+    test_live_state_hash_recording
 )
 
 find_package(Threads REQUIRED)

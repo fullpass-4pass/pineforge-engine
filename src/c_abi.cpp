@@ -13,7 +13,8 @@
  *     the live-runtime surface (strategy_request_abort,
  *     strategy_last_run_status, strategy_set_realtime_tail,
  *     strategy_set_probe_suppress_tail_logic, strategy_set_path_order,
- *     strategy_last_bar_dual_entry_path),
+ *     strategy_last_bar_dual_entry_path,
+ *     strategy_set_broker_state_hash_recording, strategy_broker_state_hash),
  *     pf_version_get/pf_version_string,
  *     pf_abi_version — the authoritative list is EXPECTED_RUNTIME in
  *     scripts/check_c_abi_runtime.py, enforced by CI). The other
@@ -127,6 +128,10 @@ static_assert(offsetof(pf_report_t, equity_curve) == offsetof(pineforge::ReportC
               "pf_report_t::equity_curve offset mismatch");
 static_assert(offsetof(pf_report_t, equity_curve_len) == offsetof(pineforge::ReportC, equity_curve_len),
               "pf_report_t::equity_curve_len offset mismatch");
+static_assert(offsetof(pf_report_t, broker_state_hash) == offsetof(pineforge::ReportC, broker_state_hash),
+              "pf_report_t::broker_state_hash offset mismatch");
+static_assert(offsetof(pf_report_t, broker_state_hash_len) == offsetof(pineforge::ReportC, broker_state_hash_len),
+              "pf_report_t::broker_state_hash_len offset mismatch");
 
 /* ── Magnifier distribution enum parity ─────────────────────────── */
 
@@ -280,6 +285,23 @@ PF_API void strategy_set_path_order(pf_strategy_t s, int mode) {
 PF_API int strategy_last_bar_dual_entry_path(pf_strategy_t s) {
     if (!s) return -1;
     return static_cast<const pineforge::BacktestEngine*>(s)->last_bar_dual_entry_path();
+}
+
+/* ABI v4 live-runtime surface (task 6): toggle per-script-bar broker-state
+ * hash recording. Default off: pf_report_t::broker_state_hash stays
+ * NULL/0-length and every historical run is byte-identical to before this
+ * flag existed. */
+PF_API void strategy_set_broker_state_hash_recording(pf_strategy_t s, int on) {
+    if (!s) return;
+    static_cast<pineforge::BacktestEngine*>(s)->set_broker_state_hash_recording(on != 0);
+}
+
+/* ABI v4 live-runtime surface (task 6): the broker-state hash of the FINAL
+ * state after the most recent run(), regardless of whether per-bar
+ * recording was enabled. Returns 0 when @p s is NULL. */
+PF_API uint64_t strategy_broker_state_hash(pf_strategy_t s) {
+    if (!s) return 0;
+    return static_cast<const pineforge::BacktestEngine*>(s)->broker_state_hash();
 }
 
 PF_API int strategy_stream_begin(pf_strategy_t s,

@@ -108,16 +108,16 @@ class ReportC(ctypes.Structure):
                 ("trace_names_len", ctypes.c_int),
                 ("metrics", MetricsC),
                 ("equity_curve", ctypes.POINTER(EquityPointC)),
-                ("equity_curve_len", ctypes.c_int64)]  # int64, NOT c_int
+                ("equity_curve_len", ctypes.c_int64),  # int64, NOT c_int
+                ("broker_state_hash", ctypes.POINTER(ctypes.c_uint64)),
+                ("broker_state_hash_len", ctypes.c_int64)]
 
 
 # pf_report_t is caller-allocated, so a stale mirror means the runtime
 # writes past our buffer. Assert the .so's ABI version before any run.
-# v4 is this groundwork commit: pf_report_t grows (a broker_state_hash
-# array after equity_curve_len) in a later commit on this branch —
-# extend this ReportC mirror when it does; the guard only checks the
-# version number, so it would keep passing (4 == 4) against an
-# under-sized mirror if ReportC isn't grown first.
+# v4 appended the live-runtime accessors and grew pf_report_t with the
+# broker_state_hash array after equity_curve_len (ReportC above already
+# carries both fields).
 EXPECTED_PF_ABI = 4
 
 def check_abi(lib: ctypes.CDLL) -> None:
